@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/app/usecase"
 	"github.com/fardannozami/whatsapp-gateway/internal/config"
@@ -16,6 +18,7 @@ import (
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	walog "go.mau.fi/whatsmeow/util/log"
 	_ "modernc.org/sqlite"
@@ -93,6 +96,28 @@ func main() {
 		}
 
 		if response != "" {
+			// Apply reply delay to appear more human-like
+			delayMs := cfg.ReplyDelayMinMs
+			if cfg.ReplyDelayMaxMs > cfg.ReplyDelayMinMs {
+				// Random delay between min and max
+				delayMs = cfg.ReplyDelayMinMs + rand.Intn(cfg.ReplyDelayMaxMs-cfg.ReplyDelayMinMs+1)
+			}
+
+			if delayMs > 0 {
+				// Show typing indicator if enabled
+				if cfg.ShowTyping {
+					_ = waService.GetClient().SendChatPresence(ctx, evt.Info.Chat, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+				}
+
+				log.Printf("Delaying reply by %dms", delayMs)
+				time.Sleep(time.Duration(delayMs) * time.Millisecond)
+
+				// Clear typing indicator
+				if cfg.ShowTyping {
+					_ = waService.GetClient().SendChatPresence(ctx, evt.Info.Chat, types.ChatPresencePaused, types.ChatPresenceMediaText)
+				}
+			}
+
 			// Send response
 			resp := &waE2E.Message{
 				Conversation: &response,
