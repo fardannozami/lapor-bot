@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Service identifier -->
+    <key>Label</key>
+    <string>com.fardannozami.lapor-bot</string>
+    
+    <!-- Path to the binary - UPDATE THIS -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/path/to/lapor-bot/lapor-bot</string>
+    </array>
+    
+    <!-- Working directory - UPDATE THIS -->
+    <key>WorkingDirectory</key>
+    <string>/path/to/lapor-bot</string>
+    
+    <!-- Environment (HOME is needed for some Go libraries) -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>/Users/YOUR_USERNAME</string>
+    </dict>
+    
+    <!-- Start automatically at login -->
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <!-- Restart if the process exits unexpectedly (crash recovery) -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    
+    <!-- Log files - UPDATE PATHS -->
+    <key>StandardOutPath</key>
+    <string>/path/to/lapor-bot/logs/lapor-bot.out.log</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/path/to/lapor-bot/logs/lapor-bot.err.log</string>
+    
+    <!-- Minimum seconds between restarts (prevents rapid restart loops) -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+</dict>
+</plist>
