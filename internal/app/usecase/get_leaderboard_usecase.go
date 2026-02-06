@@ -36,32 +36,24 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	// Lose streak: Last report < Yesterday.
 	// New submission: Reported Today AND Streak == 1 (and maybe created today?).
 
-	var keepStreak []*domain.Report
-	var loseStreak []*domain.Report
-	// New submission logic is tricky without a "CreatedDate". We'll skip specific "New submission" category for now or map it to "Keep Streak" with streak=1.
-	// Let's simplify:
-	// Active (Fire): Reported Today or Yesterday.
-	// Lost (Broken Heart): Reported before Yesterday.
-
 	yesterday := today.AddDate(0, 0, -1)
 
+	// Sort all reports by ActivityCount (total days) descending
+	sort.Slice(reports, func(i, j int) bool {
+		return reports[i].ActivityCount > reports[j].ActivityCount
+	})
+
+	// Count active vs lost for recap
+	activeCount := 0
+	lostCount := 0
 	for _, r := range reports {
 		lastReportDate := time.Date(r.LastReportDate.Year(), r.LastReportDate.Month(), r.LastReportDate.Day(), 0, 0, 0, 0, r.LastReportDate.Location())
-
 		if lastReportDate.Equal(today) || lastReportDate.Equal(yesterday) {
-			keepStreak = append(keepStreak, r)
+			activeCount++
 		} else {
-			loseStreak = append(loseStreak, r)
+			lostCount++
 		}
 	}
-
-	// Sort by Streak Descending
-	sort.Slice(keepStreak, func(i, j int) bool {
-		return keepStreak[i].Streak > keepStreak[j].Streak
-	})
-	sort.Slice(loseStreak, func(i, j int) bool {
-		return loseStreak[i].Streak > loseStreak[j].Streak
-	})
 
 	// Header
 	// Use max activity count to represent the current "Day" of the challenge
@@ -79,24 +71,21 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	sb.WriteString(fmt.Sprintf("30 Days of Sweat Challenge – Day %d (%s)\n\n", maxDay, dateStr))
 
 	// Recap
-	// "22 peoples keep the streak 🔥"
 	sb.WriteString(fmt.Sprintf("Recap day %d:\n", maxDay))
-	sb.WriteString(fmt.Sprintf("%d peoples keep the streak 🔥\n", len(keepStreak)))
-	sb.WriteString(fmt.Sprintf("%d lose the streak 💔\n", len(loseStreak)))
-	// New submission/Left behind omitted for simplicity unless we add more tracking
+	sb.WriteString(fmt.Sprintf("%d peoples keep the streak 🔥\n", activeCount))
+	sb.WriteString(fmt.Sprintf("%d lose the streak 💔\n", lostCount))
 	sb.WriteString("\nUpdate klasemen sementara:\n")
 
-	rank := 1
-	// Active
-	for _, r := range keepStreak {
-		sb.WriteString(fmt.Sprintf("%d. %s - %d days streak 🔥\n", rank, r.Name, r.Streak))
-		rank++
-	}
-
-	// Lost
-	for _, r := range loseStreak {
-		sb.WriteString(fmt.Sprintf("%d. %s - Day %d 💔\n", rank, r.Name, r.ActivityCount))
-		rank++
+	// Single unified ranking by ActivityCount
+	for rank, r := range reports {
+		lastReportDate := time.Date(r.LastReportDate.Year(), r.LastReportDate.Month(), r.LastReportDate.Day(), 0, 0, 0, 0, r.LastReportDate.Location())
+		isActive := lastReportDate.Equal(today) || lastReportDate.Equal(yesterday)
+		
+		if isActive {
+			sb.WriteString(fmt.Sprintf("%d. %s - %d days 🔥\n", rank+1, r.Name, r.ActivityCount))
+		} else {
+			sb.WriteString(fmt.Sprintf("%d. %s - %d days 💔\n", rank+1, r.Name, r.ActivityCount))
+		}
 	}
 
 	sb.WriteString("\nYang udah keringetan langsung update/posting aja nanti dimasukkin klasemen 💪\n\nSemangat🔥")
