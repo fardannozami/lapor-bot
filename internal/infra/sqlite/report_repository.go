@@ -97,3 +97,17 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 
 	return nil
 }
+
+// ResolveLIDToPhone looks up a LID in the whatsmeow_lid_map table and returns the phone number.
+// If not found or if input is already a phone number, returns the input unchanged.
+func (r *ReportRepository) ResolveLIDToPhone(ctx context.Context, lid string) string {
+	// Query the lid_map table
+	query := `SELECT pn FROM whatsmeow_lid_map WHERE lid = ?`
+	var phone string
+	err := r.db.QueryRowContext(ctx, query, lid).Scan(&phone)
+	if err == nil && phone != "" {
+		return phone
+	}
+	// Not found or error, return original
+	return lid
+}

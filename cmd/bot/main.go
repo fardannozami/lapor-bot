@@ -67,8 +67,17 @@ func main() {
 			return
 		}
 
-		// Get sender info
-		sender := evt.Info.Sender.String()
+		// Get sender info - resolve LID to phone number for consistent user tracking
+		senderJID := evt.Info.Sender
+		var userID string
+		if senderJID.Server == "lid" || senderJID.Server == types.DefaultUserServer && len(senderJID.User) > 15 {
+			// Looks like a LID, try to resolve to phone number
+			userID = repo.ResolveLIDToPhone(ctx, senderJID.User)
+		} else {
+			// Already a phone number
+			userID = senderJID.User
+		}
+		
 		pushName := evt.Info.PushName
 		if pushName == "" {
 			pushName = "Unknown" // Fallback name
@@ -86,10 +95,10 @@ func main() {
 			return
 		}
 
-		fmt.Printf("Message from %s (%s): %s\n", pushName, sender, msg)
+		fmt.Printf("Message from %s (%s): %s\n", pushName, userID, msg)
 
 		// Execute Use Case
-		response, err := handleMessageUC.Execute(ctx, sender, pushName, msg)
+		response, err := handleMessageUC.Execute(ctx, userID, pushName, msg)
 		if err != nil {
 			log.Printf("Error handling message: %v", err)
 			return

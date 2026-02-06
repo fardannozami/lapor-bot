@@ -83,8 +83,12 @@ func (s *Service) SetMessageHandler(handler func(ctx context.Context, client *wh
 
 func (s *Service) registerEventHandlers() {
 	s.client.AddEventHandler(func(evt interface{}) {
+		// Debug: log all event types
+		// Debug removed
+		
 		switch v := evt.(type) {
 		case *events.Message:
+			// Debug removed
 			if s.messageHandler != nil {
 				go s.messageHandler(context.Background(), s.client, v)
 			}
