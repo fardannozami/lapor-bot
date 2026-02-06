@@ -104,14 +104,20 @@ func main() {
 		}
 	})
 
-	// 7. Connect
-	if err := waService.Connect(context.Background()); err != nil {
-		log.Fatalf("Failed to connect: %v", err)
+	// 7. Initialize Client (DB, Device, etc) - DO NOT CONNECT YET
+	if err := waService.Initialize(context.Background()); err != nil {
+		log.Fatalf("Failed to initialize WhatsApp service: %v", err)
 	}
 
-	// Check login status
+	// 8. Connect / Login Logic
 	if !waService.IsLoggedIn() {
 		if cfg.BotPhone != "" {
+			// Pair Code Mode
+			// Must connect first to pair
+			if err := waService.Connect(); err != nil {
+				log.Fatalf("Failed to connect for pairing: %v", err)
+			}
+
 			log.Println("Not logged in. Attempting to pair with phone:", cfg.BotPhone)
 			code, err := waService.Pair(cfg.BotPhone)
 			if err != nil {
@@ -123,10 +129,16 @@ func main() {
 				log.Println("Please verify this code on your WhatsApp (Linked Devices > Link with phone number)")
 			}
 		} else {
+			// QR Code Mode
 			log.Println("Not logged in. BOT_PHONE not set. Printing QR...")
+			// PrintQR handles GetQRChannel AND Connect() internally to ensure no race condition
 			waService.PrintQR()
 		}
 	} else {
+		// Already logged in, just connect
+		if err := waService.Connect(); err != nil {
+			log.Fatalf("Failed to connect: %v", err)
+		}
 		log.Println("Client is already logged in.")
 	}
 

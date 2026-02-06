@@ -4,6 +4,7 @@ go 1.25.1
 
 require (
 	github.com/joho/godotenv v1.5.1
+	github.com/mdp/qrterminal v1.0.1
 	go.mau.fi/whatsmeow v0.0.0-20251217143725-11cf47c62d32
 	modernc.org/sqlite v1.41.0
 )
@@ -33,4 +34,5 @@ require (
 	modernc.org/libc v1.67.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
+	rsc.io/qr v0.2.0 // indirect
 )

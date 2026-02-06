@@ -3,7 +3,9 @@ package wa
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"github.com/mdp/qrterminal"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -26,7 +28,7 @@ func NewService(dbBasePath string, logger walog.Logger) *Service {
 	}
 }
 
-func (s *Service) Connect(ctx context.Context) error {
+func (s *Service) Initialize(ctx context.Context) error {
 	// Initialize the database container
 	// Use slightly different pragmas or same as main? best to share.
 	// whatsmeow uses its own connection. WAL mode persists on the DB file, so once enabled by one, it sticks.
@@ -38,7 +40,6 @@ func (s *Service) Connect(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
-	// Get the first device (default session)
 	// Get all devices
 	devices, err := container.GetAllDevices(context.Background())
 	if err != nil {
@@ -57,18 +58,17 @@ func (s *Service) Connect(ctx context.Context) error {
 	s.client = whatsmeow.NewClient(device, s.log)
 	s.registerEventHandlers()
 
-	// Connect to WhatsApp
-	if s.client.Store.ID == nil {
-		// If not logged in, wait for QR scan (handled by main)
-		// We just connect here
-	}
-
-	err = s.client.Connect()
-	if err != nil {
-		return fmt.Errorf("failed to connect: %w", err)
-	}
-
 	return nil
+}
+
+func (s *Service) Connect() error {
+	if s.client == nil {
+		return fmt.Errorf("client not initialized")
+	}
+	if s.client.IsConnected() {
+		return nil
+	}
+	return s.client.Connect()
 }
 
 func (s *Service) Disconnect() {
@@ -130,7 +130,7 @@ func (s *Service) PrintQR() {
 		for evt := range qrChan {
 			if evt.Event == "code" {
 				fmt.Println("QR Code:", evt.Code)
-				// In a real terminal, use a QR library to print to console
+				qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
 			} else {
 				fmt.Println("Login event:", evt.Event)
 			}
