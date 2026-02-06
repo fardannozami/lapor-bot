@@ -53,7 +53,7 @@ func (r *ReportRepository) UpsertReport(ctx context.Context, report *domain.Repo
 }
 
 func (r *ReportRepository) GetAllReports(ctx context.Context) ([]*domain.Report, error) {
-	query := `SELECT user_id, name, streak, activity_count, last_report_date FROM user_reports ORDER BY streak DESC`
+	query := `SELECT user_id, name, streak, activity_count, last_report_date FROM user_reports ORDER BY activity_count DESC`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
