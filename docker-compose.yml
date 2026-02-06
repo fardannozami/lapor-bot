@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    container_name: whatsapp-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persist SQLite DB and WhatsApp session data
+      - ./data:/app/data
+      # Mount .env file for configuration
+      - ./.env:/app/.env
+    environment:
+      - PORT=8080
+      - SQLITE_PATH=/app/data/whatsapp.db
+      # TZ for correct time in reports (e.g., "Asia/Jakarta")
+      - TZ=Asia/Jakarta
