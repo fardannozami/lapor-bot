@@ -4,6 +4,7 @@ go 1.25.1
 
 require (
 	github.com/joho/godotenv v1.5.1
+	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/mdp/qrterminal v1.0.1
 	go.mau.fi/whatsmeow v0.0.0-20251217143725-11cf47c62d32
 	modernc.org/sqlite v1.41.0
