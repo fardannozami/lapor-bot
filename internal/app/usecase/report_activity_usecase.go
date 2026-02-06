@@ -57,18 +57,9 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		if lastReportDate.Equal(yesterday) {
 			report.Streak++
 		} else {
-			// Logic for broken streak.
-			// If they missed a day, they restart?
-			// "45 lose the streak 💔".
-			// The leaderboard shows "Day 31 💔" for someone who lost it. identifying they are on Day 31 of the challenge but lost streak?
-			// Or maybe "Day 31" is their last max streak?
-			// Let's stick to standard streak logic: Reset to 1 if missed.
-			// BUT, if we reset to 1, they become "1 days streak 🔥". They don't appear as "Day 31 💔".
-			// "Day 31 💔" likely means they *were* on Day 31 but missed today/yesterday.
-
-			// For the specific "#lapor" response: "{counting day} hari" likely refers to the NEW streak count.
 			report.Streak = 1
 		}
+		report.ActivityCount++
 		report.Name = name // Update name if changed
 		report.LastReportDate = now
 	} else {
@@ -76,6 +67,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			UserID:         userID,
 			Name:           name,
 			Streak:         1,
+			ActivityCount:  1,
 			LastReportDate: now,
 		}
 	}
@@ -84,5 +76,5 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		return "", err
 	}
 
-	return fmt.Sprintf("Laporan diterima, %s sudah berkeringat %d hari. Lanjutkan 🔥", name, report.Streak), nil
+	return fmt.Sprintf("Laporan diterima, %s sudah berkeringat %d hari. Lanjutkan 🔥", name, report.ActivityCount), nil
 }

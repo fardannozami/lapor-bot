@@ -9,6 +9,7 @@ type Report struct {
 	UserID         string    `json:"user_id" db:"user_id"`
 	Name           string    `json:"name" db:"name"`
 	Streak         int       `json:"streak" db:"streak"`
+	ActivityCount  int       `json:"activity_count" db:"activity_count"`
 	LastReportDate time.Time `json:"last_report_date" db:"last_report_date"`
 }
 

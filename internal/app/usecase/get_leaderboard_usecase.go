@@ -64,24 +64,23 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	})
 
 	// Header
-	// "Day 37" - Let's approximate this by the max streak found or just "Leaderboard"
-	maxStreak := 0
+	// Use max activity count to represent the current "Day" of the challenge
+	maxDay := 0
 	if len(reports) > 0 {
-		// Find max streak overall
 		for _, r := range reports {
-			if r.Streak > maxStreak {
-				maxStreak = r.Streak
+			if r.ActivityCount > maxDay {
+				maxDay = r.ActivityCount
 			}
 		}
 	}
 
 	sb := strings.Builder{}
 	dateStr := now.Format("02-01-2006")
-	sb.WriteString(fmt.Sprintf("30 Days of Sweat Challenge – Day %d (%s)\n\n", maxStreak, dateStr))
+	sb.WriteString(fmt.Sprintf("30 Days of Sweat Challenge – Day %d (%s)\n\n", maxDay, dateStr))
 
 	// Recap
 	// "22 peoples keep the streak 🔥"
-	sb.WriteString(fmt.Sprintf("Recap day %d:\n", maxStreak))
+	sb.WriteString(fmt.Sprintf("Recap day %d:\n", maxDay))
 	sb.WriteString(fmt.Sprintf("%d peoples keep the streak 🔥\n", len(keepStreak)))
 	sb.WriteString(fmt.Sprintf("%d lose the streak 💔\n", len(loseStreak)))
 	// New submission/Left behind omitted for simplicity unless we add more tracking
@@ -96,7 +95,7 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 
 	// Lost
 	for _, r := range loseStreak {
-		sb.WriteString(fmt.Sprintf("%d. @%s - Day %d 💔\n", rank, r.Name, r.Streak))
+		sb.WriteString(fmt.Sprintf("%d. %s - Day %d 💔\n", rank, r.Name, r.ActivityCount))
 		rank++
 	}
 
