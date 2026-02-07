@@ -112,3 +112,4 @@ Kontribusi sangat dipersilakan! Silakan ikuti langkah-langkah berikut:
 5.  Buat **Pull Request**.
 
 Jangan ragu untuk membuka _Issue_ jika menemukan bug atau memiliki saran fitur baru.
+
