@@ -23,11 +23,11 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	}
 
 	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
 	if report != nil {
 		lastReport := report.LastReportDate
-		lastReportDate := time.Date(lastReport.Year(), lastReport.Month(), lastReport.Day(), 0, 0, 0, 0, lastReport.Location())
+		lastReportDate := time.Date(lastReport.Year(), lastReport.Month(), lastReport.Day(), 0, 0, 0, 0, time.UTC)
 
 		if lastReportDate.Equal(today) {
 			return fmt.Sprintf("%s sudah laporan hari ini, ayo jangan curang! 😉", name), nil
@@ -76,5 +76,5 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		return "", err
 	}
 
-	return fmt.Sprintf("Laporan diterima, %s sudah berkeringat %d hari. Lanjutkan 🔥", name, report.ActivityCount), nil
+	return fmt.Sprintf("Laporan diterima, %s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d hari)", name, report.ActivityCount, report.Streak), nil
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fardannozami/whatsapp-gateway/internal/infra/supabase"
 	"github.com/mdp/qrterminal"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store"
@@ -19,42 +20,66 @@ type Service struct {
 	dbBasePath     string
 	log            walog.Logger
 	messageHandler func(ctx context.Context, client *whatsmeow.Client, evt *events.Message)
+	supabaseURL    string
+	supabaseKey    string
 }
 
-func NewService(dbBasePath string, logger walog.Logger) *Service {
+func NewService(dbBasePath string, logger walog.Logger, supabaseURL, supabaseKey string) *Service {
 	return &Service{
-		dbBasePath: dbBasePath,
-		log:        logger,
+		dbBasePath:  dbBasePath,
+		log:         logger,
+		supabaseURL: supabaseURL,
+		supabaseKey: supabaseKey,
 	}
 }
 
 func (s *Service) Initialize(ctx context.Context) error {
-	// Initialize the database container
-	// Use slightly different pragmas or same as main? best to share.
-	// whatsmeow uses its own connection. WAL mode persists on the DB file, so once enabled by one, it sticks.
-	// But adding busy_timeout is good practice.
-	// Note: sqlstore.New takes a dialect and address. formatting the address with pragmas.
+	var device *store.Device
+	var sqlContainer *sqlstore.Container
+
+	// Always initialize SQLite container first
 	dbAddress := fmt.Sprintf("file:%s?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", s.dbBasePath)
-	container, err := sqlstore.New(context.Background(), "sqlite", dbAddress, s.log)
+	var err error
+	sqlContainer, err = sqlstore.New(context.Background(), "sqlite", dbAddress, s.log)
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
-	// Get all devices
-	devices, err := container.GetAllDevices(context.Background())
+	// Try to get device from SQLite first
+	sqliteDevices, err := sqlContainer.GetAllDevices(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed to get devices: %w", err)
+		return fmt.Errorf("failed to get devices from SQLite: %w", err)
 	}
 
-	// If no device exists, create a new one
-	var device *store.Device
-	if len(devices) > 0 {
-		device = devices[0]
+	// If device exists in SQLite, use it
+	if len(sqliteDevices) > 0 {
+		device = sqliteDevices[0]
+		s.log.Infof("Device loaded from SQLite")
+
+		// Note: Auto-backup will be triggered after successful connection
+		// in the event handler, not here during initialization
 	} else {
-		device = container.NewDevice()
+		// No device in SQLite, try to restore from Supabase
+		if s.supabaseURL != "" && s.supabaseKey != "" {
+			supabaseContainer, err := supabase.NewSupabaseContainer(s.supabaseURL, s.supabaseKey, s.log)
+			if err == nil {
+				supabaseDevices, err := supabaseContainer.GetAllDevices(ctx)
+				if err == nil && len(supabaseDevices) > 0 {
+					// We found a device in Supabase, but we can't restore it directly
+					// because cryptographic keys are missing. Instead, we'll create a new device
+					// and let the user login again.
+					s.log.Warnf("Found device in Supabase but cannot restore due to missing cryptographic keys")
+					s.log.Infof("Please login again to recreate the device")
+				}
+			}
+		}
+
+		// Create new device
+		device = sqlContainer.NewDevice()
+		s.log.Infof("New device created")
 	}
 
-	// Initialize the client
+	// Initialize client
 	s.client = whatsmeow.NewClient(device, s.log)
 	s.registerEventHandlers()
 
@@ -83,15 +108,33 @@ func (s *Service) SetMessageHandler(handler func(ctx context.Context, client *wh
 
 func (s *Service) registerEventHandlers() {
 	s.client.AddEventHandler(func(evt interface{}) {
-		// Debug: log all event types
-		// Debug removed
-		
 		switch v := evt.(type) {
 		case *events.Message:
-			// Debug removed
 			if s.messageHandler != nil {
 				go s.messageHandler(context.Background(), s.client, v)
 			}
+		case *events.Connected:
+			s.log.Infof("WhatsApp connected successfully")
+			// Temporarily disable auto-save to test manual backup
+			s.log.Infof("Auto-save to Supabase temporarily disabled for testing")
+		// TODO: Re-enable after fixing duplicate key issue
+		/*
+			if s.supabaseURL != "" && s.supabaseKey != "" && s.IsLoggedIn() {
+				s.log.Infof("Starting auto-save to Supabase...")
+				go func() {
+					// Add delay to avoid race conditions
+					time.Sleep(2 * time.Second)
+					err := s.SaveDeviceToSupabase(context.Background())
+					if err != nil {
+						s.log.Warnf("Failed to auto-save device to Supabase: %v", err)
+					} else {
+						s.log.Infof("Device saved to Supabase")
+					}
+				}()
+			}
+		*/
+		case *events.LoggedOut:
+			s.log.Infof("WhatsApp logged out")
 		}
 	})
 }
@@ -140,4 +183,31 @@ func (s *Service) PrintQR() {
 			}
 		}
 	}
+}
+
+func (s *Service) SaveDeviceToSupabase(ctx context.Context) error {
+	if s.supabaseURL == "" || s.supabaseKey == "" {
+		return fmt.Errorf("supabase credentials not provided")
+	}
+
+	if s.client == nil {
+		return fmt.Errorf("client is nil")
+	}
+
+	if s.client.Store == nil {
+		return fmt.Errorf("client store is nil")
+	}
+
+	supabaseContainer, err := supabase.NewSupabaseContainer(s.supabaseURL, s.supabaseKey, s.log)
+	if err != nil {
+		return fmt.Errorf("failed to create supabase container: %w", err)
+	}
+
+	err = supabaseContainer.PutDevice(ctx, s.client.Store)
+	if err != nil {
+		return fmt.Errorf("failed to save device to supabase: %w", err)
+	}
+
+	s.log.Infof("Device saved to Supabase")
+	return nil
 }

@@ -25,7 +25,6 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	}
 
 	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	// Global Challenge Day Calculation (Optional: Fix a start date or assume max streak represents it?
 	// The prompt says "Day 37 (06-02-2026)".
 	// Let's use the current Max Streak or a fixed start date if provided.
@@ -36,8 +35,6 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	// Lose streak: Last report < Yesterday.
 	// New submission: Reported Today AND Streak == 1 (and maybe created today?).
 
-	yesterday := today.AddDate(0, 0, -1)
-
 	// Sort all reports by ActivityCount (total days) descending
 	sort.Slice(reports, func(i, j int) bool {
 		return reports[i].ActivityCount > reports[j].ActivityCount
@@ -47,8 +44,8 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	activeCount := 0
 	lostCount := 0
 	for _, r := range reports {
-		lastReportDate := time.Date(r.LastReportDate.Year(), r.LastReportDate.Month(), r.LastReportDate.Day(), 0, 0, 0, 0, r.LastReportDate.Location())
-		if lastReportDate.Equal(today) || lastReportDate.Equal(yesterday) {
+		// Active if streak equals activity_count (never lost streak)
+		if r.Streak == r.ActivityCount {
 			activeCount++
 		} else {
 			lostCount++
@@ -78,10 +75,8 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 
 	// Single unified ranking by ActivityCount
 	for rank, r := range reports {
-		lastReportDate := time.Date(r.LastReportDate.Year(), r.LastReportDate.Month(), r.LastReportDate.Day(), 0, 0, 0, 0, r.LastReportDate.Location())
-		isActive := lastReportDate.Equal(today) || lastReportDate.Equal(yesterday)
-		
-		if isActive {
+		// Active if streak equals activity_count (never lost streak)
+		if r.Streak == r.ActivityCount {
 			sb.WriteString(fmt.Sprintf("%d. %s - %d days 🔥\n", rank+1, r.Name, r.ActivityCount))
 		} else {
 			sb.WriteString(fmt.Sprintf("%d. %s - %d days 💔\n", rank+1, r.Name, r.ActivityCount))
