@@ -69,6 +69,10 @@ func (m *mockReportRepo) ResolveLIDToPhone(ctx context.Context, lid string) stri
 	return lid
 }
 
+func (m *mockReportRepo) InitTable(ctx context.Context) error {
+	return nil
+}
+
 func TestHandleMessage_LaporCommand(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
@@ -84,7 +88,7 @@ func TestHandleMessage_LaporCommand(t *testing.T) {
 	}
 
 	// Should route to report usecase and return response
-	expected := "Laporan diterima, TestUser sudah berkeringat 1 hari. Lanjutkan 🔥"
+	expected := "Laporan diterima, TestUser sudah berkeringat 1 hari. Lanjutkan 🔥 (streak 1 hari)"
 	if msg != expected {
 		t.Errorf("Expected '%s', got '%s'", expected, msg)
 	}
@@ -203,7 +207,7 @@ func TestHandleMessage_UnknownCommand_ReturnsEmpty(t *testing.T) {
 		"random message",
 		"#invalid",
 		"#help",
-		"lapor", // missing #
+		"lapor",       // missing #
 		"leaderboard", // missing #
 	}
 

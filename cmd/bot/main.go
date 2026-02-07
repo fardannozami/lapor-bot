@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"math/rand"
@@ -13,7 +12,7 @@ import (
 
 	"github.com/fardannozami/whatsapp-gateway/internal/app/usecase"
 	"github.com/fardannozami/whatsapp-gateway/internal/config"
-	"github.com/fardannozami/whatsapp-gateway/internal/infra/sqlite"
+	"github.com/fardannozami/whatsapp-gateway/internal/infra/repository"
 	"github.com/fardannozami/whatsapp-gateway/internal/infra/wa"
 
 	"go.mau.fi/whatsmeow"
@@ -21,7 +20,6 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	walog "go.mau.fi/whatsmeow/util/log"
-	_ "modernc.org/sqlite"
 )
 
 func main() {
@@ -32,19 +30,7 @@ func main() {
 	logger := walog.Stdout("Client", "INFO", true)
 
 	// 3. Database & Repositories
-	// Enable WAL mode and busy timeout to avoid "database is locked" errors
-	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", cfg.SQLitePath)
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
-	}
-	defer db.Close()
-
-	repo := sqlite.NewReportRepository(db)
-	// Initialize table if needed (optional but good practice)
-	if err := repo.InitTable(context.Background()); err != nil {
-		log.Printf("Failed to init table: %v", err)
-	}
+	repo := repository.NewReportRepository(cfg)
 
 	// 4. Use Cases
 	reportUC := usecase.NewReportActivityUsecase(repo)
@@ -52,10 +38,13 @@ func main() {
 	handleMessageUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC)
 
 	// 5. WhatsApp Service
-	waService := wa.NewService(cfg.SQLitePath, logger)
+	waService := wa.NewService(cfg.SQLitePath, logger, cfg.SupabaseURL, cfg.SupabaseKey)
 
 	// 6. Register Message Handler
 	waService.SetMessageHandler(func(ctx context.Context, client *whatsmeow.Client, evt *events.Message) {
+		// Log all incoming messages with their Chat ID (useful for getting groupID)
+		fmt.Printf("[DEBUG] Incoming message from Chat ID: %s\n", evt.Info.Chat.String())
+
 		// Only handle messages from groups or specific sources if needed.
 		// For now, we filter by GroupID if configured.
 		if cfg.GroupID != "" && evt.Info.Chat.String() != cfg.GroupID {
@@ -77,7 +66,7 @@ func main() {
 			// Already a phone number
 			userID = senderJID.User
 		}
-		
+
 		pushName := evt.Info.PushName
 		if pushName == "" {
 			pushName = "Unknown" // Fallback name
@@ -89,6 +78,12 @@ func main() {
 			msg = *evt.Message.Conversation
 		} else if evt.Message.ExtendedTextMessage != nil && evt.Message.ExtendedTextMessage.Text != nil {
 			msg = *evt.Message.ExtendedTextMessage.Text
+		} else if evt.Message.ImageMessage != nil && evt.Message.ImageMessage.Caption != nil {
+			msg = *evt.Message.ImageMessage.Caption
+		} else if evt.Message.VideoMessage != nil && evt.Message.VideoMessage.Caption != nil {
+			msg = *evt.Message.VideoMessage.Caption
+		} else if evt.Message.DocumentMessage != nil && evt.Message.DocumentMessage.Caption != nil {
+			msg = *evt.Message.DocumentMessage.Caption
 		}
 
 		if msg == "" {

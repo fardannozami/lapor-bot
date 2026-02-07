@@ -34,6 +34,10 @@ func (m *mockRepo) ResolveLIDToPhone(ctx context.Context, lid string) string {
 	return lid
 }
 
+func (m *mockRepo) InitTable(ctx context.Context) error {
+	return nil
+}
+
 // =============================================================================
 // STREAK LOGIC TESTS
 // =============================================================================
@@ -72,7 +76,7 @@ func TestStreak_FirstReport(t *testing.T) {
 	}
 
 	// Check response message
-	expected := "Laporan diterima, Alice sudah berkeringat 1 hari. Lanjutkan 🔥"
+	expected := "Laporan diterima, Alice sudah berkeringat 1 hari. Lanjutkan 🔥 (streak 1 hari)"
 	if msg != expected {
 		t.Errorf("Expected message '%s', got '%s'", expected, msg)
 	}
