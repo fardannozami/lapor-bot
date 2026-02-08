@@ -18,15 +18,15 @@ func NewHandleMessageUsecase(reportUC *ReportActivityUsecase, leaderboardUC *Get
 }
 
 func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, message string) (string, error) {
-	msg := strings.TrimSpace(message)
+	msg := strings.ToLower(strings.TrimSpace(message))
 
-	// Handle #lapor
-	if strings.HasPrefix(strings.ToLower(msg), "#lapor") {
+	// Handle #lapor (di mana aja posisinya)
+	if strings.Contains(msg, "#lapor") {
 		return uc.reportUC.Execute(ctx, userID, name)
 	}
 
-	// Handle #leaderboard
-	if strings.HasPrefix(strings.ToLower(msg), "#leaderboard") {
+	// Handle #leaderboard (di mana aja juga)
+	if strings.Contains(msg, "#leaderboard") {
 		return uc.leaderboardUC.Execute(ctx)
 	}
 
