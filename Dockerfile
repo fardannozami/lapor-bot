@@ -17,7 +17,7 @@ COPY . .
 
 # Build the application
 # CGO_ENABLED=0 for static binary (modernc.org/sqlite is pure Go)
-RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/bot
 
 # Run Stage
 FROM alpine:latest
