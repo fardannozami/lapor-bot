@@ -18,6 +18,9 @@ type UserReport struct {
 	Streak         int    `json:"streak"`
 	ActivityCount  int    `json:"activity_count"`
 	LastReportDate string `json:"last_report_date"`
+	MaxStreak      int    `json:"max_streak"`
+	TotalPoints    int    `json:"total_points"`
+	Achievements   string `json:"achievements"`
 }
 
 type LIDMap struct {
@@ -51,6 +54,9 @@ func (r *ReportRepository) GetReport(ctx context.Context, userID string) (*domai
 		Name:          result.Name,
 		Streak:        result.Streak,
 		ActivityCount: result.ActivityCount,
+		MaxStreak:     result.MaxStreak,
+		TotalPoints:   result.TotalPoints,
+		Achievements:  result.Achievements,
 	}
 
 	if result.LastReportDate != "" {
@@ -67,6 +73,9 @@ func (r *ReportRepository) UpsertReport(ctx context.Context, report *domain.Repo
 		Streak:         report.Streak,
 		ActivityCount:  report.ActivityCount,
 		LastReportDate: report.LastReportDate.Format("2006-01-02T15:04:05Z07:00"),
+		MaxStreak:      report.MaxStreak,
+		TotalPoints:    report.TotalPoints,
+		Achievements:   report.Achievements,
 	}
 
 	var results []UserReport
@@ -95,6 +104,9 @@ func (r *ReportRepository) GetAllReports(ctx context.Context) ([]*domain.Report,
 			Name:          result.Name,
 			Streak:        result.Streak,
 			ActivityCount: result.ActivityCount,
+			MaxStreak:     result.MaxStreak,
+			TotalPoints:   result.TotalPoints,
+			Achievements:  result.Achievements,
 		}
 
 		if result.LastReportDate != "" {

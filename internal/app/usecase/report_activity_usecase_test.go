@@ -76,9 +76,14 @@ func TestStreak_FirstReport(t *testing.T) {
 	}
 
 	// Check response message
+	// Check response message
 	expected := "Laporan diterima, Alice sudah berkeringat 1 hari. Lanjutkan 🔥 (streak 1 hari)"
-	if msg != expected {
-		t.Errorf("Expected message '%s', got '%s'", expected, msg)
+	if !containsSubstring(msg, expected) {
+		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg)
+	}
+	// Should also have unlocked "Pemula" achievement
+	if !containsSubstring(msg, "Pemula") {
+		t.Errorf("Expected message to contain achievement 'Pemula', got '%s'", msg)
 	}
 }
 
