@@ -33,9 +33,12 @@ func main() {
 	repo := repository.NewReportRepository(cfg)
 
 	// 4. Use Cases
+	// 4. Use Cases
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
-	handleMessageUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	handleMessageUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	// 5. WhatsApp Service
 	waService := wa.NewService(cfg.SQLitePath, logger, cfg.SupabaseURL, cfg.SupabaseKey)

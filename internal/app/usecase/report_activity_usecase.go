@@ -53,6 +53,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		// If last report was today (already handled above).
 		// If last report was before yesterday, streak = 1.
 
+		// Determine streak and update report
 		yesterday := today.AddDate(0, 0, -1)
 		if lastReportDate.Equal(yesterday) {
 			report.Streak++
@@ -69,12 +70,56 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			Streak:         1,
 			ActivityCount:  1,
 			LastReportDate: now,
+			MaxStreak:      0,
+			TotalPoints:    0,
+			Achievements:   "",
 		}
+	}
+
+	// 1. Update Max Streak
+	newRecord := false
+	if report.Streak > report.MaxStreak {
+		report.MaxStreak = report.Streak
+		// Only consider it a "new record" if it's substantial (e.g., > 3 days) to avoid spamming everyday for new users
+		if report.Streak > 3 {
+			newRecord = true
+		}
+	}
+
+	// 2. Check for new achievements
+	newAchievements := domain.CheckNewAchievements(report)
+	var unlockedNames []string
+	pointsGained := 0
+
+	for _, ach := range newAchievements {
+		report.Achievements = domain.AddAchievement(report.Achievements, ach.ID)
+		report.TotalPoints += ach.Points
+		pointsGained += ach.Points
+		unlockedNames = append(unlockedNames, fmt.Sprintf("%s (%d pts)", ach.Name, ach.Points))
 	}
 
 	if err := uc.repo.UpsertReport(ctx, report); err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("Laporan diterima, %s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d hari)", name, report.ActivityCount, report.Streak), nil
+	// 3. Construct Response
+	response := fmt.Sprintf("Laporan diterima, %s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d hari)", name, report.ActivityCount, report.Streak)
+
+	// Append Gamification Notifications
+	if newRecord {
+		response += fmt.Sprintf("\n\n🏆 New Personal Best Streak: %d hari!", report.Streak)
+	}
+
+	if len(unlockedNames) > 0 {
+		response += "\n\n🎉 ACHIEVEMENT UNLOCKED! 🎉"
+		for _, name := range unlockedNames {
+			response += fmt.Sprintf("\n🏅 %s", name)
+		}
+	}
+
+	if pointsGained > 0 {
+		response += fmt.Sprintf("\n\n⭐ +%d points (Total: %d)", pointsGained, report.TotalPoints)
+	}
+
+	return response, nil
 }

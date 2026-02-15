@@ -86,6 +86,13 @@ Bot hanya merespon perintah berikut di dalam grup yang telah dikonfigurasi (`GRO
 | --- | --- |
 | `#lapor` | Merekam aktivitas harian user. Menambah streak jika laporan hari ini/kemarin. |
 | `#leaderboard` | Menampilkan klasemen streak, daftar yang "Keep Streak" 🔥 dan "Lose Streak" 💔. |
+| `#mystats` | Menampilkan statistik personal (streak, poin, achievements). |
+| `#achievements` | Menampilkan daftar semua achievement dan progress member. |
+
+### Fitur Gamifikasi 🏅
+- **Points & Achievements**: Dapatkan poin dan badge unik dengan menjaga streak dan aktif melapor.
+- **Milestone Notification**: Dapat notifikasi khusus saat mencapai streak tertenu (7, 14, 30 hari, dst).
+- **Leaderboard**: Bersaing dengan teman untuk streak tertinggi.
 
 ## Struktur Project
 

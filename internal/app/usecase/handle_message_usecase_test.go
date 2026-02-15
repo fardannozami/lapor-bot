@@ -77,7 +77,9 @@ func TestHandleMessage_LaporCommand(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	ctx := context.Background()
 
@@ -88,9 +90,10 @@ func TestHandleMessage_LaporCommand(t *testing.T) {
 	}
 
 	// Should route to report usecase and return response
+	// Should route to report usecase and return response
 	expected := "Laporan diterima, TestUser sudah berkeringat 1 hari. Lanjutkan 🔥 (streak 1 hari)"
-	if msg != expected {
-		t.Errorf("Expected '%s', got '%s'", expected, msg)
+	if !containsSubstring(msg, expected) {
+		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg)
 	}
 
 	// Verify user was created
@@ -106,7 +109,9 @@ func TestHandleMessage_LaporCaseInsensitive(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	ctx := context.Background()
 
@@ -129,7 +134,9 @@ func TestHandleMessage_LaporWithTrailingText(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	ctx := context.Background()
 
@@ -147,7 +154,9 @@ func TestHandleMessage_LeaderboardCommand(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	ctx := context.Background()
 
@@ -178,7 +187,9 @@ func TestHandleMessage_LeaderboardCaseInsensitive(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	ctx := context.Background()
 
@@ -198,7 +209,9 @@ func TestHandleMessage_UnknownCommand_ReturnsEmpty(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	ctx := context.Background()
 
@@ -226,7 +239,9 @@ func TestHandleMessage_WhitespaceHandling(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	ctx := context.Background()
 
@@ -255,7 +270,9 @@ func TestHandleMessage_EmptyMessage(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	ctx := context.Background()
 
@@ -265,5 +282,45 @@ func TestHandleMessage_EmptyMessage(t *testing.T) {
 	}
 	if result != "" {
 		t.Errorf("Empty message should return empty string, got '%s'", result)
+	}
+}
+
+func TestHandleMessage_GamificationCommands(t *testing.T) {
+	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
+	reportUC := usecase.NewReportActivityUsecase(repo)
+	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
+
+	ctx := context.Background()
+
+	// Setup data
+	repo.reports["user1"] = &domain.Report{
+		UserID:        "user1",
+		Name:          "Gamer",
+		Streak:        10,
+		ActivityCount: 10,
+		MaxStreak:     10,
+		TotalPoints:   50,
+		Achievements:  "first_report",
+	}
+
+	// Test #mystats
+	msg, err := handleUC.Execute(ctx, "user1", "Gamer", "#mystats")
+	if err != nil {
+		t.Fatalf("Unexpected error for #mystats: %v", err)
+	}
+	if msg == "" || !containsSubstring(msg, "Statistik kamu, Gamer") {
+		t.Errorf("#mystats response invalid: %s", msg)
+	}
+
+	// Test #achievements
+	msg, err = handleUC.Execute(ctx, "user1", "Gamer", "#achievements")
+	if err != nil {
+		t.Fatalf("Unexpected error for #achievements: %v", err)
+	}
+	if msg == "" || !containsSubstring(msg, "Daftar Achievement") {
+		t.Errorf("#achievements response invalid: %s", msg)
 	}
 }
