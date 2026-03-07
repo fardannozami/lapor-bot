@@ -20,5 +20,5 @@ jobs:
           script: |
             cd ${{ secrets.REMOTE_DIR }}
             git pull origin main
-            docker compose pull
-            docker compose up -d --build --remove-orphans
+            sudo docker compose build
+            sudo docker compose up -d --remove-orphans
