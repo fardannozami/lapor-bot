@@ -79,6 +79,36 @@ func (r *ReportRepository) GetAllReports(ctx context.Context) ([]*domain.Report,
 	return reports, nil
 }
 
+func (r *ReportRepository) GetInactiveUsers(ctx context.Context, days int) ([]*domain.Report, error) {
+	// SQLite date filter: users who haven't reported in more than 'days' days
+	query := `
+		SELECT user_id, name, streak, activity_count, last_report_date, COALESCE(max_streak, 0), COALESCE(total_points, 0), COALESCE(achievements, '') 
+		FROM user_reports 
+		WHERE last_report_date < datetime('now', '-' || ? || ' days')
+		ORDER BY last_report_date ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query, days)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reports []*domain.Report
+	for rows.Next() {
+		var report domain.Report
+		var lastReportDate string
+		if err := rows.Scan(&report.UserID, &report.Name, &report.Streak, &report.ActivityCount, &lastReportDate, &report.MaxStreak, &report.TotalPoints, &report.Achievements); err != nil {
+			return nil, err
+		}
+		report.LastReportDate, err = time.Parse(time.RFC3339, lastReportDate)
+		if err != nil {
+			return nil, err
+		}
+		reports = append(reports, &report)
+	}
+	return reports, nil
+}
+
 func (r *ReportRepository) InitTable(ctx context.Context) error {
 	query := `
 		CREATE TABLE IF NOT EXISTS user_reports (

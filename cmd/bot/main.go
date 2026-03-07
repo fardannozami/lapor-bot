@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -39,6 +40,7 @@ func main() {
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	remindInactiveUC := usecase.NewRemindInactiveUsersUsecase(repo)
 	handleMessageUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	// 5. WhatsApp Service
@@ -104,6 +106,19 @@ func main() {
 		}
 
 		if response != "" {
+			// Special handling for check_inactive command if it wasn't handled by default use case
+			// Actually, let's just add it to handleMessageUC or handle it here if it's a special admin command.
+			// For simplicity, we add it here.
+			if strings.HasPrefix(msg, "!check_inactive") {
+				if cfg.GroupID != "" {
+					_, err := remindInactiveUC.Execute(ctx, waService.GetClient(), cfg.GroupID)
+					if err != nil {
+						log.Printf("Failed to run manual inactivity check: %v", err)
+					}
+				}
+				return
+			}
+
 			// Apply reply delay to appear more human-like
 			delayMs := cfg.ReplyDelayMinMs
 			if cfg.ReplyDelayMaxMs > cfg.ReplyDelayMinMs {
@@ -176,6 +191,38 @@ func main() {
 	}
 
 	log.Println("Bot is running... Press Ctrl+C to exit.")
+
+	// Background ticker for inactivity check (every day at 08:00 WIB)
+	go func() {
+		// Ensure logic runs in Asia/Jakarta
+		loc, _ := time.LoadLocation("Asia/Jakarta")
+		
+		for {
+			now := time.Now().In(loc)
+			nextRun := time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, loc)
+			
+			if now.After(nextRun) {
+				nextRun = nextRun.Add(24 * time.Hour)
+			}
+			
+			delay := time.Until(nextRun)
+			log.Printf("Next scheduled inactivity check at: %v (in %v)", nextRun, delay)
+			
+			select {
+			case <-time.After(delay):
+				if cfg.GroupID != "" && waService.IsLoggedIn() && waService.GetClient().IsConnected() {
+					log.Println("Running scheduled inactivity check...")
+					_, err := remindInactiveUC.Execute(context.Background(), waService.GetClient(), cfg.GroupID)
+					if err != nil {
+						log.Printf("Scheduled inactivity check failed: %v", err)
+					}
+				}
+			case <-context.Background().Done():
+				return
+			}
+		}
+	}()
+
 	log.Printf("Starting healthcheck server on port %s", cfg.Port)
 
 	// 8. Healthcheck server

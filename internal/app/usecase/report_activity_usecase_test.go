@@ -38,6 +38,10 @@ func (m *mockRepo) InitTable(ctx context.Context) error {
 	return nil
 }
 
+func (m *mockRepo) GetInactiveUsers(ctx context.Context, days int) ([]*domain.Report, error) {
+	return nil, nil
+}
+
 // =============================================================================
 // STREAK LOGIC TESTS
 // =============================================================================

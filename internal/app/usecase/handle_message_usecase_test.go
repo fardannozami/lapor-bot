@@ -73,6 +73,10 @@ func (m *mockReportRepo) InitTable(ctx context.Context) error {
 	return nil
 }
 
+func (m *mockReportRepo) GetInactiveUsers(ctx context.Context, days int) ([]*domain.Report, error) {
+	return nil, nil
+}
+
 func TestHandleMessage_LaporCommand(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)

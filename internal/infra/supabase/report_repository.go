@@ -119,6 +119,42 @@ func (r *ReportRepository) GetAllReports(ctx context.Context) ([]*domain.Report,
 	return reports, nil
 }
 
+func (r *ReportRepository) GetInactiveUsers(ctx context.Context, days int) ([]*domain.Report, error) {
+	// Calculate the threshold date
+	threshold := time.Now().AddDate(0, 0, -days).Format("2006-01-02T15:04:05Z07:00")
+
+	var results []UserReport
+	err := r.client.DB.From("user_reports").
+		Select("*").
+		Lt("last_report_date", threshold).
+		Execute(&results)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var reports []*domain.Report
+	for _, result := range results {
+		report := &domain.Report{
+			UserID:        result.UserID,
+			Name:          result.Name,
+			Streak:        result.Streak,
+			ActivityCount: result.ActivityCount,
+			MaxStreak:     result.MaxStreak,
+			TotalPoints:   result.TotalPoints,
+			Achievements:  result.Achievements,
+		}
+
+		if result.LastReportDate != "" {
+			report.LastReportDate = parseTime(result.LastReportDate)
+		}
+
+		reports = append(reports, report)
+	}
+
+	return reports, nil
+}
+
 func (r *ReportRepository) InitTable(ctx context.Context) error {
 	// Table initialization is handled by the SQL schema in Supabase
 	// This method is kept for compatibility but does nothing

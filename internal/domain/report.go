@@ -20,6 +20,7 @@ type ReportRepository interface {
 	GetReport(ctx context.Context, userID string) (*Report, error)
 	UpsertReport(ctx context.Context, report *Report) error
 	GetAllReports(ctx context.Context) ([]*Report, error)
+	GetInactiveUsers(ctx context.Context, days int) ([]*Report, error)
 	InitTable(ctx context.Context) error
 	ResolveLIDToPhone(ctx context.Context, lid string) string
 }
