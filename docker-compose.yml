@@ -15,3 +15,17 @@ services:
       - SQLITE_PATH=/app/data/whatsapp.db
       # TZ for correct time in reports (e.g., "Asia/Jakarta")
       - TZ=Asia/Jakarta
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      update_config:
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
+      restart_policy:
+        condition: on-failure

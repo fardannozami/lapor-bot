@@ -25,6 +25,7 @@ func Load() Config {
 		log.Println("No .env file found, using defaults/environment variables")
 	}
 
+	port := getenv("PORT", "8080")
 	sqlitePath := getenv("SQLITE_PATH", "./data/whatsapp.db")
 	supabaseURL := getenv("SUPABASE_URL", "")
 	supabaseKey := getenv("SUPABASE_KEY", "")
@@ -35,6 +36,7 @@ func Load() Config {
 	showTyping := getenvBool("SHOW_TYPING", false)
 
 	return Config{
+		Port:            port,
 		SQLitePath:      sqlitePath,
 		SupabaseURL:     supabaseURL,
 		SupabaseKey:     supabaseKey,

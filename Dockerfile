@@ -25,7 +25,8 @@ FROM alpine:latest
 WORKDIR /app
 
 # Install certificates for external connections (required for WhatsApp) and timezone data
-RUN apk --no-cache add ca-certificates tzdata
+# Install certificates for external connections (required for WhatsApp), timezone data, and curl for healthchecks
+RUN apk --no-cache add ca-certificates tzdata curl
 
 # Create data directory for SQLite and WhatsApp sessions
 RUN mkdir -p /app/data

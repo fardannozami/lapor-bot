@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -175,13 +176,40 @@ func main() {
 	}
 
 	log.Println("Bot is running... Press Ctrl+C to exit.")
+	log.Printf("Starting healthcheck server on port %s", cfg.Port)
 
-	// 8. Wait for OS Signal
+	// 8. Healthcheck server
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "OK")
+	})
+
+	server := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: mux,
+	}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("Healthcheck server error: %v", err)
+		}
+	}()
+
+	// 9. Wait for OS Signal
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
 	log.Println("Shutting down...")
 	waService.Disconnect()
+
+	// Shutdown healthcheck server
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("Healthcheck server shutdown error: %v", err)
+	}
+
 	os.Exit(0)
 }
