@@ -9,19 +9,10 @@ import (
 	"github.com/fardannozami/whatsapp-gateway/internal/config"
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
 	"github.com/fardannozami/whatsapp-gateway/internal/infra/sqlite"
-	"github.com/fardannozami/whatsapp-gateway/internal/infra/supabase"
-	supa "github.com/nedpals/supabase-go"
 	_ "modernc.org/sqlite"
 )
 
 func NewReportRepository(cfg config.Config) domain.ReportRepository {
-	// Use Supabase if configured, otherwise fall back to SQLite
-	if cfg.SupabaseURL != "" && cfg.SupabaseKey != "" {
-		log.Println("Using Supabase database")
-		client := supa.CreateClient(cfg.SupabaseURL, cfg.SupabaseKey)
-		return supabase.NewReportRepository(client)
-	}
-
 	log.Println("Using SQLite database")
 	// Enable WAL mode and busy timeout to avoid "database is locked" errors
 	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", cfg.SQLitePath)

@@ -44,7 +44,7 @@ func main() {
 	handleMessageUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
 
 	// 5. WhatsApp Service
-	waService := wa.NewService(cfg.SQLitePath, logger, cfg.SupabaseURL, cfg.SupabaseKey)
+	waService := wa.NewService(cfg.SQLitePath, logger)
 
 	// 6. Register Message Handler
 	waService.SetMessageHandler(func(ctx context.Context, client *whatsmeow.Client, evt *events.Message) {
@@ -101,7 +101,7 @@ func main() {
 		// Special handling for check_inactive command
 		if strings.HasPrefix(msg, "!check_inactive") {
 			log.Printf("[DEBUG] Received !check_inactive command from %s", evt.Info.Chat.String())
-			
+
 			targetID := cfg.GroupID
 			if targetID == "" {
 				targetID = evt.Info.Chat.String()
@@ -113,7 +113,7 @@ func main() {
 				log.Printf("Failed to run manual inactivity check: %v", err)
 				response = fmt.Sprintf("Gagal menjalankan pengecekan: %v", err)
 			}
-			
+
 			// Send the status response back to the user
 			log.Printf("[DEBUG] Sending response for !check_inactive: %s", response)
 			resp := &waE2E.Message{
@@ -211,18 +211,18 @@ func main() {
 	go func() {
 		// Ensure logic runs in Asia/Jakarta
 		loc, _ := time.LoadLocation("Asia/Jakarta")
-		
+
 		for {
 			now := time.Now().In(loc)
-			nextRun := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, loc)
-			
+			nextRun := time.Date(now.Year(), now.Month(), now.Day(), 15, 3, 0, 0, loc)
+
 			if now.After(nextRun) {
 				nextRun = nextRun.Add(24 * time.Hour)
 			}
-			
+
 			delay := time.Until(nextRun)
 			log.Printf("Next scheduled inactivity check at: %v (in %v)", nextRun, delay)
-			
+
 			select {
 			case <-time.After(delay):
 				if cfg.GroupID != "" && waService.IsLoggedIn() && waService.GetClient().IsConnected() {

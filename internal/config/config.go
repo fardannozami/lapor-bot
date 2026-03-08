@@ -11,8 +11,6 @@ import (
 type Config struct {
 	Port            string
 	SQLitePath      string
-	SupabaseURL     string
-	SupabaseKey     string
 	GroupID         string
 	BotPhone        string
 	ReplyDelayMinMs int  // Minimum delay before reply (milliseconds)
@@ -27,8 +25,6 @@ func Load() Config {
 
 	port := getenv("PORT", "8080")
 	sqlitePath := getenv("SQLITE_PATH", "./data/whatsapp.db")
-	supabaseURL := getenv("SUPABASE_URL", "")
-	supabaseKey := getenv("SUPABASE_KEY", "")
 	groupID := getenv("GROUP_ID", "")
 	botPhone := getenv("BOT_PHONE", "")
 	replyDelayMinMs := getenvInt("REPLY_DELAY_MIN_MS", 0)
@@ -38,8 +34,6 @@ func Load() Config {
 	return Config{
 		Port:            port,
 		SQLitePath:      sqlitePath,
-		SupabaseURL:     supabaseURL,
-		SupabaseKey:     supabaseKey,
 		GroupID:         groupID,
 		BotPhone:        botPhone,
 		ReplyDelayMinMs: replyDelayMinMs,
