@@ -214,7 +214,7 @@ func main() {
 
 		for {
 			now := time.Now().In(loc)
-			nextRun := time.Date(now.Year(), now.Month(), now.Day(), 15, 3, 0, 0, loc)
+			nextRun := time.Date(now.Year(), now.Month(), now.Day(), 15, 9, 0, 0, loc)
 
 			if now.After(nextRun) {
 				nextRun = nextRun.Add(24 * time.Hour)
