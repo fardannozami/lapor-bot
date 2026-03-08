@@ -238,6 +238,45 @@ func main() {
 		}
 	}()
 
+	// Background ticker for daily leaderboard (every day at 23:58 WIB)
+	go func() {
+		loc, _ := time.LoadLocation("Asia/Jakarta")
+		for {
+			now := time.Now().In(loc)
+			nextRun := time.Date(now.Year(), now.Month(), now.Day(), 23, 58, 0, 0, loc)
+
+			if now.After(nextRun) {
+				nextRun = nextRun.Add(24 * time.Hour)
+			}
+
+			delay := time.Until(nextRun)
+			log.Printf("Next scheduled leaderboard at: %v (in %v)", nextRun, delay)
+
+			select {
+			case <-time.After(delay):
+				if cfg.GroupID != "" && waService.IsLoggedIn() && waService.GetClient().IsConnected() {
+					log.Println("Running scheduled leaderboard...")
+					response, err := leaderboardUC.Execute(context.Background())
+					if err != nil {
+						log.Printf("Scheduled leaderboard failed: %v", err)
+						continue
+					}
+
+					targetJID, _ := types.ParseJID(cfg.GroupID)
+					msg := &waE2E.Message{
+						Conversation: &response,
+					}
+					_, err = waService.GetClient().SendMessage(context.Background(), targetJID, msg)
+					if err != nil {
+						log.Printf("Failed to send scheduled leaderboard: %v", err)
+					}
+				}
+			case <-context.Background().Done():
+				return
+			}
+		}
+	}()
+
 	log.Printf("Starting healthcheck server on port %s", cfg.Port)
 
 	// 8. Healthcheck server
