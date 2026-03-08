@@ -207,14 +207,14 @@ func main() {
 
 	log.Println("Bot is running... Press Ctrl+C to exit.")
 
-	// Background ticker for inactivity check (every day at 08:00 WIB)
+	// Background ticker for inactivity check (every day at 12:00 WIB)
 	go func() {
 		// Ensure logic runs in Asia/Jakarta
 		loc, _ := time.LoadLocation("Asia/Jakarta")
 		
 		for {
 			now := time.Now().In(loc)
-			nextRun := time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, loc)
+			nextRun := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, loc)
 			
 			if now.After(nextRun) {
 				nextRun = nextRun.Add(24 * time.Hour)
