@@ -100,17 +100,28 @@ func main() {
 
 		// Special handling for check_inactive command
 		if strings.HasPrefix(msg, "!check_inactive") {
-			if cfg.GroupID != "" {
-				response, err := remindInactiveUC.Execute(ctx, waService.GetClient(), cfg.GroupID)
-				if err != nil {
-					log.Printf("Failed to run manual inactivity check: %v", err)
-					return
-				}
-				// Send the status response back to the user
-				resp := &waE2E.Message{
-					Conversation: &response,
-				}
-				_, _ = waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
+			log.Printf("[DEBUG] Received !check_inactive command from %s", evt.Info.Chat.String())
+			
+			targetID := cfg.GroupID
+			if targetID == "" {
+				targetID = evt.Info.Chat.String()
+				log.Printf("[DEBUG] GROUP_ID is empty, using current chat JID: %s", targetID)
+			}
+
+			response, err := remindInactiveUC.Execute(ctx, waService.GetClient(), targetID)
+			if err != nil {
+				log.Printf("Failed to run manual inactivity check: %v", err)
+				response = fmt.Sprintf("Gagal menjalankan pengecekan: %v", err)
+			}
+			
+			// Send the status response back to the user
+			log.Printf("[DEBUG] Sending response for !check_inactive: %s", response)
+			resp := &waE2E.Message{
+				Conversation: &response,
+			}
+			_, err = waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
+			if err != nil {
+				log.Printf("Failed to send status response: %v", err)
 			}
 			return
 		}
