@@ -42,7 +42,7 @@ func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsm
 	}
 
 	if len(inactiveUsers) == 0 {
-		return "", nil // No inactive users to remind
+		return "Tidak ada user yang tidak laporan lebih dari seminggu. Mantap! 👍", nil
 	}
 
 	// 2. Construct message with tags

@@ -98,6 +98,23 @@ func main() {
 
 		fmt.Printf("Message from %s (%s): %s\n", pushName, userID, msg)
 
+		// Special handling for check_inactive command
+		if strings.HasPrefix(msg, "!check_inactive") {
+			if cfg.GroupID != "" {
+				response, err := remindInactiveUC.Execute(ctx, waService.GetClient(), cfg.GroupID)
+				if err != nil {
+					log.Printf("Failed to run manual inactivity check: %v", err)
+					return
+				}
+				// Send the status response back to the user
+				resp := &waE2E.Message{
+					Conversation: &response,
+				}
+				_, _ = waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
+			}
+			return
+		}
+
 		// Execute Use Case
 		response, err := handleMessageUC.Execute(ctx, userID, pushName, msg)
 		if err != nil {
@@ -106,19 +123,6 @@ func main() {
 		}
 
 		if response != "" {
-			// Special handling for check_inactive command if it wasn't handled by default use case
-			// Actually, let's just add it to handleMessageUC or handle it here if it's a special admin command.
-			// For simplicity, we add it here.
-			if strings.HasPrefix(msg, "!check_inactive") {
-				if cfg.GroupID != "" {
-					_, err := remindInactiveUC.Execute(ctx, waService.GetClient(), cfg.GroupID)
-					if err != nil {
-						log.Printf("Failed to run manual inactivity check: %v", err)
-					}
-				}
-				return
-			}
-
 			// Apply reply delay to appear more human-like
 			delayMs := cfg.ReplyDelayMinMs
 			if cfg.ReplyDelayMaxMs > cfg.ReplyDelayMinMs {
