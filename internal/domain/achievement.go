@@ -92,6 +92,58 @@ var AllAchievements = []Achievement{
 	},
 }
 
+// ComebackAchievement represents achievements earned by returning after inactivity.
+// These are checked separately because they need InactiveDays context.
+type ComebackAchievement struct {
+	ID               string
+	Name             string
+	Description      string
+	Points           int
+	MinInactiveDays  int // must have been inactive this many days
+	MinComebackStreak int // must rebuild streak to this many days
+}
+
+// AllComebackAchievements defines achievements for users who return after inactivity.
+var AllComebackAchievements = []ComebackAchievement{
+	{
+		ID:               "comeback_7",
+		Name:             "Comeback Kid",
+		Description:      "Kembali dan raih 7 streak setelah absen >7 hari",
+		Points:           30,
+		MinInactiveDays:  7,
+		MinComebackStreak: 7,
+	},
+	{
+		ID:               "comeback_hero",
+		Name:             "Comeback Hero",
+		Description:      "Kembali dan raih 14 streak setelah absen >14 hari",
+		Points:           75,
+		MinInactiveDays:  14,
+		MinComebackStreak: 14,
+	},
+	{
+		ID:               "phoenix",
+		Name:             "Phoenix",
+		Description:      "Kembali dan raih 30 streak setelah absen >30 hari",
+		Points:           150,
+		MinInactiveDays:  30,
+		MinComebackStreak: 30,
+	},
+}
+
+// CheckComebackAchievements evaluates comeback achievements against the report.
+func CheckComebackAchievements(report *Report) []ComebackAchievement {
+	var newlyUnlocked []ComebackAchievement
+	for _, a := range AllComebackAchievements {
+		if !HasAchievement(report.Achievements, a.ID) &&
+			report.InactiveDays >= a.MinInactiveDays &&
+			report.ComebackStreak >= a.MinComebackStreak {
+			newlyUnlocked = append(newlyUnlocked, a)
+		}
+	}
+	return newlyUnlocked
+}
+
 // HasAchievement checks if a report's achievements string contains the given achievement ID.
 func HasAchievement(achievements string, id string) bool {
 	if achievements == "" {

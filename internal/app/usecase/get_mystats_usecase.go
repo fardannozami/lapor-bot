@@ -28,14 +28,41 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 
 	sb := strings.Builder{}
 	sb.WriteString(fmt.Sprintf("📊 Statistik kamu, %s:\n\n", report.Name))
+
+	// Level display
+	sb.WriteString(fmt.Sprintf("🎖️ Level: %s\n", domain.FormatLevel(report.TotalPoints)))
+	sb.WriteString(fmt.Sprintf("📈 %s\n\n", domain.FormatProgressBar(report.TotalPoints)))
+
 	sb.WriteString(fmt.Sprintf("🔥 Streak saat ini: %d hari\n", report.Streak))
 	sb.WriteString(fmt.Sprintf("🏆 Streak tertinggi: %d hari\n", report.MaxStreak))
 	sb.WriteString(fmt.Sprintf("📅 Total hari aktif: %d\n", report.ActivityCount))
 	sb.WriteString(fmt.Sprintf("⭐ Total poin: %d\n", report.TotalPoints))
 
+	// Comeback status
+	if report.InactiveDays > 0 && report.ComebackStreak > 0 && report.ComebackStreak < 30 {
+		sb.WriteString(fmt.Sprintf("\n🔄 Comeback streak: %d hari (setelah %d hari absen)\n", report.ComebackStreak, report.InactiveDays))
+
+		// Show next comeback achievement target
+		for _, a := range domain.AllComebackAchievements {
+			if !domain.HasAchievement(report.Achievements, a.ID) &&
+				report.InactiveDays >= a.MinInactiveDays {
+				remaining := a.MinComebackStreak - report.ComebackStreak
+				if remaining > 0 {
+					sb.WriteString(fmt.Sprintf("🎯 %d hari lagi untuk unlock \"%s\"!\n", remaining, a.Name))
+				}
+				break
+			}
+		}
+	}
+
 	// Helper to get achievement name by ID
 	getAchName := func(id string) string {
 		for _, a := range domain.AllAchievements {
+			if a.ID == id {
+				return a.Name
+			}
+		}
+		for _, a := range domain.AllComebackAchievements {
 			if a.ID == id {
 				return a.Name
 			}

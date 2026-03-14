@@ -14,6 +14,8 @@ type Report struct {
 	MaxStreak      int       `json:"max_streak" db:"max_streak"`
 	TotalPoints    int       `json:"total_points" db:"total_points"`
 	Achievements   string    `json:"achievements" db:"achievements"`
+	ComebackStreak int       `json:"comeback_streak" db:"comeback_streak"`
+	InactiveDays   int       `json:"inactive_days" db:"inactive_days"`
 }
 
 type ReportRepository interface {

@@ -6,18 +6,26 @@ import (
 )
 
 type HandleMessageUsecase struct {
-	reportUC       *ReportActivityUsecase
+	reportUC    *ReportActivityUsecase
 	leaderboardUC  *GetLeaderboardUsecase
 	myStatsUC      *GetMyStatsUsecase
 	achievementsUC *GetAchievementsUsecase
+	comebackUC     *ComebackChallengeUsecase
 }
 
-func NewHandleMessageUsecase(reportUC *ReportActivityUsecase, leaderboardUC *GetLeaderboardUsecase, myStatsUC *GetMyStatsUsecase, achievementsUC *GetAchievementsUsecase) *HandleMessageUsecase {
+func NewHandleMessageUsecase(
+	reportUC *ReportActivityUsecase,
+	leaderboardUC *GetLeaderboardUsecase,
+	myStatsUC *GetMyStatsUsecase,
+	achievementsUC *GetAchievementsUsecase,
+	comebackUC *ComebackChallengeUsecase,
+) *HandleMessageUsecase {
 	return &HandleMessageUsecase{
 		reportUC:       reportUC,
 		leaderboardUC:  leaderboardUC,
 		myStatsUC:      myStatsUC,
 		achievementsUC: achievementsUC,
+		comebackUC:     comebackUC,
 	}
 }
 
@@ -42,6 +50,11 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 	// Handle #achievements
 	if strings.Contains(msg, "#achievements") {
 		return uc.achievementsUC.Execute(ctx)
+	}
+
+	// Handle #comeback
+	if strings.Contains(msg, "#comeback") {
+		return uc.comebackUC.Execute(ctx, userID, name)
 	}
 
 	return "", nil

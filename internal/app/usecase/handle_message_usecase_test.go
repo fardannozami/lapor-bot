@@ -83,7 +83,8 @@ func TestHandleMessage_LaporCommand(t *testing.T) {
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC)
 
 	ctx := context.Background()
 
@@ -115,7 +116,8 @@ func TestHandleMessage_LaporCaseInsensitive(t *testing.T) {
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC)
 
 	ctx := context.Background()
 
@@ -140,7 +142,8 @@ func TestHandleMessage_LaporWithTrailingText(t *testing.T) {
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC)
 
 	ctx := context.Background()
 
@@ -160,7 +163,8 @@ func TestHandleMessage_LeaderboardCommand(t *testing.T) {
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC)
 
 	ctx := context.Background()
 
@@ -193,7 +197,8 @@ func TestHandleMessage_LeaderboardCaseInsensitive(t *testing.T) {
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC)
 
 	ctx := context.Background()
 
@@ -215,7 +220,8 @@ func TestHandleMessage_UnknownCommand_ReturnsEmpty(t *testing.T) {
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC)
 
 	ctx := context.Background()
 
@@ -245,7 +251,8 @@ func TestHandleMessage_WhitespaceHandling(t *testing.T) {
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC)
 
 	ctx := context.Background()
 
@@ -276,7 +283,8 @@ func TestHandleMessage_EmptyMessage(t *testing.T) {
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC)
 
 	ctx := context.Background()
 
@@ -295,7 +303,8 @@ func TestHandleMessage_GamificationCommands(t *testing.T) {
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC)
 
 	ctx := context.Background()
 
