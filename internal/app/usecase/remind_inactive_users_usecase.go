@@ -62,8 +62,8 @@ func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsm
 	var mentions []string
 	for _, user := range inactiveUsers {
 		lastReport := user.LastReportDate
-		lastReportDate := time.Date(lastReport.Year(), lastReport.Month(), lastReport.Day(), 0, 0, 0, 0, time.UTC)
-		todayDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		lastReportDate := domain.GetToday(lastReport)
+		todayDate := domain.GetToday(now)
 		daysInactive := int(math.Round(todayDate.Sub(lastReportDate).Hours() / 24))
 
 		// Personalized info with lost streak

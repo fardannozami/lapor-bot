@@ -18,6 +18,17 @@ type Report struct {
 	InactiveDays   int       `json:"inactive_days" db:"inactive_days"`
 }
 
+// ReportCutoffOffset is the spare time allowed for late-night reporting.
+// For example, if offset is 30m, 00:29 AM is still considered "yesterday".
+const ReportCutoffOffset = 30 * time.Minute
+
+// GetToday returns the normalized "today" (midnight) based on the cutoff offset.
+func GetToday(t time.Time) time.Time {
+	// Shift time back by offset then truncate to date
+	shifted := t.Add(-ReportCutoffOffset)
+	return time.Date(shifted.Year(), shifted.Month(), shifted.Day(), 0, 0, 0, 0, time.UTC)
+}
+
 type ReportRepository interface {
 	GetReport(ctx context.Context, userID string) (*Report, error)
 	UpsertReport(ctx context.Context, report *Report) error

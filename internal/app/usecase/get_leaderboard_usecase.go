@@ -25,6 +25,7 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	}
 
 	now := time.Now()
+	displayDate := domain.GetToday(now)
 	// Global Challenge Day Calculation (Optional: Fix a start date or assume max streak represents it?
 	// The prompt says "Day 37 (06-02-2026)".
 	// Let's use the current Max Streak or a fixed start date if provided.
@@ -64,7 +65,7 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	}
 
 	sb := strings.Builder{}
-	dateStr := now.Format("02-01-2006")
+	dateStr := displayDate.Format("02-01-2006")
 	sb.WriteString(fmt.Sprintf("30 Days of Sweat Challenge – Day %d (%s)\n\n", maxDay, dateStr))
 
 	// Recap

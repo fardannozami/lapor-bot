@@ -24,11 +24,11 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	}
 
 	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	today := domain.GetToday(now)
 
 	if report != nil {
 		lastReport := report.LastReportDate
-		lastReportDate := time.Date(lastReport.Year(), lastReport.Month(), lastReport.Day(), 0, 0, 0, 0, time.UTC)
+		lastReportDate := domain.GetToday(lastReport)
 
 		if lastReportDate.Equal(today) {
 			return fmt.Sprintf("%s sudah laporan hari ini, ayo jangan curang! 😉", name), nil
