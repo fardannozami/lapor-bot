@@ -148,7 +148,8 @@ func (r *ReportRepository) MigrateDayToWeekStreaks(ctx context.Context) error {
 	}
 
 	var exists int
-	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sys_migrations WHERE name = 'streak_day_to_week'").Scan(&exists)
+	// Using a new migration name to allow re-running with the refined logic if needed
+	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sys_migrations WHERE name = 'streak_day_to_week_v2'").Scan(&exists)
 	if err != nil {
 		return err
 	}
@@ -156,19 +157,30 @@ func (r *ReportRepository) MigrateDayToWeekStreaks(ctx context.Context) error {
 		return nil
 	}
 
-	// Perform migration: convert day streaks to approximate week streaks (round up)
+	// Perform migration: use total days / 7 for initial weekly streak
 	_, err = r.db.ExecContext(ctx, `
 		UPDATE user_reports 
-		SET streak = (streak + 6) / 7,
-			max_streak = (max_streak + 6) / 7,
-			comeback_streak = (comeback_streak + 6) / 7
-		WHERE streak > 0
+		SET streak = activity_count / 7,
+			max_streak = activity_count / 7,
+			comeback_streak = 0
+		WHERE activity_count >= 7
 	`)
 	if err != nil {
 		return err
 	}
 
-	_, err = r.db.ExecContext(ctx, "INSERT INTO sys_migrations (name) VALUES ('streak_day_to_week')")
+	// For users with < 7 days, set streak to 1 if they have any activity
+	_, err = r.db.ExecContext(ctx, `
+		UPDATE user_reports 
+		SET streak = 1,
+			max_streak = 1
+		WHERE activity_count > 0 AND activity_count < 7
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.ExecContext(ctx, "INSERT INTO sys_migrations (name) VALUES ('streak_day_to_week_v2')")
 	return err
 }
 
