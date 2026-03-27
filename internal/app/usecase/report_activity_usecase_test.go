@@ -236,7 +236,7 @@ func TestLeaderboard_RanksByActivityCount(t *testing.T) {
 
 	now := time.Now()
 	yesterday := now.AddDate(0, 0, -1)
-	weekAgo := now.AddDate(0, 0, -7)
+	twoWeeksAgo := now.AddDate(0, 0, -14)
 
 	// Setup: 3 users with different activity counts and streak status
 	repo.reports["user1"] = &domain.Report{
@@ -244,7 +244,7 @@ func TestLeaderboard_RanksByActivityCount(t *testing.T) {
 		Name:           "HighTotal_LostStreak",
 		Streak:         0,
 		ActivityCount:  30, // Highest total, but lost streak
-		LastReportDate: weekAgo,
+		LastReportDate: twoWeeksAgo,
 	}
 	repo.reports["user2"] = &domain.Report{
 		UserID:         "user2",
