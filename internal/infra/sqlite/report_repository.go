@@ -133,7 +133,43 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN comeback_streak INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN inactive_days INTEGER DEFAULT 0")
 
+	// Run data migrations
+	if err := r.MigrateDayToWeekStreaks(ctx); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (r *ReportRepository) MigrateDayToWeekStreaks(ctx context.Context) error {
+	_, err := r.db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS sys_migrations (name TEXT PRIMARY KEY)")
+	if err != nil {
+		return err
+	}
+
+	var exists int
+	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sys_migrations WHERE name = 'streak_day_to_week'").Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists > 0 {
+		return nil
+	}
+
+	// Perform migration: convert day streaks to approximate week streaks (round up)
+	_, err = r.db.ExecContext(ctx, `
+		UPDATE user_reports 
+		SET streak = (streak + 6) / 7,
+			max_streak = (max_streak + 6) / 7,
+			comeback_streak = (comeback_streak + 6) / 7
+		WHERE streak > 0
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.ExecContext(ctx, "INSERT INTO sys_migrations (name) VALUES ('streak_day_to_week')")
+	return err
 }
 
 // ResolveLIDToPhone looks up a LID in the whatsmeow_lid_map table and returns the phone number.

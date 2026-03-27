@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -26,10 +27,8 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 
 	now := time.Now()
 	displayDate := domain.GetToday(now)
-	// Global Challenge Day Calculation (Optional: Fix a start date or assume max streak represents it?
-	// The prompt says "Day 37 (06-02-2026)".
-	// Let's use the current Max Streak or a fixed start date if provided.
-	// For now, let's look at the highest streak in the DB to infer "Day X" or just use the current highest streak as the "Day".
+	startDate := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	challengeDay := int(displayDate.Sub(startDate).Hours()/24) + 1
 
 	// Logic for "Keep the streak" vs "Lose the streak":
 	// Keep streak: Reported Today OR Reported Yesterday (still have time to report today).
@@ -44,9 +43,13 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	// Count active vs lost for recap
 	activeCount := 0
 	lostCount := 0
+	currentWeekStart := domain.GetStartOfISOWeek(displayDate)
 	for _, r := range reports {
-		// Active if streak equals activity_count (never lost streak)
-		if r.Streak == r.ActivityCount {
+		lastWeekStart := domain.GetStartOfISOWeek(r.LastReportDate)
+		weeksSinceLastReport := int(math.Round(currentWeekStart.Sub(lastWeekStart).Hours() / (24 * 7)))
+
+		// Active if reported this week or last week (still has chance to continue streak)
+		if weeksSinceLastReport <= 1 {
 			activeCount++
 		} else {
 			lostCount++
@@ -54,32 +57,23 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	}
 
 	// Header
-	// Use max activity count to represent the current "Day" of the challenge
-	maxDay := 0
-	if len(reports) > 0 {
-		for _, r := range reports {
-			if r.ActivityCount > maxDay {
-				maxDay = r.ActivityCount
-			}
-		}
-	}
-
 	sb := strings.Builder{}
 	dateStr := displayDate.Format("02-01-2006")
-	sb.WriteString(fmt.Sprintf("30 Days of Sweat Challenge – Day %d (%s)\n\n", maxDay, dateStr))
+	sb.WriteString(fmt.Sprintf("30 Days of Sweat Challenge – Day %d (%s)\n\n", challengeDay, dateStr))
 
 	// Recap
-	sb.WriteString(fmt.Sprintf("Recap day %d:\n", maxDay))
+	sb.WriteString(fmt.Sprintf("Recap day %d:\n", challengeDay))
 	sb.WriteString(fmt.Sprintf("%d peoples keep the streak 🔥\n", activeCount))
 	sb.WriteString(fmt.Sprintf("%d lose the streak 💔\n", lostCount))
 	sb.WriteString("\nUpdate klasemen sementara:\n")
 
 	// Single unified ranking by ActivityCount
 	for rank, r := range reports {
-		// Active if streak equals activity_count (never lost streak)
-		// NOTE: With weekly streaks, we might need a different criteria for "active" in the recap,
-		// but for the rankings list, we'll just show the streak in weeks.
-		if r.Streak > 0 {
+		// Active if reported this week or last week
+		lastWeekStart := domain.GetStartOfISOWeek(r.LastReportDate)
+		weeksSinceLastReport := int(math.Round(currentWeekStart.Sub(lastWeekStart).Hours() / (24 * 7)))
+
+		if weeksSinceLastReport <= 1 {
 			sb.WriteString(fmt.Sprintf("%d. %s - %d days (%d weeks streak 🔥)\n", rank+1, r.Name, r.ActivityCount, r.Streak))
 		} else {
 			sb.WriteString(fmt.Sprintf("%d. %s - %d days (💔)\n", rank+1, r.Name, r.ActivityCount))
