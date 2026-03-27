@@ -95,8 +95,7 @@ func TestHandleMessage_LaporCommand(t *testing.T) {
 	}
 
 	// Should route to report usecase and return response
-	// Should route to report usecase and return response
-	expected := "Laporan diterima, TestUser sudah berkeringat 1 hari. Lanjutkan 🔥 (streak 1 hari)"
+	expected := "Laporan diterima, TestUser sudah berkeringat 1 hari. Lanjutkan 🔥 (streak 1 minggu)"
 	if !containsSubstring(msg, expected) {
 		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg)
 	}

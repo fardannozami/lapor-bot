@@ -34,17 +34,22 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			return fmt.Sprintf("%s sudah laporan hari ini, ayo jangan curang! 😉", name), nil
 		}
 
-		yesterday := today.AddDate(0, 0, -1)
 		daysSinceLastReport := int(math.Round(today.Sub(lastReportDate).Hours() / 24))
 
-		if lastReportDate.Equal(yesterday) {
-			// Consecutive day — streak continues
+		currentWeekStart := domain.GetStartOfISOWeek(today)
+		lastWeekStart := domain.GetStartOfISOWeek(lastReportDate)
+		weeksSinceLastReport := int(math.Round(currentWeekStart.Sub(lastWeekStart).Hours() / (24 * 7)))
+
+		if currentWeekStart.Equal(lastWeekStart) {
+			// Same week — streak stays the same, nothing to increment
+		} else if weeksSinceLastReport == 1 {
+			// Consecutive week — streak continues
 			report.Streak++
 			report.ComebackStreak++ // also increment comeback streak if active
 		} else {
-			// Missed day(s) — this is a comeback
+			// Missed week(s) — streak resets
 			report.InactiveDays = daysSinceLastReport
-			report.ComebackStreak = 1 // reset comeback streak counter
+			report.ComebackStreak = 1
 			report.Streak = 1
 		}
 		report.ActivityCount++
@@ -65,11 +70,16 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		}
 	}
 
+	// Logic for MaxStreak: it should be at least 1 if they reported once
+	if report.MaxStreak == 0 {
+		report.MaxStreak = 1
+	}
+
 	// 1. Update Max Streak
 	newRecord := false
 	if report.Streak > report.MaxStreak {
 		report.MaxStreak = report.Streak
-		if report.Streak > 3 {
+		if report.Streak > 1 {
 			newRecord = true
 		}
 	}
@@ -121,18 +131,18 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		// Show comeback challenge info
 		nextComebackAch := uc.getNextComebackTarget(report)
 		if nextComebackAch != nil {
-			response += fmt.Sprintf("\n🔥 Comeback Challenge dimulai! Raih %d hari berturut-turut untuk unlock \"%s\"!", nextComebackAch.MinComebackStreak, nextComebackAch.Name)
+			response += fmt.Sprintf("\n🔥 Comeback Challenge dimulai! Raih %d minggu berturut-turut untuk unlock \"%s\"!", nextComebackAch.MinComebackStreak, nextComebackAch.Name)
 		} else {
 			response += "\n🔥 Comeback Challenge dimulai! Ayo bangun streak-mu kembali!"
 		}
 	} else {
 		// Normal report message
-		response = fmt.Sprintf("Laporan diterima, %s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d hari)", name, report.ActivityCount, report.Streak)
+		response = fmt.Sprintf("Laporan diterima, %s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)", name, report.ActivityCount, report.Streak)
 	}
 
 	// Append Gamification Notifications
 	if newRecord {
-		response += fmt.Sprintf("\n\n🏆 New Personal Best Streak: %d hari!", report.Streak)
+		response += fmt.Sprintf("\n\n🏆 New Personal Best Streak: %d minggu!", report.Streak)
 	}
 
 	if leveledUp {

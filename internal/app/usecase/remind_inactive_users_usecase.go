@@ -69,7 +69,7 @@ func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsm
 		// Personalized info with lost streak
 		sb.WriteString(fmt.Sprintf("- @%s (%s)", user.UserID, user.Name))
 		if user.MaxStreak > 0 {
-			sb.WriteString(fmt.Sprintf(" — pernah streak %d hari 🔥, sudah %d hari absen", user.MaxStreak, daysInactive))
+			sb.WriteString(fmt.Sprintf(" — pernah streak %d minggu 🔥, sudah %d hari absen", user.MaxStreak, daysInactive))
 		} else {
 			sb.WriteString(fmt.Sprintf(" — sudah %d hari absen", daysInactive))
 		}

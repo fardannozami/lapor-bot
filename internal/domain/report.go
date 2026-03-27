@@ -29,6 +29,19 @@ func GetToday(t time.Time) time.Time {
 	return time.Date(shifted.Year(), shifted.Month(), shifted.Day(), 0, 0, 0, 0, time.UTC)
 }
 
+// GetStartOfISOWeek returns the Monday of the ISO week containing t.
+func GetStartOfISOWeek(t time.Time) time.Time {
+	t = GetToday(t)
+	// ISO week starts on Monday. Go's Weekday() returns 0 for Sunday, 1 for Monday, etc.
+	// We want to shift back to the most recent Monday.
+	weekday := int(t.Weekday())
+	if weekday == 0 { // Sunday
+		weekday = 7
+	}
+	daysToSubtract := weekday - 1
+	return t.AddDate(0, 0, -daysToSubtract)
+}
+
 type ReportRepository interface {
 	GetReport(ctx context.Context, userID string) (*Report, error)
 	UpsertReport(ctx context.Context, report *Report) error

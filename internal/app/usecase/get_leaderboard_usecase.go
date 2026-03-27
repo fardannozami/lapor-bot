@@ -77,10 +77,12 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	// Single unified ranking by ActivityCount
 	for rank, r := range reports {
 		// Active if streak equals activity_count (never lost streak)
-		if r.Streak == r.ActivityCount {
-			sb.WriteString(fmt.Sprintf("%d. %s - %d days 🔥\n", rank+1, r.Name, r.ActivityCount))
+		// NOTE: With weekly streaks, we might need a different criteria for "active" in the recap,
+		// but for the rankings list, we'll just show the streak in weeks.
+		if r.Streak > 0 {
+			sb.WriteString(fmt.Sprintf("%d. %s - %d days (%d weeks streak 🔥)\n", rank+1, r.Name, r.ActivityCount, r.Streak))
 		} else {
-			sb.WriteString(fmt.Sprintf("%d. %s - %d days 💔\n", rank+1, r.Name, r.ActivityCount))
+			sb.WriteString(fmt.Sprintf("%d. %s - %d days (💔)\n", rank+1, r.Name, r.ActivityCount))
 		}
 	}
 

@@ -80,8 +80,7 @@ func TestStreak_FirstReport(t *testing.T) {
 	}
 
 	// Check response message
-	// Check response message
-	expected := "Laporan diterima, Alice sudah berkeringat 1 hari. Lanjutkan 🔥 (streak 1 hari)"
+	expected := "Laporan diterima, Alice sudah berkeringat 1 hari. Lanjutkan 🔥 (streak 1 minggu)"
 	if !containsSubstring(msg, expected) {
 		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg)
 	}
@@ -96,14 +95,14 @@ func TestStreak_ConsecutiveDay_StreakIncreases(t *testing.T) {
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
-	// Setup: user reported yesterday
-	yesterday := time.Now().AddDate(0, 0, -1)
+	// Setup: user reported last week (consecutive week)
+	lastWeek := time.Now().AddDate(0, 0, -7)
 	repo.reports["user1"] = &domain.Report{
 		UserID:         "user1",
 		Name:           "Bob",
 		Streak:         5,
 		ActivityCount:  10,
-		LastReportDate: yesterday,
+		LastReportDate: lastWeek,
 	}
 
 	// Report today (consecutive day)
@@ -114,10 +113,10 @@ func TestStreak_ConsecutiveDay_StreakIncreases(t *testing.T) {
 
 	r := repo.reports["user1"]
 	if r.Streak != 6 {
-		t.Errorf("Consecutive day: expected Streak=6 (5+1), got %d", r.Streak)
+		t.Errorf("Consecutive week: expected Streak=6 (5+1), got %d", r.Streak)
 	}
 	if r.ActivityCount != 11 {
-		t.Errorf("Consecutive day: expected ActivityCount=11 (10+1), got %d", r.ActivityCount)
+		t.Errorf("Consecutive week: expected ActivityCount=11 (10+1), got %d", r.ActivityCount)
 	}
 }
 
@@ -126,14 +125,14 @@ func TestStreak_MissedDay_StreakResets(t *testing.T) {
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
-	// Setup: user last reported 3 days ago (missed 2 days)
-	threeDaysAgo := time.Now().AddDate(0, 0, -3)
+	// Setup: user last reported 2 weeks ago (missed 1 whole week)
+	twoWeeksAgo := time.Now().AddDate(0, 0, -14)
 	repo.reports["user1"] = &domain.Report{
 		UserID:         "user1",
 		Name:           "Charlie",
-		Streak:         20, // Had a 20-day streak
+		Streak:         20, // Had a 20-week streak
 		ActivityCount:  25,
-		LastReportDate: threeDaysAgo,
+		LastReportDate: twoWeeksAgo,
 	}
 
 	// Report today after missing days
@@ -144,10 +143,10 @@ func TestStreak_MissedDay_StreakResets(t *testing.T) {
 
 	r := repo.reports["user1"]
 	if r.Streak != 1 {
-		t.Errorf("Missed day: expected Streak=1 (reset), got %d", r.Streak)
+		t.Errorf("Missed week: expected Streak=1 (reset), got %d", r.Streak)
 	}
 	if r.ActivityCount != 26 {
-		t.Errorf("Missed day: expected ActivityCount=26 (25+1, preserved), got %d", r.ActivityCount)
+		t.Errorf("Missed week: expected ActivityCount=26 (25+1, preserved), got %d", r.ActivityCount)
 	}
 }
 
@@ -278,12 +277,12 @@ func TestLeaderboard_RanksByActivityCount(t *testing.T) {
 		t.Errorf("Leaderboard should rank by ActivityCount: got positions %d, %d, %d", pos1, pos2, pos3)
 	}
 
-	// Verify emojis
-	if !containsSubstring(result, "HighTotal_LostStreak - 30 days 💔") {
-		t.Errorf("Lost streak user should have 💔 emoji")
+	// Verify emojis and format
+	if !containsSubstring(result, "HighTotal_LostStreak - 30 days (💔)") {
+		t.Errorf("Lost streak user should have 💔 emoji in ranking")
 	}
-	if !containsSubstring(result, "MediumTotal_ActiveStreak - 25 days 🔥") {
-		t.Errorf("Active streak user should have 🔥 emoji")
+	if !containsSubstring(result, "MediumTotal_ActiveStreak - 25 days (25 weeks streak 🔥)") {
+		t.Errorf("Active streak user should have weeks streak and 🔥 emoji")
 	}
 }
 

@@ -31,7 +31,7 @@ func (uc *ComebackChallengeUsecase) Execute(ctx context.Context, userID, name st
 
 	if report.InactiveDays == 0 {
 		sb.WriteString("Kamu belum pernah absen lama. Pertahankan streak-mu! 🔥\n\n")
-		sb.WriteString(fmt.Sprintf("🔥 Streak saat ini: %d hari\n", report.Streak))
+		sb.WriteString(fmt.Sprintf("🔥 Streak saat ini: %d minggu\n", report.Streak))
 		sb.WriteString(fmt.Sprintf("📅 Total hari aktif: %d\n", report.ActivityCount))
 		sb.WriteString(fmt.Sprintf("🎖️ Level: %s\n", domain.FormatLevel(report.TotalPoints)))
 		return sb.String(), nil
@@ -39,7 +39,7 @@ func (uc *ComebackChallengeUsecase) Execute(ctx context.Context, userID, name st
 
 	// Show comeback status
 	sb.WriteString(fmt.Sprintf("Kamu kembali setelah %d hari absen.\n", report.InactiveDays))
-	sb.WriteString(fmt.Sprintf("Comeback streak saat ini: %d hari 🔥\n\n", report.ComebackStreak))
+	sb.WriteString(fmt.Sprintf("Comeback streak saat ini: %d minggu 🔥\n\n", report.ComebackStreak))
 
 	// Show comeback achievements status
 	sb.WriteString("🏅 Comeback Achievements:\n")
@@ -49,7 +49,7 @@ func (uc *ComebackChallengeUsecase) Execute(ctx context.Context, userID, name st
 		} else if report.InactiveDays >= a.MinInactiveDays {
 			remaining := a.MinComebackStreak - report.ComebackStreak
 			if remaining > 0 {
-				sb.WriteString(fmt.Sprintf("  🎯 %s — %d hari lagi! (%d pts)\n", a.Name, remaining, a.Points))
+				sb.WriteString(fmt.Sprintf("  🎯 %s — %d minggu lagi! (%d pts)\n", a.Name, remaining, a.Points))
 			} else {
 				// Should have been unlocked already, but just in case
 				sb.WriteString(fmt.Sprintf("  🏅 %s — READY TO UNLOCK! (%d pts)\n", a.Name, a.Points))
