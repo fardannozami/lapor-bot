@@ -43,7 +43,7 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	// Count active vs lost for recap
 	activeCount := 0
 	lostCount := 0
-	currentWeekStart := domain.GetStartOfISOWeek(displayDate)
+	currentWeekStart := domain.GetStartOfISOWeek(now)
 	for _, r := range reports {
 		lastWeekStart := domain.GetStartOfISOWeek(r.LastReportDate)
 		weeksSinceLastReport := int(math.Round(currentWeekStart.Sub(lastWeekStart).Hours() / (24 * 7)))
