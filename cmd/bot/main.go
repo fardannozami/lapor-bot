@@ -178,6 +178,7 @@ func main() {
 			resp := &waE2E.Message{
 				Conversation: &response.Text,
 			}
+			targetChat.Device = 0
 			_, err := waService.GetClient().SendMessage(ctx, targetChat, resp)
 			if err != nil {
 				log.Printf("Failed to send response: %v", err)
