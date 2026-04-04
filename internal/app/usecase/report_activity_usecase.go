@@ -17,7 +17,7 @@ func NewReportActivityUsecase(repo domain.ReportRepository) *ReportActivityUseca
 	return &ReportActivityUsecase{repo: repo}
 }
 
-func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name string) (string, error) {
+func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name string, workout *domain.HevyWorkout) (string, error) {
 	report, err := uc.repo.GetReport(ctx, userID)
 	if err != nil {
 		return "", err
@@ -31,7 +31,11 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		lastReportDate := domain.GetToday(lastReport)
 
 		if lastReportDate.Equal(today) {
-			return fmt.Sprintf("%s sudah laporan hari ini, ayo jangan curang! 😉", name), nil
+			duplicateMsg := fmt.Sprintf("%s sudah laporan hari ini, ayo jangan curang! 😉", name)
+			if workout != nil {
+				duplicateMsg += "\n" + uc.formatWorkout(workout)
+			}
+			return duplicateMsg, nil
 		}
 
 		daysSinceLastReport := int(math.Round(today.Sub(lastReportDate).Hours() / 24))
@@ -141,6 +145,11 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		response = fmt.Sprintf("Laporan diterima, %s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)", name, report.ActivityCount, report.Streak)
 	}
 
+	// Append Workout Details if present
+	if workout != nil {
+		response += "\n" + uc.formatWorkout(workout)
+	}
+
 	// Append Gamification Notifications
 	if newRecord {
 		response += fmt.Sprintf("\n\n🏆 New Personal Best Streak: %d minggu!", report.Streak)
@@ -166,6 +175,24 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	response += fmt.Sprintf("\n%s", progressBar)
 
 	return response, nil
+}
+
+func (uc *ReportActivityUsecase) formatWorkout(workout *domain.HevyWorkout) string {
+	if workout == nil {
+		return ""
+	}
+
+	res := fmt.Sprintf("\n🏋️‍♂️ *%s Detail:*\n", workout.Title)
+	if len(workout.Exercises) > 0 {
+		res += "\n"
+		for _, ex := range workout.Exercises {
+			res += fmt.Sprintf("%s\n", ex)
+		}
+	}
+	if workout.Time != "" {
+		res += fmt.Sprintf("... ⏱️ Time: %s", workout.Time)
+	}
+	return res
 }
 
 // getNextComebackTarget finds the next comeback achievement the user can target.

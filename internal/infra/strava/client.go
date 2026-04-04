@@ -97,11 +97,12 @@ func (c *Client) RefreshToken(refreshToken string) (*domain.StravaAccount, error
 }
 
 type Activity struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Distance  float64   `json:"distance"` // meters
-	Type      string    `json:"type"`
-	StartDate time.Time `json:"start_date"`
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Distance    float64   `json:"distance"` // meters
+	Type        string    `json:"type"`
+	StartDate   time.Time `json:"start_date"`
 }
 
 func (c *Client) GetActivity(accessToken string, activityID int64) (*Activity, error) {

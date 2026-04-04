@@ -75,7 +75,7 @@ func TestStreak_FirstReport(t *testing.T) {
 	ctx := context.Background()
 
 	// First ever report
-	msg, err := uc.Execute(ctx, "user1", "Alice")
+	msg, err := uc.Execute(ctx, "user1", "Alice", nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestStreak_ConsecutiveDay_StreakIncreases(t *testing.T) {
 	}
 
 	// Report today (consecutive day)
-	_, err := uc.Execute(ctx, "user1", "Bob")
+	_, err := uc.Execute(ctx, "user1", "Bob", nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestStreak_MissedDay_StreakResets(t *testing.T) {
 	}
 
 	// Report today after missing days
-	_, err := uc.Execute(ctx, "user1", "Charlie")
+	_, err := uc.Execute(ctx, "user1", "Charlie", nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestStreak_SameDay_Rejected(t *testing.T) {
 	}
 
 	// Try to report again same day
-	msg, err := uc.Execute(ctx, "user1", "Diana")
+	msg, err := uc.Execute(ctx, "user1", "Diana", nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestStreak_LongGap_StreakResets(t *testing.T) {
 	}
 
 	// Report today after long absence
-	_, err := uc.Execute(ctx, "user1", "Eve")
+	_, err := uc.Execute(ctx, "user1", "Eve", nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

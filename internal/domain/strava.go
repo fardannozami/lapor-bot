@@ -11,6 +11,7 @@ type StravaAccount struct {
 	AccessToken  string    `json:"access_token" db:"access_token"`
 	RefreshToken string    `json:"refresh_token" db:"refresh_token"`
 	ExpiresAt    time.Time `json:"expires_at" db:"expires_at"`
+	Name         string    `json:"name" db:"name"`
 }
 
 type StravaRepository interface {

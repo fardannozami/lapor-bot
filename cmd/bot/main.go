@@ -145,7 +145,13 @@ func main() {
 			return
 		}
 
-		if response != "" {
+		if response.Text != "" {
+			// Determine response target
+			targetChat := evt.Info.Chat
+			if response.IsPrivate {
+				targetChat = evt.Info.Sender
+			}
+
 			// Apply reply delay to appear more human-like
 			delayMs := cfg.ReplyDelayMinMs
 			if cfg.ReplyDelayMaxMs > cfg.ReplyDelayMinMs {
@@ -156,7 +162,7 @@ func main() {
 			if delayMs > 0 {
 				// Show typing indicator if enabled
 				if cfg.ShowTyping {
-					_ = waService.GetClient().SendChatPresence(ctx, evt.Info.Chat, types.ChatPresenceComposing, types.ChatPresenceMediaText)
+					_ = waService.GetClient().SendChatPresence(ctx, targetChat, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 				}
 
 				log.Printf("Delaying reply by %dms", delayMs)
@@ -164,15 +170,15 @@ func main() {
 
 				// Clear typing indicator
 				if cfg.ShowTyping {
-					_ = waService.GetClient().SendChatPresence(ctx, evt.Info.Chat, types.ChatPresencePaused, types.ChatPresenceMediaText)
+					_ = waService.GetClient().SendChatPresence(ctx, targetChat, types.ChatPresencePaused, types.ChatPresenceMediaText)
 				}
 			}
 
 			// Send response
 			resp := &waE2E.Message{
-				Conversation: &response,
+				Conversation: &response.Text,
 			}
-			_, err := waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
+			_, err := waService.GetClient().SendMessage(ctx, targetChat, resp)
 			if err != nil {
 				log.Printf("Failed to send response: %v", err)
 			}

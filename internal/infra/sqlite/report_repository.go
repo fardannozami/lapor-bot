@@ -132,6 +132,7 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 			access_token TEXT,
 			refresh_token TEXT,
 			expires_at TEXT,
+			name TEXT,
 			FOREIGN KEY (user_id) REFERENCES user_reports(user_id)
 		);
 	`
@@ -148,6 +149,7 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN achievements TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN comeback_streak INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN inactive_days INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE strava_accounts ADD COLUMN name TEXT")
 
 	// Run data migrations
 	if err := r.MigrateDayToWeekStreaks(ctx); err != nil {
@@ -216,28 +218,29 @@ func (r *ReportRepository) ResolveLIDToPhone(ctx context.Context, lid string) st
 
 func (r *ReportRepository) UpsertStravaAccount(ctx context.Context, account *domain.StravaAccount) error {
 	query := `
-		INSERT INTO strava_accounts (user_id, athlete_id, access_token, refresh_token, expires_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO strava_accounts (user_id, athlete_id, access_token, refresh_token, expires_at, name)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			athlete_id = excluded.athlete_id,
 			access_token = excluded.access_token,
 			refresh_token = excluded.refresh_token,
-			expires_at = excluded.expires_at
+			expires_at = excluded.expires_at,
+			name = excluded.name
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		account.UserID, account.AthleteID, account.AccessToken,
-		account.RefreshToken, account.ExpiresAt.Format(time.RFC3339),
+		account.RefreshToken, account.ExpiresAt.Format(time.RFC3339), account.Name,
 	)
 	return err
 }
 
 func (r *ReportRepository) GetStravaAccountByAthleteID(ctx context.Context, athleteID int64) (*domain.StravaAccount, error) {
-	query := `SELECT user_id, athlete_id, access_token, refresh_token, expires_at FROM strava_accounts WHERE athlete_id = ?`
+	query := `SELECT user_id, athlete_id, access_token, refresh_token, expires_at, COALESCE(name, '') FROM strava_accounts WHERE athlete_id = ?`
 	row := r.db.QueryRowContext(ctx, query, athleteID)
 
 	var account domain.StravaAccount
 	var expiresAt string
-	err := row.Scan(&account.UserID, &account.AthleteID, &account.AccessToken, &account.RefreshToken, &expiresAt)
+	err := row.Scan(&account.UserID, &account.AthleteID, &account.AccessToken, &account.RefreshToken, &expiresAt, &account.Name)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -254,12 +257,12 @@ func (r *ReportRepository) GetStravaAccountByAthleteID(ctx context.Context, athl
 }
 
 func (r *ReportRepository) GetStravaAccountByUserID(ctx context.Context, userID string) (*domain.StravaAccount, error) {
-	query := `SELECT user_id, athlete_id, access_token, refresh_token, expires_at FROM strava_accounts WHERE user_id = ?`
+	query := `SELECT user_id, athlete_id, access_token, refresh_token, expires_at, COALESCE(name, '') FROM strava_accounts WHERE user_id = ?`
 	row := r.db.QueryRowContext(ctx, query, userID)
 
 	var account domain.StravaAccount
 	var expiresAt string
-	err := row.Scan(&account.UserID, &account.AthleteID, &account.AccessToken, &account.RefreshToken, &expiresAt)
+	err := row.Scan(&account.UserID, &account.AthleteID, &account.AccessToken, &account.RefreshToken, &expiresAt, &account.Name)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

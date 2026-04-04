@@ -109,8 +109,8 @@ func TestHandleMessage_LaporCommand(t *testing.T) {
 
 	// Should route to report usecase and return response
 	expected := "Laporan diterima, TestUser sudah berkeringat 1 hari. Lanjutkan 🔥 (streak 1 minggu)"
-	if !containsSubstring(msg, expected) {
-		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg)
+	if !containsSubstring(msg.Text, expected) {
+		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg.Text)
 	}
 
 	// Verify user was created
@@ -143,7 +143,7 @@ func TestHandleMessage_LaporCaseInsensitive(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", cmd, err)
 		}
-		if msg == "" {
+		if msg.Text == "" {
 			t.Errorf("Command '%s' should return a response", cmd)
 		}
 	}
@@ -166,7 +166,7 @@ func TestHandleMessage_LaporWithTrailingText(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if msg == "" {
+	if msg.Text == "" {
 		t.Error("#lapor with trailing text should still be recognized")
 	}
 }
@@ -198,11 +198,11 @@ func TestHandleMessage_LeaderboardCommand(t *testing.T) {
 	}
 
 	// Should return leaderboard output
-	if msg == "" {
+	if msg.Text == "" {
 		t.Error("#leaderboard should return a response")
 	}
-	if !containsSubstring(msg, "30 Days of Sweat Challenge") {
-		t.Errorf("Response should contain '30 Days of Sweat Challenge', got '%s'", msg)
+	if !containsSubstring(msg.Text, "30 Days of Sweat Challenge") {
+		t.Errorf("Response should contain '30 Days of Sweat Challenge', got '%s'", msg.Text)
 	}
 }
 
@@ -224,7 +224,7 @@ func TestHandleMessage_LeaderboardCaseInsensitive(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", cmd, err)
 		}
-		if msg == "" {
+		if msg.Text == "" {
 			t.Errorf("Command '%s' should return a response", cmd)
 		}
 	}
@@ -251,13 +251,13 @@ func TestHandleMessage_UnknownCommand_ReturnsEmpty(t *testing.T) {
 		"leaderboard", // missing #
 	}
 
-	for _, msg := range testCases {
-		result, err := handleUC.Execute(ctx, "user1", "User", msg)
+	for _, msgText := range testCases {
+		result, err := handleUC.Execute(ctx, "user1", "User", msgText)
 		if err != nil {
-			t.Fatalf("Unexpected error for '%s': %v", msg, err)
+			t.Fatalf("Unexpected error for '%s': %v", msgText, err)
 		}
-		if result != "" {
-			t.Errorf("Unknown command '%s' should return empty string, got '%s'", msg, result)
+		if result.Text != "" {
+			t.Errorf("Unknown command '%s' should return empty string, got '%s'", msgText, result.Text)
 		}
 	}
 }
@@ -289,7 +289,7 @@ func TestHandleMessage_WhitespaceHandling(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Test %d: Unexpected error for '%q': %v", i, cmd, err)
 		}
-		if msg == "" {
+		if msg.Text == "" {
 			t.Errorf("Test %d: Command '%q' with whitespace should still work", i, cmd)
 		}
 	}
@@ -311,8 +311,8 @@ func TestHandleMessage_EmptyMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if result != "" {
-		t.Errorf("Empty message should return empty string, got '%s'", result)
+	if result.Text != "" {
+		t.Errorf("Empty message should return empty string, got '%s'", result.Text)
 	}
 }
 
@@ -344,8 +344,8 @@ func TestHandleMessage_GamificationCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error for #mystats: %v", err)
 	}
-	if msg == "" || !containsSubstring(msg, "Statistik kamu, Gamer") {
-		t.Errorf("#mystats response invalid: %s", msg)
+	if msg.Text == "" || !containsSubstring(msg.Text, "Statistik kamu, Gamer") {
+		t.Errorf("#mystats response invalid: %s", msg.Text)
 	}
 
 	// Test #achievements
@@ -353,8 +353,8 @@ func TestHandleMessage_GamificationCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error for #achievements: %v", err)
 	}
-	if msg == "" || !containsSubstring(msg, "Daftar Achievement") {
-		t.Errorf("#achievements response invalid: %s", msg)
+	if msg.Text == "" || !containsSubstring(msg.Text, "Daftar Achievement") {
+		t.Errorf("#achievements response invalid: %s", msg.Text)
 	}
 }
 
@@ -375,8 +375,8 @@ func TestHandleMessage_SetNameCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !containsSubstring(msg, "Namamu telah diatur sebagai King Budi") {
-		t.Errorf("Unexpected response: %s", msg)
+	if !containsSubstring(msg.Text, "Namamu telah diatur sebagai King Budi") {
+		t.Errorf("Unexpected response: %s", msg.Text)
 	}
 
 	// Verify repo
@@ -390,8 +390,8 @@ func TestHandleMessage_SetNameCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !containsSubstring(msg, "dari King Budi menjadi Budi Solo") {
-		t.Errorf("Unexpected response: %s", msg)
+	if !containsSubstring(msg.Text, "dari King Budi menjadi Budi Solo") {
+		t.Errorf("Unexpected response: %s", msg.Text)
 	}
 
 	// Verify repo update

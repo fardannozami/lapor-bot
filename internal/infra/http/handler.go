@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -46,7 +47,11 @@ func (s *Server) HandleStravaLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authURL := s.linkUC.GetAuthURL(userID)
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		name = "User"
+	}
+	authURL := s.linkUC.GetAuthURL(userID, name)
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
 
@@ -80,6 +85,7 @@ func (s *Server) HandleStravaWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		log.Printf("Strava webhook challenge verification successful")
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"hub.challenge": challenge})
 		return
@@ -93,8 +99,10 @@ func (s *Server) HandleStravaWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		log.Printf("Received Strava webhook: %+v", event)
+
 		go func() {
-			if err := s.processUC.Execute(r.Context(), s.waClient, event); err != nil {
+			if err := s.processUC.Execute(context.Background(), s.waClient, event); err != nil {
 				log.Printf("Strava webhook execution error: %v", err)
 			}
 		}()
