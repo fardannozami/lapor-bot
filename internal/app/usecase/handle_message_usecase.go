@@ -11,6 +11,7 @@ type HandleMessageUsecase struct {
 	myStatsUC      *GetMyStatsUsecase
 	achievementsUC *GetAchievementsUsecase
 	comebackUC     *ComebackChallengeUsecase
+	updateNameUC   *UpdateNameUsecase
 }
 
 func NewHandleMessageUsecase(
@@ -19,6 +20,7 @@ func NewHandleMessageUsecase(
 	myStatsUC *GetMyStatsUsecase,
 	achievementsUC *GetAchievementsUsecase,
 	comebackUC *ComebackChallengeUsecase,
+	updateNameUC *UpdateNameUsecase,
 ) *HandleMessageUsecase {
 	return &HandleMessageUsecase{
 		reportUC:       reportUC,
@@ -26,6 +28,7 @@ func NewHandleMessageUsecase(
 		myStatsUC:      myStatsUC,
 		achievementsUC: achievementsUC,
 		comebackUC:     comebackUC,
+		updateNameUC:   updateNameUC,
 	}
 }
 
@@ -35,6 +38,14 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 	// Handle #lapor (di mana aja posisinya)
 	if strings.Contains(msg, "#lapor") {
 		return uc.reportUC.Execute(ctx, userID, name)
+	}
+
+	// Handle #setname
+	if strings.Contains(msg, "#setname") {
+		// Extract name from message: everything after "#setname"
+		idx := strings.Index(msg, "#setname")
+		newName := strings.TrimSpace(message[idx+len("#setname"):])
+		return uc.updateNameUC.Execute(ctx, userID, newName)
 	}
 
 	// Handle #leaderboard (di mana aja juga)

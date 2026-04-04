@@ -53,8 +53,9 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			report.Streak = 1
 		}
 		report.ActivityCount++
-		report.Name = name
+		// report.Name = name // Removed: don't update name during report
 		report.LastReportDate = now
+		name = report.Name // Use the stored name for the response message
 	} else {
 		report = &domain.Report{
 			UserID:         userID,

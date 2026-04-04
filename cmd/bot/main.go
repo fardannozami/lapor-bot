@@ -42,7 +42,8 @@ func main() {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	remindInactiveUC := usecase.NewRemindInactiveUsersUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
-	handleMessageUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC)
+	updateNameUC := usecase.NewUpdateNameUsecase(repo)
+	handleMessageUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC)
 
 	// 5. WhatsApp Service
 	waService := wa.NewService(cfg.SQLitePath, logger)
