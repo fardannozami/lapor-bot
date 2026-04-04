@@ -42,6 +42,18 @@ func (m *mockRepo) GetInactiveUsers(ctx context.Context, days int) ([]*domain.Re
 	return nil, nil
 }
 
+func (m *mockRepo) UpsertStravaAccount(ctx context.Context, account *domain.StravaAccount) error {
+	return nil
+}
+
+func (m *mockRepo) GetStravaAccountByAthleteID(ctx context.Context, athleteID int64) (*domain.StravaAccount, error) {
+	return nil, nil
+}
+
+func (m *mockRepo) GetStravaAccountByUserID(ctx context.Context, userID string) (*domain.StravaAccount, error) {
+	return nil, nil
+}
+
 // =============================================================================
 // STREAK LOGIC TESTS
 // =============================================================================

@@ -14,7 +14,9 @@ import (
 
 	"github.com/fardannozami/whatsapp-gateway/internal/app/usecase"
 	"github.com/fardannozami/whatsapp-gateway/internal/config"
+	botHTTP "github.com/fardannozami/whatsapp-gateway/internal/infra/http"
 	"github.com/fardannozami/whatsapp-gateway/internal/infra/repository"
+	"github.com/fardannozami/whatsapp-gateway/internal/infra/strava"
 	"github.com/fardannozami/whatsapp-gateway/internal/infra/wa"
 
 	"go.mau.fi/whatsmeow"
@@ -43,7 +45,15 @@ func main() {
 	remindInactiveUC := usecase.NewRemindInactiveUsersUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleMessageUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC)
+
+	// Strava Integration
+	stravaClient := strava.NewClient(cfg)
+	linkStravaUC := usecase.NewLinkStravaUsecase(repo, stravaClient, cfg)
+	processStravaUC := usecase.NewProcessStravaWebhookUsecase(repo, stravaClient, reportUC, cfg.GroupID)
+
+	handleMessageUC := usecase.NewHandleMessageUsecase(
+		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, linkStravaUC,
+	)
 
 	// 5. WhatsApp Service
 	waService := wa.NewService(cfg.SQLitePath, logger)
@@ -279,14 +289,12 @@ func main() {
 		}
 	}()
 
-	log.Printf("Starting healthcheck server on port %s", cfg.Port)
+	log.Printf("Starting HTTP server on port %s", cfg.Port)
 
-	// 8. Healthcheck server
+	// 8. HTTP server (Healthcheck + Strava)
+	httpServer := botHTTP.NewServer(linkStravaUC, processStravaUC, waService.GetClient(), cfg)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "OK")
-	})
+	httpServer.RegisterHandlers(mux)
 
 	server := &http.Server{
 		Addr:    ":" + cfg.Port,
@@ -295,7 +303,7 @@ func main() {
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Healthcheck server error: %v", err)
+			log.Printf("HTTP server error: %v", err)
 		}
 	}()
 

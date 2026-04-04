@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"strings"
 )
 
@@ -12,6 +13,7 @@ type HandleMessageUsecase struct {
 	achievementsUC *GetAchievementsUsecase
 	comebackUC     *ComebackChallengeUsecase
 	updateNameUC   *UpdateNameUsecase
+	linkStravaUC   *LinkStravaUsecase
 }
 
 func NewHandleMessageUsecase(
@@ -21,6 +23,7 @@ func NewHandleMessageUsecase(
 	achievementsUC *GetAchievementsUsecase,
 	comebackUC *ComebackChallengeUsecase,
 	updateNameUC *UpdateNameUsecase,
+	linkStravaUC *LinkStravaUsecase,
 ) *HandleMessageUsecase {
 	return &HandleMessageUsecase{
 		reportUC:       reportUC,
@@ -29,6 +32,7 @@ func NewHandleMessageUsecase(
 		achievementsUC: achievementsUC,
 		comebackUC:     comebackUC,
 		updateNameUC:   updateNameUC,
+		linkStravaUC:   linkStravaUC,
 	}
 }
 
@@ -66,6 +70,13 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 	// Handle #comeback
 	if strings.Contains(msg, "#comeback") {
 		return uc.comebackUC.Execute(ctx, userID, name)
+	}
+
+	// Handle #strava
+	if strings.Contains(msg, "#strava") {
+		authURL := uc.linkStravaUC.GetAuthURL(userID)
+		response := fmt.Sprintf("🚴‍♂️ *Integrasi Strava* 🏃‍♂️\n\nKlik link di bawah ini untuk menghubungkan akun Strava kamu:\n\n%s\n\nSetelah berhasil, aktivitas larimu akan otomatis dilaporkan! 🎉", authURL)
+		return response, nil
 	}
 
 	return "", nil

@@ -49,4 +49,9 @@ type ReportRepository interface {
 	GetInactiveUsers(ctx context.Context, days int) ([]*Report, error)
 	InitTable(ctx context.Context) error
 	ResolveLIDToPhone(ctx context.Context, lid string) string
+
+	// Strava Integration
+	UpsertStravaAccount(ctx context.Context, account *StravaAccount) error
+	GetStravaAccountByAthleteID(ctx context.Context, athleteID int64) (*StravaAccount, error)
+	GetStravaAccountByUserID(ctx context.Context, userID string) (*StravaAccount, error)
 }

@@ -124,6 +124,22 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 		return err
 	}
 
+	// Strava Accounts Table
+	stravaQuery := `
+		CREATE TABLE IF NOT EXISTS strava_accounts (
+			user_id TEXT PRIMARY KEY,
+			athlete_id INTEGER UNIQUE,
+			access_token TEXT,
+			refresh_token TEXT,
+			expires_at TEXT,
+			FOREIGN KEY (user_id) REFERENCES user_reports(user_id)
+		);
+	`
+	_, err = r.db.ExecContext(ctx, stravaQuery)
+	if err != nil {
+		return err
+	}
+
 	// Simple migration: try to add columns if they don't exist
 	// Ignore error if they already exist
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN activity_count INTEGER DEFAULT 0")
@@ -194,4 +210,67 @@ func (r *ReportRepository) ResolveLIDToPhone(ctx context.Context, lid string) st
 		return phone
 	}
 	return lid
+}
+
+// Strava Integration
+
+func (r *ReportRepository) UpsertStravaAccount(ctx context.Context, account *domain.StravaAccount) error {
+	query := `
+		INSERT INTO strava_accounts (user_id, athlete_id, access_token, refresh_token, expires_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(user_id) DO UPDATE SET
+			athlete_id = excluded.athlete_id,
+			access_token = excluded.access_token,
+			refresh_token = excluded.refresh_token,
+			expires_at = excluded.expires_at
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		account.UserID, account.AthleteID, account.AccessToken,
+		account.RefreshToken, account.ExpiresAt.Format(time.RFC3339),
+	)
+	return err
+}
+
+func (r *ReportRepository) GetStravaAccountByAthleteID(ctx context.Context, athleteID int64) (*domain.StravaAccount, error) {
+	query := `SELECT user_id, athlete_id, access_token, refresh_token, expires_at FROM strava_accounts WHERE athlete_id = ?`
+	row := r.db.QueryRowContext(ctx, query, athleteID)
+
+	var account domain.StravaAccount
+	var expiresAt string
+	err := row.Scan(&account.UserID, &account.AthleteID, &account.AccessToken, &account.RefreshToken, &expiresAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	account.ExpiresAt, err = time.Parse(time.RFC3339, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &account, nil
+}
+
+func (r *ReportRepository) GetStravaAccountByUserID(ctx context.Context, userID string) (*domain.StravaAccount, error) {
+	query := `SELECT user_id, athlete_id, access_token, refresh_token, expires_at FROM strava_accounts WHERE user_id = ?`
+	row := r.db.QueryRowContext(ctx, query, userID)
+
+	var account domain.StravaAccount
+	var expiresAt string
+	err := row.Scan(&account.UserID, &account.AthleteID, &account.AccessToken, &account.RefreshToken, &expiresAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	account.ExpiresAt, err = time.Parse(time.RFC3339, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &account, nil
 }

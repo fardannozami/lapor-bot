@@ -16,6 +16,10 @@ type Config struct {
 	ReplyDelayMinMs int  // Minimum delay before reply (milliseconds)
 	ReplyDelayMaxMs int  // Maximum delay before reply (milliseconds), 0 = use min as fixed
 	ShowTyping      bool // Show typing indicator during delay
+	StravaClientID  string
+	StravaClientSecret string
+	StravaVerifyToken string
+	AppBaseURL      string
 }
 
 func Load() Config {
@@ -30,6 +34,10 @@ func Load() Config {
 	replyDelayMinMs := getenvInt("REPLY_DELAY_MIN_MS", 0)
 	replyDelayMaxMs := getenvInt("REPLY_DELAY_MAX_MS", 0)
 	showTyping := getenvBool("SHOW_TYPING", false)
+	stravaClientID := getenv("STRAVA_CLIENT_ID", "")
+	stravaClientSecret := getenv("STRAVA_CLIENT_SECRET", "")
+	stravaVerifyToken := getenv("STRAVA_VERIFY_TOKEN", "")
+	appBaseURL := getenv("APP_BASE_URL", "http://localhost:8080")
 
 	return Config{
 		Port:            port,
@@ -39,6 +47,10 @@ func Load() Config {
 		ReplyDelayMinMs: replyDelayMinMs,
 		ReplyDelayMaxMs: replyDelayMaxMs,
 		ShowTyping:      showTyping,
+		StravaClientID:  stravaClientID,
+		StravaClientSecret: stravaClientSecret,
+		StravaVerifyToken: stravaVerifyToken,
+		AppBaseURL:      appBaseURL,
 	}
 }
 
