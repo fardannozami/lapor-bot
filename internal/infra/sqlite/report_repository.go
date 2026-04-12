@@ -18,7 +18,7 @@ func NewReportRepository(db *sql.DB) *ReportRepository {
 
 const selectColumns = `user_id, name, streak, activity_count, last_report_date, 
 	COALESCE(max_streak, 0), COALESCE(total_points, 0), COALESCE(achievements, ''),
-	COALESCE(comeback_streak, 0), COALESCE(inactive_days, 0)`
+	COALESCE(comeback_streak, 0), COALESCE(inactive_days, 0), COALESCE(centurion_cycles, 0)`
 
 func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, error) {
 	var report domain.Report
@@ -26,7 +26,7 @@ func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, e
 	err := scanner.Scan(
 		&report.UserID, &report.Name, &report.Streak, &report.ActivityCount,
 		&lastReportDate, &report.MaxStreak, &report.TotalPoints, &report.Achievements,
-		&report.ComebackStreak, &report.InactiveDays,
+		&report.ComebackStreak, &report.InactiveDays, &report.CenturionCycles,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -51,8 +51,8 @@ func (r *ReportRepository) GetReport(ctx context.Context, userID string) (*domai
 
 func (r *ReportRepository) UpsertReport(ctx context.Context, report *domain.Report) error {
 	query := `
-		INSERT INTO user_reports (user_id, name, streak, activity_count, last_report_date, max_streak, total_points, achievements, comeback_streak, inactive_days)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_reports (user_id, name, streak, activity_count, last_report_date, max_streak, total_points, achievements, comeback_streak, inactive_days, centurion_cycles)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			name = excluded.name,
 			streak = excluded.streak,
@@ -62,12 +62,13 @@ func (r *ReportRepository) UpsertReport(ctx context.Context, report *domain.Repo
 			total_points = excluded.total_points,
 			achievements = excluded.achievements,
 			comeback_streak = excluded.comeback_streak,
-			inactive_days = excluded.inactive_days
+			inactive_days = excluded.inactive_days,
+			centurion_cycles = excluded.centurion_cycles
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		report.UserID, report.Name, report.Streak, report.ActivityCount,
 		report.LastReportDate.Format(time.RFC3339), report.MaxStreak, report.TotalPoints,
-		report.Achievements, report.ComebackStreak, report.InactiveDays,
+		report.Achievements, report.ComebackStreak, report.InactiveDays, report.CenturionCycles,
 	)
 	return err
 }
@@ -149,10 +150,14 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN achievements TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN comeback_streak INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN inactive_days INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN centurion_cycles INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE strava_accounts ADD COLUMN name TEXT")
 
 	// Run data migrations
 	if err := r.MigrateDayToWeekStreaks(ctx); err != nil {
+		return err
+	}
+	if err := r.MigrateCenturionPrestige(ctx); err != nil {
 		return err
 	}
 
@@ -199,6 +204,34 @@ func (r *ReportRepository) MigrateDayToWeekStreaks(ctx context.Context) error {
 	}
 
 	_, err = r.db.ExecContext(ctx, "INSERT INTO sys_migrations (name) VALUES ('streak_day_to_week_v2')")
+	return err
+}
+
+func (r *ReportRepository) MigrateCenturionPrestige(ctx context.Context) error {
+	var exists int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sys_migrations WHERE name = 'centurion_prestige_v1'").Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists > 0 {
+		return nil
+	}
+
+	// For users with > 100 days:
+	// cycles = (activity_count - 1) / 100
+	// new_count = ((activity_count - 1) % 100) + 1
+	// SQLite doesn't have integer division like Go, but we can use CAST or floor
+	_, err = r.db.ExecContext(ctx, `
+		UPDATE user_reports 
+		SET centurion_cycles = (activity_count - 1) / 100,
+		    activity_count = ((activity_count - 1) % 100) + 1
+		WHERE activity_count > 100
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.ExecContext(ctx, "INSERT INTO sys_migrations (name) VALUES ('centurion_prestige_v1')")
 	return err
 }
 

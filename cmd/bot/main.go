@@ -45,6 +45,7 @@ func main() {
 	remindInactiveUC := usecase.NewRemindInactiveUsersUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
+	broadcastUpdateUC := usecase.NewBroadcastUpdateUsecase()
 
 	// Strava Integration
 	stravaClient := strava.NewClient(cfg)
@@ -52,7 +53,7 @@ func main() {
 	processStravaUC := usecase.NewProcessStravaWebhookUsecase(repo, stravaClient, reportUC, cfg.GroupID)
 
 	handleMessageUC := usecase.NewHandleMessageUsecase(
-		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, linkStravaUC,
+		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, linkStravaUC, broadcastUpdateUC,
 	)
 
 	// 5. WhatsApp Service

@@ -73,10 +73,15 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 		lastWeekStart := domain.GetStartOfISOWeek(r.LastReportDate)
 		weeksSinceLastReport := int(math.Round(currentWeekStart.Sub(lastWeekStart).Hours() / (24 * 7)))
 
+		cyclePrefix := ""
+		if r.CenturionCycles > 0 {
+			cyclePrefix = fmt.Sprintf("[S1-C%d] ", r.CenturionCycles+1)
+		}
+
 		if weeksSinceLastReport <= 1 {
-			sb.WriteString(fmt.Sprintf("%d. %s - %d days (%d weeks streak 🔥)\n", rank+1, r.Name, r.ActivityCount, r.Streak))
+			sb.WriteString(fmt.Sprintf("%d. %s%s - %d days (%d weeks streak 🔥)\n", rank+1, cyclePrefix, r.Name, r.ActivityCount, r.Streak))
 		} else {
-			sb.WriteString(fmt.Sprintf("%d. %s - %d days (💔)\n", rank+1, r.Name, r.ActivityCount))
+			sb.WriteString(fmt.Sprintf("%d. %s%s - %d days (💔)\n", rank+1, cyclePrefix, r.Name, r.ActivityCount))
 		}
 	}
 

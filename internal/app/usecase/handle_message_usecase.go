@@ -21,6 +21,7 @@ type HandleMessageUsecase struct {
 	comebackUC     *ComebackChallengeUsecase
 	updateNameUC   *UpdateNameUsecase
 	linkStravaUC   *LinkStravaUsecase
+	broadcastUpdateUC *BroadcastUpdateUsecase
 }
 
 func NewHandleMessageUsecase(
@@ -31,6 +32,7 @@ func NewHandleMessageUsecase(
 	comebackUC *ComebackChallengeUsecase,
 	updateNameUC *UpdateNameUsecase,
 	linkStravaUC *LinkStravaUsecase,
+	broadcastUpdateUC *BroadcastUpdateUsecase,
 ) *HandleMessageUsecase {
 	return &HandleMessageUsecase{
 		reportUC:       reportUC,
@@ -40,6 +42,7 @@ func NewHandleMessageUsecase(
 		comebackUC:     comebackUC,
 		updateNameUC:   updateNameUC,
 		linkStravaUC:   linkStravaUC,
+		broadcastUpdateUC: broadcastUpdateUC,
 	}
 }
 
@@ -91,6 +94,12 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		authURL := uc.linkStravaUC.GetAuthURL(userID, name)
 		text := fmt.Sprintf("🚴‍♂️ *Integrasi Strava* 🏃‍♂️\n\nKlik link di bawah ini untuk menghubungkan akun Strava kamu:\n\n%s\n\nSetelah berhasil, aktivitas larimu akan otomatis dilaporkan! 🎉", authURL)
 		return MessageResponse{Text: text, IsPrivate: true}, nil
+	}
+
+	// Handle !broadcast_update (Admin only in theory, but currently anyone can trigger for simplicity unless asked)
+	if strings.HasPrefix(msg, "!broadcast_update") {
+		text := uc.broadcastUpdateUC.Execute()
+		return MessageResponse{Text: text}, nil
 	}
 
 	return MessageResponse{}, nil

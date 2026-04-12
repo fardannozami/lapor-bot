@@ -16,6 +16,7 @@ type Report struct {
 	Achievements   string    `json:"achievements" db:"achievements"`
 	ComebackStreak int       `json:"comeback_streak" db:"comeback_streak"`
 	InactiveDays   int       `json:"inactive_days" db:"inactive_days"`
+	CenturionCycles int       `json:"centurion_cycles" db:"centurion_cycles"`
 }
 
 // ReportCutoffOffset is the spare time allowed for late-night reporting.

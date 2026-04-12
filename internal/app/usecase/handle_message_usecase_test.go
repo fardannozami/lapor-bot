@@ -97,7 +97,7 @@ func TestHandleMessage_LaporCommand(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 
@@ -130,7 +130,7 @@ func TestHandleMessage_LaporCaseInsensitive(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 
@@ -157,7 +157,7 @@ func TestHandleMessage_LaporWithTrailingText(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 
@@ -179,7 +179,7 @@ func TestHandleMessage_LeaderboardCommand(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 
@@ -214,7 +214,7 @@ func TestHandleMessage_LeaderboardCaseInsensitive(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 
@@ -238,7 +238,7 @@ func TestHandleMessage_UnknownCommand_ReturnsEmpty(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 
@@ -270,7 +270,7 @@ func TestHandleMessage_WhitespaceHandling(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 
@@ -303,7 +303,7 @@ func TestHandleMessage_EmptyMessage(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 
@@ -324,7 +324,7 @@ func TestHandleMessage_GamificationCommands(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 
@@ -366,7 +366,7 @@ func TestHandleMessage_SetNameCommand(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 
@@ -409,7 +409,7 @@ func TestHandleMessage_LaporDoesNotUpdateName(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
 
 	ctx := context.Background()
 

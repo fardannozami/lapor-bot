@@ -298,6 +298,102 @@ func TestLeaderboard_RanksByActivityCount(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// CENTURION PRESTIGE TESTS
+// =============================================================================
+
+func TestCenturion_PrestigeTransition(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	// 1. Setup: User at Day 99
+	lastWeek := time.Now().AddDate(0, 0, -7)
+	repo.reports["user1"] = &domain.Report{
+		UserID:         "user1",
+		Name:           "Centurion-to-be",
+		Streak:         12,
+		ActivityCount:  99,
+		LastReportDate: lastWeek,
+	}
+
+	// 2. Report Day 100
+	msg, _ := uc.Execute(ctx, "user1", "Centurion-to-be", nil)
+	r := repo.reports["user1"]
+	if r.ActivityCount != 100 {
+		t.Errorf("Expected day 100, got %d", r.ActivityCount)
+	}
+	if !containsSubstring(msg, "LUAR BIASA") || !containsSubstring(msg, "HARI KE-100") {
+		t.Errorf("Expected 100-day celebration message, got: %s", msg)
+	}
+
+	// 3. Report Day 101 (should transition to Cycle 1, Day 1)
+	r.LastReportDate = time.Now() // set to "today" relative to the logic inside uc.Execute(now)
+	// Note: Execute uses time.Now(), so we need to be careful. 
+	// In the real app we can't easily spoof time.now() without a clock provider.
+	// But in these tests, uc.Execute is called. Let's just call it again but simulate it's a new day/week.
+	
+	// Fast-forward the report object's date to "yesterday" so the next Execute() call increments the streak
+	repo.reports["user1"].LastReportDate = time.Now().AddDate(0, 0, -7)
+
+	msg, _ = uc.Execute(ctx, "user1", "Centurion-to-be", nil)
+	r = repo.reports["user1"]
+
+	if r.ActivityCount != 1 {
+		t.Errorf("Expected ActivityCount reset to 1 after 100, got %d", r.ActivityCount)
+	}
+	if r.CenturionCycles != 1 {
+		t.Errorf("Expected CenturionCycles=1 after day 101, got %d", r.CenturionCycles)
+	}
+	if r.Streak != 14 { // 12 (original) + 1 (for day 100) + 1 (for day 101)
+		t.Errorf("Expected streak to continue to 14, got %d", r.Streak)
+	}
+	if !containsSubstring(msg, "ERA BARU DIMULAI") || !containsSubstring(msg, "Siklus 2") {
+		t.Errorf("Expected cycle transition message, got: %s", msg)
+	}
+	if !containsSubstring(msg, "[C2] Centurion-to-be") {
+		t.Errorf("Expected [C2] badge in message, got: %s", msg)
+	}
+}
+
+func TestLeaderboard_CenturionSorting(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	uc := usecase.NewGetLeaderboardUsecase(repo)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	// Setup: 
+	// User A: Cycle 0, Day 50 (Experienced)
+	// User B: Cycle 1, Day 1 (Just "lapped" the leaderboard)
+	repo.reports["userA"] = &domain.Report{
+		Name:           "OldGuard",
+		ActivityCount:  50,
+		CenturionCycles: 0,
+		LastReportDate: now,
+	}
+	repo.reports["userB"] = &domain.Report{
+		Name:           "PrestigePlayer",
+		ActivityCount:  1,
+		CenturionCycles: 1,
+		LastReportDate: now,
+	}
+
+	result, _ := uc.Execute(ctx)
+
+	// Since we sort by ActivityCount DESC, Day 50 (OldGuard) should be higher than Day 1 (PrestigePlayer)
+	posA := indexOf(result, "OldGuard")
+	posB := indexOf(result, "PrestigePlayer")
+
+	if posA > posB {
+		t.Errorf("Leaderboard should put Day 50 above Day 1 even if Day 1 is Cycle 2. Got positions A:%d, B:%d", posA, posB)
+	}
+	
+	if !containsSubstring(result, "[S1-C2] PrestigePlayer") {
+		t.Errorf("Leaderboard should show [S1-C2] badge for the Prestige player")
+	}
+}
+
 // Helper functions
 func indexOf(s, substr string) int {
 	for i := 0; i <= len(s)-len(substr); i++ {

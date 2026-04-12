@@ -57,9 +57,22 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			report.Streak = 1
 		}
 		report.ActivityCount++
+		
+		// Handle Centurion Cycle Transition
+		isNewCycle := false
+		if report.ActivityCount > 100 {
+			report.ActivityCount = 1
+			report.CenturionCycles++
+			isNewCycle = true
+		}
+
 		// report.Name = name // Removed: don't update name during report
 		report.LastReportDate = now
 		name = report.Name // Use the stored name for the response message
+		
+		if isNewCycle {
+			// Special handling for new cycle can be added here or in the response construction
+		}
 	} else {
 		report = &domain.Report{
 			UserID:         userID,
@@ -142,7 +155,25 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		}
 	} else {
 		// Normal report message
-		response = fmt.Sprintf("Laporan diterima, %s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)", name, report.ActivityCount, report.Streak)
+		cyclePrefix := ""
+		if report.CenturionCycles > 0 {
+			cyclePrefix = fmt.Sprintf("[C%d] ", report.CenturionCycles+1)
+		}
+		
+		response = fmt.Sprintf("Laporan diterima, %s%s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)", cyclePrefix, name, report.ActivityCount, report.Streak)
+	}
+
+	// 7. Add Centurion Milestone Message
+	if report.ActivityCount == 1 && report.CenturionCycles > 0 && !isComeback {
+		response = "🔥 *ERA BARU DIMULAI!* 🔥\n" + 
+				  fmt.Sprintf("Selamat %s, Anda telah menyelesaikan 100 hari sebelumnya.\n", name) +
+				  fmt.Sprintf("Sekarang Anda memulai *Siklus %d (Hari ke-1)*. Terus jaga konsistensi! 💪\n\n", report.CenturionCycles+1) +
+				  response
+	} else if report.ActivityCount == 100 {
+		response = "🎊 *LUAR BIASA!* 🎊\n" +
+				  fmt.Sprintf("Selamat %s, Anda mencapai *HARI KE-100*! 💯\n", name) +
+				  "Anda sekarang resmi menyandang gelar *CENTURION 🛡️*. Nama Anda telah diabdikan dalam jajaran legenda grup!\n\n" +
+				  response
 	}
 
 	// Append Workout Details if present
