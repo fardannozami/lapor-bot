@@ -36,6 +36,11 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 }
 
 func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
+	if s.waClient == nil || !s.waClient.IsConnected() {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, "Disconnected")
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "OK")
 }

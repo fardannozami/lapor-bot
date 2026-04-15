@@ -318,9 +318,8 @@ func main() {
 	// 9. Wait for OS Signal
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
-
-	log.Println("Shutting down...")
+	sig := <-c
+	log.Printf("Received signal: %v. Shutting down...", sig)
 	waService.Disconnect()
 
 	// Shutdown healthcheck server
