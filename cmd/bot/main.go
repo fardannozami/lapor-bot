@@ -46,6 +46,7 @@ func main() {
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
 	broadcastUpdateUC := usecase.NewBroadcastUpdateUsecase()
+	resetSessionUC := usecase.NewResetSessionUsecase(repo)
 
 	// Strava Integration
 	stravaClient := strava.NewClient(cfg)
@@ -226,6 +227,15 @@ func main() {
 	}
 
 	log.Println("Bot is running... Press Ctrl+C to exit.")
+
+	// Schedule Session 2 reset at May 1, 2026 00:00 WIB
+	resetCtx, resetCancel := context.WithCancel(context.Background())
+	defer resetCancel()
+	usecase.ScheduleSessionReset(resetCtx, resetSessionUC, func() *whatsmeow.Client {
+		return waService.GetClient()
+	}, func() bool {
+		return waService.IsLoggedIn() && waService.GetClient().IsConnected()
+	}, cfg.GroupID)
 
 	// Background ticker for inactivity check (every day at 12:00 WIB)
 	go func() {

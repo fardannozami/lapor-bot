@@ -22,7 +22,7 @@ Kami ingin mengumumkan bahwa *Session 1* dari challenge "30 Days of Sweat" akan 
 • 🔥 Streak mingguan — mulai dari 0
 • 📊 Jumlah hari aktif — mulai dari 0
 • 🏅 Achievements — reset semua
-• ⭐ Points & Level — mulai dari awalZ
+• ⭐ Points & Level — mulai dari awal
 • 🛡️ Centurion Cycles — reset
 
 💡 *Artinya:*

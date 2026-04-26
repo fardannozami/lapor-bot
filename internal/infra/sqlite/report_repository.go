@@ -110,6 +110,11 @@ func (r *ReportRepository) GetInactiveUsers(ctx context.Context, days int) ([]*d
 	return scanReports(rows)
 }
 
+func (r *ReportRepository) ResetAllReports(ctx context.Context) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM user_reports`)
+	return err
+}
+
 func (r *ReportRepository) InitTable(ctx context.Context) error {
 	query := `
 		CREATE TABLE IF NOT EXISTS user_reports (

@@ -77,6 +77,11 @@ func (m *mockReportRepo) GetInactiveUsers(ctx context.Context, days int) ([]*dom
 	return nil, nil
 }
 
+func (m *mockReportRepo) ResetAllReports(ctx context.Context) error {
+	m.reports = make(map[string]*domain.Report)
+	return nil
+}
+
 func (m *mockReportRepo) UpsertStravaAccount(ctx context.Context, account *domain.StravaAccount) error {
 	return nil
 }

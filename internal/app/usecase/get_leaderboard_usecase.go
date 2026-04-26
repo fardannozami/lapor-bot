@@ -27,7 +27,12 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 
 	now := time.Now()
 	displayDate := domain.GetToday(now)
-	startDate := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	// Session-aware start date (auto-cycles every 4 months)
+	sessionNumber, sessionStart := GetCurrentSessionInfo(now)
+	_ = sessionNumber
+	startDate := time.Date(sessionStart.Year(), sessionStart.Month(), sessionStart.Day(), 0, 0, 0, 0, time.UTC)
+
 	challengeDay := int(displayDate.Sub(startDate).Hours()/24) + 1
 
 	// Logic for "Keep the streak" vs "Lose the streak":
