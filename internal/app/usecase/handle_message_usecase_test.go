@@ -3,6 +3,7 @@ package usecase_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/app/usecase"
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
@@ -45,7 +46,8 @@ func (m *mockLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 
 // mockReportRepo implements domain.ReportRepository for testing
 type mockReportRepo struct {
-	reports map[string]*domain.Report
+	reports        map[string]*domain.Report
+	activityCounts []domain.ActivityLeaderboardEntry
 }
 
 func (m *mockReportRepo) GetReport(ctx context.Context, userID string) (*domain.Report, error) {
@@ -57,12 +59,25 @@ func (m *mockReportRepo) UpsertReport(ctx context.Context, report *domain.Report
 	return nil
 }
 
+func (m *mockReportRepo) UpsertReportWithActivity(ctx context.Context, report *domain.Report, activityDate time.Time) error {
+	m.reports[report.UserID] = report
+	return nil
+}
+
 func (m *mockReportRepo) GetAllReports(ctx context.Context) ([]*domain.Report, error) {
 	var result []*domain.Report
 	for _, r := range m.reports {
 		result = append(result, r)
 	}
 	return result, nil
+}
+
+func (m *mockReportRepo) LogActivity(ctx context.Context, userID string, activityDate time.Time) error {
+	return nil
+}
+
+func (m *mockReportRepo) GetActivityCountsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]domain.ActivityLeaderboardEntry, error) {
+	return m.activityCounts, nil
 }
 
 func (m *mockReportRepo) ResolveLIDToPhone(ctx context.Context, lid string) string {
@@ -232,6 +247,42 @@ func TestHandleMessage_LeaderboardCaseInsensitive(t *testing.T) {
 		if msg.Text == "" {
 			t.Errorf("Command '%s' should return a response", cmd)
 		}
+	}
+}
+
+func TestHandleMessage_WeeklyLeaderboardCommand(t *testing.T) {
+	repo := &mockReportRepo{
+		reports: make(map[string]*domain.Report),
+		activityCounts: []domain.ActivityLeaderboardEntry{
+			{Name: "Alice", ActivityCount: 3},
+			{Name: "Budi", ActivityCount: 1},
+		},
+	}
+	reportUC := usecase.NewReportActivityUsecase(repo)
+	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	updateNameUC := usecase.NewUpdateNameUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, updateNameUC, nil, usecase.NewBroadcastUpdateUsecase())
+
+	ctx := context.Background()
+
+	msg, err := handleUC.Execute(ctx, "user1", "User", "#leaderboard-weekly")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if !containsSubstring(msg.Text, "Berikut posisi sementara mingguan") {
+		t.Fatalf("Expected weekly leaderboard response, got %q", msg.Text)
+	}
+	if containsSubstring(msg.Text, "30 Days of Sweat Challenge") {
+		t.Fatalf("Weekly command should not fall back to the regular leaderboard response")
+	}
+	if !containsSubstring(msg.Text, "1. Alice: 3 hari") {
+		t.Errorf("Expected Alice to appear with 3 hari, got %q", msg.Text)
+	}
+	if !containsSubstring(msg.Text, "2. Budi: 1 hari") {
+		t.Errorf("Expected Budi to appear with 1 hari, got %q", msg.Text)
 	}
 }
 

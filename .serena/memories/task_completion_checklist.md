@@ -1,0 +1,1 @@
+After completing a change: format modified Go files with `gofmt -w`, then run `go test ./...`. If the task touched user-visible message text or scheduling/date logic, verify the relevant output strings and boundary behavior with at least one focused test. Keep existing Indonesian messaging style for bot responses unless the task says otherwise.

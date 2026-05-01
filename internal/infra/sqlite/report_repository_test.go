@@ -199,6 +199,53 @@ func TestReportRepository_GetAllReports_OrderByActivityCount(t *testing.T) {
 	}
 }
 
+func TestReportRepository_GetActivityCountsByDateRange(t *testing.T) {
+	_, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	base := time.Date(2026, time.April, 26, 0, 0, 0, 0, time.UTC)
+
+	reports := []*domain.Report{
+		{UserID: "user1", Name: "Alice", LastReportDate: base},
+		{UserID: "user2", Name: "Budi", LastReportDate: base},
+	}
+	for _, report := range reports {
+		if err := repo.UpsertReport(ctx, report); err != nil {
+			t.Fatalf("Failed to insert report: %v", err)
+		}
+	}
+
+	activityDates := []struct {
+		userID string
+		date   time.Time
+	}{
+		{userID: "user1", date: base},
+		{userID: "user1", date: base.AddDate(0, 0, 2)},
+		{userID: "user2", date: base.AddDate(0, 0, 3)},
+		{userID: "user2", date: base.AddDate(0, 0, 7)},
+	}
+	for _, activity := range activityDates {
+		if err := repo.LogActivity(ctx, activity.userID, activity.date); err != nil {
+			t.Fatalf("Failed to log activity: %v", err)
+		}
+	}
+
+	entries, err := repo.GetActivityCountsByDateRange(ctx, base, base.AddDate(0, 0, 7))
+	if err != nil {
+		t.Fatalf("Failed to get activity counts: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("Expected 2 entries, got %d", len(entries))
+	}
+	if entries[0].Name != "Alice" || entries[0].ActivityCount != 2 {
+		t.Fatalf("Expected Alice with 2 activities first, got %+v", entries[0])
+	}
+	if entries[1].Name != "Budi" || entries[1].ActivityCount != 1 {
+		t.Fatalf("Expected Budi with 1 activity second, got %+v", entries[1])
+	}
+}
+
 func TestReportRepository_InitTable_Idempotent(t *testing.T) {
 	db, repo, cleanup := setupTestDB(t)
 	defer cleanup()

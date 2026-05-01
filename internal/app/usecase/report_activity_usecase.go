@@ -4,20 +4,31 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
 )
 
 type ReportActivityUsecase struct {
-	repo domain.ReportRepository
+	repo  domain.ReportRepository
+	locks sync.Map
 }
 
 func NewReportActivityUsecase(repo domain.ReportRepository) *ReportActivityUsecase {
 	return &ReportActivityUsecase{repo: repo}
 }
 
+func (uc *ReportActivityUsecase) userLock(userID string) *sync.Mutex {
+	lock, _ := uc.locks.LoadOrStore(userID, &sync.Mutex{})
+	return lock.(*sync.Mutex)
+}
+
 func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name string, workout *domain.HevyWorkout) (string, error) {
+	lock := uc.userLock(userID)
+	lock.Lock()
+	defer lock.Unlock()
+
 	report, err := uc.repo.GetReport(ctx, userID)
 	if err != nil {
 		return "", err
@@ -57,7 +68,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			report.Streak = 1
 		}
 		report.ActivityCount++
-		
+
 		// Handle Centurion Cycle Transition
 		isNewCycle := false
 		if report.ActivityCount > 100 {
@@ -69,7 +80,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		// report.Name = name // Removed: don't update name during report
 		report.LastReportDate = now
 		name = report.Name // Use the stored name for the response message
-		
+
 		if isNewCycle {
 			// Special handling for new cycle can be added here or in the response construction
 		}
@@ -130,7 +141,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	newLevel := domain.GetLevel(report.TotalPoints)
 	leveledUp := newLevel.Tier > oldLevel.Tier
 
-	if err := uc.repo.UpsertReport(ctx, report); err != nil {
+	if err := uc.repo.UpsertReportWithActivity(ctx, report, today); err != nil {
 		return "", err
 	}
 
@@ -159,21 +170,21 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		if report.CenturionCycles > 0 {
 			cyclePrefix = fmt.Sprintf("[C%d] ", report.CenturionCycles+1)
 		}
-		
+
 		response = fmt.Sprintf("Laporan diterima, %s%s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)", cyclePrefix, name, report.ActivityCount, report.Streak)
 	}
 
 	// 7. Add Centurion Milestone Message
 	if report.ActivityCount == 1 && report.CenturionCycles > 0 && !isComeback {
-		response = "🔥 *ERA BARU DIMULAI!* 🔥\n" + 
-				  fmt.Sprintf("Selamat %s, Anda telah menyelesaikan 100 hari sebelumnya.\n", name) +
-				  fmt.Sprintf("Sekarang Anda memulai *Siklus %d (Hari ke-1)*. Terus jaga konsistensi! 💪\n\n", report.CenturionCycles+1) +
-				  response
+		response = "🔥 *ERA BARU DIMULAI!* 🔥\n" +
+			fmt.Sprintf("Selamat %s, Anda telah menyelesaikan 100 hari sebelumnya.\n", name) +
+			fmt.Sprintf("Sekarang Anda memulai *Siklus %d (Hari ke-1)*. Terus jaga konsistensi! 💪\n\n", report.CenturionCycles+1) +
+			response
 	} else if report.ActivityCount == 100 {
 		response = "🎊 *LUAR BIASA!* 🎊\n" +
-				  fmt.Sprintf("Selamat %s, Anda mencapai *HARI KE-100*! 💯\n", name) +
-				  "Anda sekarang resmi menyandang gelar *CENTURION 🛡️*. Nama Anda telah diabdikan dalam jajaran legenda grup!\n\n" +
-				  response
+			fmt.Sprintf("Selamat %s, Anda mencapai *HARI KE-100*! 💯\n", name) +
+			"Anda sekarang resmi menyandang gelar *CENTURION 🛡️*. Nama Anda telah diabdikan dalam jajaran legenda grup!\n\n" +
+			response
 	}
 
 	// Append Workout Details if present

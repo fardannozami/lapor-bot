@@ -12,6 +12,10 @@ type ReportRepository struct {
 	db *sql.DB
 }
 
+type execContexter interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 func NewReportRepository(db *sql.DB) *ReportRepository {
 	return &ReportRepository{db: db}
 }
@@ -49,7 +53,7 @@ func (r *ReportRepository) GetReport(ctx context.Context, userID string) (*domai
 	return scanReport(row)
 }
 
-func (r *ReportRepository) UpsertReport(ctx context.Context, report *domain.Report) error {
+func upsertReport(ctx context.Context, execer execContexter, report *domain.Report) error {
 	query := `
 		INSERT INTO user_reports (user_id, name, streak, activity_count, last_report_date, max_streak, total_points, achievements, comeback_streak, inactive_days, centurion_cycles)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -65,12 +69,47 @@ func (r *ReportRepository) UpsertReport(ctx context.Context, report *domain.Repo
 			inactive_days = excluded.inactive_days,
 			centurion_cycles = excluded.centurion_cycles
 	`
-	_, err := r.db.ExecContext(ctx, query,
+	_, err := execer.ExecContext(ctx, query,
 		report.UserID, report.Name, report.Streak, report.ActivityCount,
 		report.LastReportDate.Format(time.RFC3339), report.MaxStreak, report.TotalPoints,
 		report.Achievements, report.ComebackStreak, report.InactiveDays, report.CenturionCycles,
 	)
 	return err
+}
+
+func (r *ReportRepository) UpsertReport(ctx context.Context, report *domain.Report) error {
+	return upsertReport(ctx, r.db, report)
+}
+
+func logActivity(ctx context.Context, execer execContexter, userID string, activityDate time.Time) error {
+	query := `
+		INSERT OR IGNORE INTO activity_logs (user_id, activity_date, created_at)
+		VALUES (?, ?, ?)
+	`
+	_, err := execer.ExecContext(ctx, query, userID, activityDate.Format(time.DateOnly), time.Now().UTC().Format(time.RFC3339))
+	return err
+}
+
+func (r *ReportRepository) UpsertReportWithActivity(ctx context.Context, report *domain.Report, activityDate time.Time) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	if err := upsertReport(ctx, tx, report); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := logActivity(ctx, tx, report.UserID, activityDate); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (r *ReportRepository) LogActivity(ctx context.Context, userID string, activityDate time.Time) error {
+	return logActivity(ctx, r.db, userID, activityDate)
 }
 
 func scanReports(rows *sql.Rows) ([]*domain.Report, error) {
@@ -95,6 +134,35 @@ func (r *ReportRepository) GetAllReports(ctx context.Context) ([]*domain.Report,
 	return scanReports(rows)
 }
 
+func (r *ReportRepository) GetActivityCountsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]domain.ActivityLeaderboardEntry, error) {
+	query := `
+		SELECT al.user_id,
+		       COALESCE(NULLIF(ur.name, ''), al.user_id) AS name,
+		       COUNT(*) AS activity_count
+		FROM activity_logs al
+		LEFT JOIN user_reports ur ON ur.user_id = al.user_id
+		WHERE al.activity_date >= ? AND al.activity_date < ?
+		GROUP BY al.user_id, COALESCE(NULLIF(ur.name, ''), al.user_id)
+		ORDER BY activity_count DESC, name ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query, startDate.Format(time.DateOnly), endDate.Format(time.DateOnly))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []domain.ActivityLeaderboardEntry
+	for rows.Next() {
+		var entry domain.ActivityLeaderboardEntry
+		if err := rows.Scan(&entry.UserID, &entry.Name, &entry.ActivityCount); err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries, rows.Err()
+}
+
 func (r *ReportRepository) GetInactiveUsers(ctx context.Context, days int) ([]*domain.Report, error) {
 	query := `
 		SELECT ` + selectColumns + `
@@ -111,6 +179,9 @@ func (r *ReportRepository) GetInactiveUsers(ctx context.Context, days int) ([]*d
 }
 
 func (r *ReportRepository) ResetAllReports(ctx context.Context) error {
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM activity_logs`); err != nil {
+		return err
+	}
 	_, err := r.db.ExecContext(ctx, `DELETE FROM user_reports`)
 	return err
 }
@@ -126,6 +197,25 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 		);
 	`
 	_, err := r.db.ExecContext(ctx, query)
+	if err != nil {
+		return err
+	}
+
+	activityLogQuery := `
+		CREATE TABLE IF NOT EXISTS activity_logs (
+			user_id TEXT NOT NULL,
+			activity_date TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			PRIMARY KEY (user_id, activity_date),
+			FOREIGN KEY (user_id) REFERENCES user_reports(user_id) ON DELETE CASCADE
+		);
+	`
+	_, err = r.db.ExecContext(ctx, activityLogQuery)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_activity_logs_date ON activity_logs (activity_date)`)
 	if err != nil {
 		return err
 	}

@@ -6,17 +6,23 @@ import (
 )
 
 type Report struct {
-	UserID         string    `json:"user_id" db:"user_id"`
-	Name           string    `json:"name" db:"name"`
-	Streak         int       `json:"streak" db:"streak"`
-	ActivityCount  int       `json:"activity_count" db:"activity_count"`
-	LastReportDate time.Time `json:"last_report_date" db:"last_report_date"`
-	MaxStreak      int       `json:"max_streak" db:"max_streak"`
-	TotalPoints    int       `json:"total_points" db:"total_points"`
-	Achievements   string    `json:"achievements" db:"achievements"`
-	ComebackStreak int       `json:"comeback_streak" db:"comeback_streak"`
-	InactiveDays   int       `json:"inactive_days" db:"inactive_days"`
+	UserID          string    `json:"user_id" db:"user_id"`
+	Name            string    `json:"name" db:"name"`
+	Streak          int       `json:"streak" db:"streak"`
+	ActivityCount   int       `json:"activity_count" db:"activity_count"`
+	LastReportDate  time.Time `json:"last_report_date" db:"last_report_date"`
+	MaxStreak       int       `json:"max_streak" db:"max_streak"`
+	TotalPoints     int       `json:"total_points" db:"total_points"`
+	Achievements    string    `json:"achievements" db:"achievements"`
+	ComebackStreak  int       `json:"comeback_streak" db:"comeback_streak"`
+	InactiveDays    int       `json:"inactive_days" db:"inactive_days"`
 	CenturionCycles int       `json:"centurion_cycles" db:"centurion_cycles"`
+}
+
+type ActivityLeaderboardEntry struct {
+	UserID        string
+	Name          string
+	ActivityCount int
 }
 
 // ReportCutoffOffset is the spare time allowed for late-night reporting.
@@ -43,10 +49,19 @@ func GetStartOfISOWeek(t time.Time) time.Time {
 	return t.AddDate(0, 0, -daysToSubtract)
 }
 
+// GetStartOfSundayWeek returns the Sunday that starts the week containing t.
+func GetStartOfSundayWeek(t time.Time) time.Time {
+	t = GetToday(t)
+	return t.AddDate(0, 0, -int(t.Weekday()))
+}
+
 type ReportRepository interface {
 	GetReport(ctx context.Context, userID string) (*Report, error)
 	UpsertReport(ctx context.Context, report *Report) error
+	UpsertReportWithActivity(ctx context.Context, report *Report, activityDate time.Time) error
 	GetAllReports(ctx context.Context) ([]*Report, error)
+	LogActivity(ctx context.Context, userID string, activityDate time.Time) error
+	GetActivityCountsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]ActivityLeaderboardEntry, error)
 	GetInactiveUsers(ctx context.Context, days int) ([]*Report, error)
 	ResetAllReports(ctx context.Context) error
 	InitTable(ctx context.Context) error
