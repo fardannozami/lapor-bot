@@ -14,14 +14,15 @@ type MessageResponse struct {
 }
 
 type HandleMessageUsecase struct {
-	reportUC    *ReportActivityUsecase
-	leaderboardUC  *GetLeaderboardUsecase
-	myStatsUC      *GetMyStatsUsecase
-	achievementsUC *GetAchievementsUsecase
-	comebackUC     *ComebackChallengeUsecase
-	updateNameUC   *UpdateNameUsecase
-	linkStravaUC   *LinkStravaUsecase
-	broadcastUpdateUC *BroadcastUpdateUsecase
+	reportUC            *ReportActivityUsecase
+	leaderboardUC       *GetLeaderboardUsecase
+	weeklyLeaderboardUC *GetWeeklyLeaderboardUsecase
+	myStatsUC           *GetMyStatsUsecase
+	achievementsUC      *GetAchievementsUsecase
+	comebackUC          *ComebackChallengeUsecase
+	updateNameUC        *UpdateNameUsecase
+	linkStravaUC        *LinkStravaUsecase
+	broadcastUpdateUC   *BroadcastUpdateUsecase
 }
 
 func NewHandleMessageUsecase(
@@ -35,14 +36,15 @@ func NewHandleMessageUsecase(
 	broadcastUpdateUC *BroadcastUpdateUsecase,
 ) *HandleMessageUsecase {
 	return &HandleMessageUsecase{
-		reportUC:       reportUC,
-		leaderboardUC:  leaderboardUC,
-		myStatsUC:      myStatsUC,
-		achievementsUC: achievementsUC,
-		comebackUC:     comebackUC,
-		updateNameUC:   updateNameUC,
-		linkStravaUC:   linkStravaUC,
-		broadcastUpdateUC: broadcastUpdateUC,
+		reportUC:            reportUC,
+		leaderboardUC:       leaderboardUC,
+		weeklyLeaderboardUC: NewGetWeeklyLeaderboardUsecase(leaderboardUC.repo),
+		myStatsUC:           myStatsUC,
+		achievementsUC:      achievementsUC,
+		comebackUC:          comebackUC,
+		updateNameUC:        updateNameUC,
+		linkStravaUC:        linkStravaUC,
+		broadcastUpdateUC:   broadcastUpdateUC,
 	}
 }
 
@@ -62,6 +64,12 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		idx := strings.Index(msg, "#setname")
 		newName := strings.TrimSpace(message[idx+len("#setname"):])
 		text, err := uc.updateNameUC.Execute(ctx, userID, newName)
+		return MessageResponse{Text: text}, err
+	}
+
+	// Handle #leaderboard-weekly first so it doesn't get swallowed by #leaderboard
+	if strings.Contains(msg, "#leaderboard-weekly") {
+		text, err := uc.weeklyLeaderboardUC.Execute(ctx)
 		return MessageResponse{Text: text}, err
 	}
 

@@ -94,22 +94,22 @@ func GetNextResetTime(now time.Time) time.Time {
 
 // Execute resets all report data and sends an announcement to the group.
 func (uc *ResetSessionUsecase) Execute(ctx context.Context, client *whatsmeow.Client, groupID string, sessionNumber int) error {
-	log.Printf("[SESSION RESET] Starting Session %d reset — clearing all report data...", sessionNumber)
+	log.Printf("[SESSION RESET] Starting Season %d reset — clearing all report data...", sessionNumber)
 
 	// Reset all reports in the database
 	if err := uc.repo.ResetAllReports(ctx); err != nil {
 		return fmt.Errorf("failed to reset all reports: %w", err)
 	}
 
-	log.Printf("[SESSION RESET] All report data has been cleared for Session %d!", sessionNumber)
+	log.Printf("[SESSION RESET] All report data has been cleared for Season %d!", sessionNumber)
 
 	// Send announcement to the group
 	if groupID != "" && client != nil && client.IsConnected() {
-		announcement := fmt.Sprintf(`🔄 *SESSION %d TELAH DIMULAI!* 🔄
+		announcement := fmt.Sprintf(`🔄 *SEASON %d TELAH DIMULAI!* 🔄
 
 Halo para pejuang keringat! 🏋️‍♂️
 
-Session %d telah resmi berakhir dan semua data telah di-reset! 🗑️
+Season %d telah resmi berakhir dan semua data telah di-reset! 🗑️
 
 ✅ *Yang sudah di-reset:*
 • 🏆 Leaderboard — reset total
@@ -119,12 +119,12 @@ Session %d telah resmi berakhir dan semua data telah di-reset! 🗑️
 • ⭐ Points & Level — mulai dari awal
 • 🛡️ Centurion Cycles — reset
 
-🆕 *Session %d dimulai SEKARANG!*
+🆕 *Season %d dimulai SEKARANG!*
 Semua peserta mulai dari titik yang sama. Ini adalah awal yang baru — kesempatan bagi siapapun untuk menjadi yang terbaik! 💪
 
-📌 Langsung laporkan aktivitas pertamamu di Session %d dengan mengirim #lapor!
+📌 Langsung laporkan aktivitas pertamamu di Season %d dengan mengirim #lapor!
 
-*Semangat Session %d!* 🚀🔥`, sessionNumber, sessionNumber-1, sessionNumber, sessionNumber, sessionNumber)
+*Semangat Season %d!* 🚀🔥`, sessionNumber, sessionNumber-1, sessionNumber, sessionNumber, sessionNumber)
 
 		targetJID, _ := types.ParseJID(groupID)
 		msg := &waE2E.Message{
@@ -135,14 +135,14 @@ Semua peserta mulai dari titik yang sama. Ini adalah awal yang baru — kesempat
 			log.Printf("[SESSION RESET] Failed to send announcement: %v", err)
 			return fmt.Errorf("reset succeeded but failed to send announcement: %w", err)
 		}
-		log.Printf("[SESSION RESET] Session %d announcement sent to group!", sessionNumber)
+		log.Printf("[SESSION RESET] Season %d announcement sent to group!", sessionNumber)
 	}
 
 	return nil
 }
 
 // ScheduleSessionReset starts a background goroutine that automatically resets
-// session data every 4 months (Jan 1, May 1, Sep 1) at 00:00 WIB.
+// season data every 4 months (Jan 1, May 1, Sep 1) at 00:00 WIB.
 // It loops forever, scheduling the next reset after each one completes.
 func ScheduleSessionReset(ctx context.Context, uc *ResetSessionUsecase, client func() *whatsmeow.Client, isConnected func() bool, groupID string) {
 	go func() {
@@ -162,7 +162,7 @@ func ScheduleSessionReset(ctx context.Context, uc *ResetSessionUsecase, client f
 					}
 				}
 				if !isAnyFromCurrentSession {
-					log.Printf("[SESSION RESET] Missed reset detected for Session %d. Executing now...", sessionNum)
+					log.Printf("[SESSION RESET] Missed reset detected for Season %d. Executing now...", sessionNum)
 					_ = uc.Execute(context.Background(), client(), groupID, sessionNum)
 				}
 			}
@@ -171,11 +171,11 @@ func ScheduleSessionReset(ctx context.Context, uc *ResetSessionUsecase, client f
 			nextSession, _ := GetCurrentSessionInfo(nextReset)
 
 			delay := time.Until(nextReset)
-			log.Printf("[SESSION RESET] Next session reset (Session %d) scheduled at: %v (in %v)", nextSession, nextReset, delay)
+			log.Printf("[SESSION RESET] Next season reset (Season %d) scheduled at: %v (in %v)", nextSession, nextReset, delay)
 
 			select {
 			case <-time.After(delay):
-				log.Printf("[SESSION RESET] Reset time reached! Executing Session %d reset...", nextSession)
+				log.Printf("[SESSION RESET] Reset time reached! Executing Season %d reset...", nextSession)
 
 				// Wait a moment for stable connection
 				time.Sleep(5 * time.Second)
@@ -185,7 +185,7 @@ func ScheduleSessionReset(ctx context.Context, uc *ResetSessionUsecase, client f
 					if err != nil {
 						log.Printf("[SESSION RESET] Reset failed: %v", err)
 					} else {
-						log.Printf("[SESSION RESET] Session %d reset completed successfully!", nextSession)
+						log.Printf("[SESSION RESET] Season %d reset completed successfully!", nextSession)
 					}
 				} else {
 					log.Println("[SESSION RESET] WARNING: Bot is not connected. Reset will be retried in 1 minute.")
@@ -197,7 +197,7 @@ func ScheduleSessionReset(ctx context.Context, uc *ResetSessionUsecase, client f
 							if err != nil {
 								log.Printf("[SESSION RESET] Retry %d failed: %v", i+1, err)
 							} else {
-								log.Printf("[SESSION RESET] Session %d reset completed on retry %d!", nextSession, i+1)
+								log.Printf("[SESSION RESET] Season %d reset completed on retry %d!", nextSession, i+1)
 								break
 							}
 						}

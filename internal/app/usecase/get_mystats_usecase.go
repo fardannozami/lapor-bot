@@ -4,16 +4,21 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
 )
 
 type GetMyStatsUsecase struct {
 	repo domain.ReportRepository
+	now  func() time.Time
 }
 
 func NewGetMyStatsUsecase(repo domain.ReportRepository) *GetMyStatsUsecase {
-	return &GetMyStatsUsecase{repo: repo}
+	return &GetMyStatsUsecase{
+		repo: repo,
+		now:  time.Now,
+	}
 }
 
 func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (string, error) {
@@ -26,6 +31,34 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 		return fmt.Sprintf("Halo %s, kamu belum pernah laporan aktivitas. Yuk mulai dengan ketik #lapor!", name), nil
 	}
 
+	now := uc.now()
+	weekStart := domain.GetStartOfSundayWeek(now)
+	weekEnd := weekStart.AddDate(0, 0, 7)
+	weeklyEntries, err := uc.repo.GetActivityCountsByDateRange(ctx, weekStart, weekEnd)
+	if err != nil {
+		return "", err
+	}
+
+	_, sessionStart := GetCurrentSessionInfo(now)
+	seasonStart := time.Date(sessionStart.Year(), sessionStart.Month(), sessionStart.Day(), 0, 0, 0, 0, time.UTC)
+	seasonEnd := GetNextResetTime(now)
+	seasonEntries, err := uc.repo.GetActivityCountsByDateRange(ctx, seasonStart, seasonEnd)
+	if err != nil {
+		return "", err
+	}
+
+	getActivityCount := func(entries []domain.ActivityLeaderboardEntry) int {
+		for _, entry := range entries {
+			if entry.UserID == userID {
+				return entry.ActivityCount
+			}
+		}
+		return 0
+	}
+
+	weeklyCount := getActivityCount(weeklyEntries)
+	seasonCount := getActivityCount(seasonEntries)
+
 	sb := strings.Builder{}
 	sb.WriteString(fmt.Sprintf("📊 Statistik kamu, %s:\n\n", report.Name))
 
@@ -36,6 +69,8 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 	sb.WriteString(fmt.Sprintf("🔥 Streak saat ini: %d minggu\n", report.Streak))
 	sb.WriteString(fmt.Sprintf("🏆 Streak tertinggi: %d minggu\n", report.MaxStreak))
 	sb.WriteString(fmt.Sprintf("📅 Total hari aktif: %d\n", report.ActivityCount))
+	sb.WriteString(fmt.Sprintf("🗓️ Total hari season: %d\n", seasonCount))
+	sb.WriteString(fmt.Sprintf("📆 Total mingguan: %d\n", weeklyCount))
 	sb.WriteString(fmt.Sprintf("⭐ Total poin: %d\n", report.TotalPoints))
 
 	// Comeback status
