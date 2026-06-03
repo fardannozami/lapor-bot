@@ -85,9 +85,16 @@ Bot hanya merespon perintah berikut di dalam grup yang telah dikonfigurasi (`GRO
 | Perintah | Fungsi |
 | --- | --- |
 | `#lapor` | Merekam aktivitas harian user. Menambah streak jika laporan hari ini/kemarin. |
+| `#cancel` | Membatalkan laporan hari ini. Hanya bisa digunakan di hari yang sama. |
 | `#leaderboard` | Menampilkan klasemen streak, daftar yang "Keep Streak" 🔥 dan "Lose Streak" 💔. |
+| `#leaderboard-weekly` | Menampilkan klasemen total hari aktif minggu ini. |
 | `#mystats` | Menampilkan statistik personal (streak, poin, achievements). |
 | `#achievements` | Menampilkan daftar semua achievement dan progress member. |
+| `#comeback` | Menampilkan status comeback challenge setelah absen. |
+| `#motivasi` | Menampilkan pesan motivasi acak untuk semangat berolahraga. |
+| `#help` | Menampilkan panduan penggunaan bot dan daftar command. |
+| `#strava` | Menghubungkan akun Strava untuk laporan otomatis. |
+| `#setname [nama]` | Mengubah nama tampilan di leaderboard. |
 
 ### Fitur Gamifikasi 🏅
 - **Points & Achievements**: Dapatkan poin dan badge unik dengan menjaga streak dan aktif melapor.

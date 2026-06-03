@@ -56,6 +56,18 @@ func (r *myStatsRepoStub) ResolveLIDToPhone(ctx context.Context, lid string) str
 	return lid
 }
 
+func (r *myStatsRepoStub) GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error) {
+	return nil, nil
+}
+
+func (r *myStatsRepoStub) DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error {
+	return nil
+}
+
+func (r *myStatsRepoStub) DeleteReport(ctx context.Context, userID string) error {
+	return nil
+}
+
 func (r *myStatsRepoStub) UpsertStravaAccount(ctx context.Context, account *domain.StravaAccount) error {
 	return nil
 }
