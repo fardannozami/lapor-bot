@@ -90,32 +90,33 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 		}
 	}
 
-	// Helper to get achievement name by ID
-	getAchName := func(id string) string {
-		for _, a := range domain.AllAchievements {
-			if a.ID == id {
-				return a.Name
-			}
+	sb.WriteString("\n🏅 *Achievements & Progress*\n")
+
+	// Show all standard achievements with status
+	for _, a := range domain.AllAchievements {
+		if domain.HasAchievement(report.Achievements, a.ID) {
+			sb.WriteString(fmt.Sprintf("✅ %s — %s (%d pts)\n", a.Name, a.Description, a.Points))
+		} else {
+			sb.WriteString(fmt.Sprintf("🔒 %s — %s (%d pts)\n", a.Name, a.Description, a.Points))
 		}
-		for _, a := range domain.AllComebackAchievements {
-			if a.ID == id {
-				return a.Name
-			}
-		}
-		return id
 	}
 
-	if report.Achievements != "" {
-		sb.WriteString("\n🏅 Achievements:\n")
-		ids := strings.Split(report.Achievements, ",")
-		for _, id := range ids {
-			trimmedID := strings.TrimSpace(id)
-			if trimmedID != "" {
-				sb.WriteString(fmt.Sprintf("✅ %s\n", getAchName(trimmedID)))
+	// Show comeback achievements with progress
+	sb.WriteString("\n🔄 *Comeback Achievements*\n")
+	sb.WriteString("_Khusus untuk yang kembali setelah absen!_\n")
+	for _, a := range domain.AllComebackAchievements {
+		if domain.HasAchievement(report.Achievements, a.ID) {
+			sb.WriteString(fmt.Sprintf("✅ %s — %s (%d pts)\n", a.Name, a.Description, a.Points))
+		} else if report.InactiveDays >= a.MinInactiveDays {
+			remaining := a.MinComebackStreak - report.ComebackStreak
+			if remaining > 0 {
+				sb.WriteString(fmt.Sprintf("🎯 %s — %d minggu lagi (%d pts)\n", a.Name, remaining, a.Points))
+			} else {
+				sb.WriteString(fmt.Sprintf("🏅 %s — Siap unlock! (%d pts)\n", a.Name, a.Points))
 			}
+		} else {
+			sb.WriteString(fmt.Sprintf("🔒 %s — butuh absen >%d hari dulu (%d pts)\n", a.Name, a.MinInactiveDays, a.Points))
 		}
-	} else {
-		sb.WriteString("\n🏅 Belum ada achievement. Terus semangat! 💪")
 	}
 
 	return sb.String(), nil

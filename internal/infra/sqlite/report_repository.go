@@ -384,6 +384,47 @@ func (r *ReportRepository) GetStravaAccountByAthleteID(ctx context.Context, athl
 	return &account, nil
 }
 
+func (r *ReportRepository) GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error) {
+	query := `
+		SELECT activity_date FROM activity_logs
+		WHERE user_id = ?
+		ORDER BY activity_date ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dates []time.Time
+	for rows.Next() {
+		var dateStr string
+		if err := rows.Scan(&dateStr); err != nil {
+			return nil, err
+		}
+		date, err := time.Parse(time.DateOnly, dateStr)
+		if err != nil {
+			return nil, err
+		}
+		dates = append(dates, date)
+	}
+	return dates, rows.Err()
+}
+
+func (r *ReportRepository) DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error {
+	query := `DELETE FROM activity_logs WHERE user_id = ? AND activity_date = ?`
+	_, err := r.db.ExecContext(ctx, query, userID, activityDate.Format(time.DateOnly))
+	return err
+}
+
+func (r *ReportRepository) DeleteReport(ctx context.Context, userID string) error {
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM activity_logs WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+	_, err := r.db.ExecContext(ctx, `DELETE FROM user_reports WHERE user_id = ?`, userID)
+	return err
+}
+
 func (r *ReportRepository) GetStravaAccountByUserID(ctx context.Context, userID string) (*domain.StravaAccount, error) {
 	query := `SELECT user_id, athlete_id, access_token, refresh_token, expires_at, COALESCE(name, '') FROM strava_accounts WHERE user_id = ?`
 	row := r.db.QueryRowContext(ctx, query, userID)

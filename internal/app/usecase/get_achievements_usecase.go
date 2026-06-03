@@ -39,14 +39,27 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 	}
 
 	sb := strings.Builder{}
-	sb.WriteString("🎖️ Daftar Achievement Challenge:\n\n")
+	sb.WriteString("🎖️ *Daftar Achievement Challenge*\n\n")
 
 	for _, ach := range domain.AllAchievements {
 		count := stats[ach.ID]
-		// Status icon based on unlock count
 		var icon string
 		if count > 0 {
 			icon = "🏅"
+		} else {
+			icon = "🔒"
+		}
+
+		sb.WriteString(fmt.Sprintf("%s %s — %s (%d/%d member)\n", icon, ach.Name, ach.Description, count, totalMembers))
+	}
+
+	sb.WriteString("\n🔄 *Comeback Achievements*\n")
+	sb.WriteString("_Kembali aktif setelah absen & bangun streak lagi!_\n\n")
+	for _, ach := range domain.AllComebackAchievements {
+		count := stats[ach.ID]
+		var icon string
+		if count > 0 {
+			icon = "✅"
 		} else {
 			icon = "🔒"
 		}

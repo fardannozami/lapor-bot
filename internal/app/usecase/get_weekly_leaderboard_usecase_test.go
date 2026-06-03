@@ -56,6 +56,18 @@ func (r *weeklyLeaderboardRepoStub) ResolveLIDToPhone(ctx context.Context, lid s
 	return lid
 }
 
+func (r *weeklyLeaderboardRepoStub) GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error) {
+	return nil, nil
+}
+
+func (r *weeklyLeaderboardRepoStub) DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error {
+	return nil
+}
+
+func (r *weeklyLeaderboardRepoStub) DeleteReport(ctx context.Context, userID string) error {
+	return nil
+}
+
 func (r *weeklyLeaderboardRepoStub) UpsertStravaAccount(ctx context.Context, account *domain.StravaAccount) error {
 	return nil
 }

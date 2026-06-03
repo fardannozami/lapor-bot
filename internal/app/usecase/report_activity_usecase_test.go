@@ -73,6 +73,18 @@ func (m *mockRepo) GetStravaAccountByUserID(ctx context.Context, userID string) 
 	return nil, nil
 }
 
+func (m *mockRepo) GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error) {
+	return nil, nil
+}
+
+func (m *mockRepo) DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error {
+	return nil
+}
+
+func (m *mockRepo) DeleteReport(ctx context.Context, userID string) error {
+	return nil
+}
+
 // =============================================================================
 // STREAK LOGIC TESTS
 // =============================================================================
