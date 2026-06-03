@@ -195,6 +195,9 @@ func BuildReminderMessage(
 		sb.WriteString(motivationsShort[rand.Intn(len(motivationsShort))])
 	}
 
+	// Append health pillar reminders (olahraga, makanan, istirahat, kelola stres)
+	sb.WriteString(BuildWellnessReminder())
+
 	mentions = deduplicateMentions(mentions)
 	return sb.String(), mentions
 }

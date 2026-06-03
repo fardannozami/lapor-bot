@@ -294,6 +294,10 @@ func main() {
 						continue
 					}
 
+					// Append random motivation + health pillar reminders
+					// (olahraga, makanan, istirahat, kelola stres)
+					response += usecase.BuildWellnessReminder()
+
 					targetJID, _ := types.ParseJID(cfg.GroupID)
 					msg := &waE2E.Message{
 						Conversation: &response,
