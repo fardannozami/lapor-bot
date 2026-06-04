@@ -11,13 +11,18 @@ type Level struct {
 }
 
 // AllLevels defines the progression tiers in ascending order.
+// Curved to reward early engagement while making max tier a long-term achievement.
+// With ~17 weeks per 4-month season, dedicated users can reach Tier 5-6 in season 1,
+// Tier 7 in season 2-3, and Tier 8 in season 4+.
 var AllLevels = []Level{
 	{Tier: 1, Name: "Newbie", Icon: "🌱", MinPoints: 0},
-	{Tier: 2, Name: "Fighter", Icon: "💪", MinPoints: 30},
-	{Tier: 3, Name: "Warrior", Icon: "⚔️", MinPoints: 80},
-	{Tier: 4, Name: "Champion", Icon: "🏆", MinPoints: 200},
-	{Tier: 5, Name: "Legend", Icon: "👑", MinPoints: 400},
-	{Tier: 6, Name: "Immortal", Icon: "🔱", MinPoints: 700},
+	{Tier: 2, Name: "Fighter", Icon: "💪", MinPoints: 50},
+	{Tier: 3, Name: "Warrior", Icon: "⚔️", MinPoints: 120},
+	{Tier: 4, Name: "Champion", Icon: "🏆", MinPoints: 250},
+	{Tier: 5, Name: "Legend", Icon: "👑", MinPoints: 500},
+	{Tier: 6, Name: "Immortal", Icon: "🔱", MinPoints: 1000},
+	{Tier: 7, Name: "Titan", Icon: "⭐", MinPoints: 2000},
+	{Tier: 8, Name: "God", Icon: "⚡", MinPoints: 3500},
 }
 
 // GetLevel returns the current level for the given total points.

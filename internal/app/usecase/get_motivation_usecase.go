@@ -94,3 +94,9 @@ func (uc *GetMotivationUsecase) Execute() string {
 	idx := uc.rng.Intn(len(motivationalQuotes))
 	return "✨ *Motivasi Harian* ✨\n\n" + motivationalQuotes[idx] + "\n\n_Ketik #motivasi untuk quote baru!_"
 }
+
+// RandomQuote returns a single random motivational quote without formatting.
+func RandomQuote() string {
+	idx := time.Now().UnixNano() % int64(len(motivationalQuotes))
+	return motivationalQuotes[idx]
+}

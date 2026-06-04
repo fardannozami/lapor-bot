@@ -10,7 +10,7 @@ var helpSections = []struct {
 	{
 		emoji:   "📝",
 		title:   "Melaporkan Aktivitas",
-		content: "*#lapor* — Laporkan workout atau aktivitas harianmu.\nContoh: `#lapor` atau `#lapor Push Day`\n\n🔄 Setiap laporan yang valid akan menambah streak mingguanmu dan total hari aktif.",
+		content: "*#lapor* — Laporkan workout atau aktivitas harianmu.\nContoh: `#lapor` atau `#lapor Push Day`\n\n🔄 Setiap laporan yang valid akan menambah streak mingguanmu dan total hari aktif.\n❄️ *Streak Freeze* — kamu punya 1 freeze gratis per season. Freeze otomatis melindungi 1 minggu absen. Dapatkan +1 freeze lagi saat kamu mencapai 4 minggu streak!",
 	},
 	{
 		emoji:   "❌",
@@ -20,7 +20,7 @@ var helpSections = []struct {
 	{
 		emoji:   "🏆",
 		title:   "Leaderboard & Statistik",
-		content: "*#leaderboard* — Lihat klasemen streak mingguan.\n*#leaderboard-weekly* — Lihat klasemen total hari aktif minggu ini.\n*#mystats* — Cek statistik personal (streak, poin, achievements).",
+		content: "*#leaderboard* — Lihat klasemen lifetime (total hari aktif).\n*#leaderboard-weekly* — Lihat klasemen total hari aktif minggu ini.\n*#leaderboard-seasonal* — Lihat klasemen seasonal points.\n*#mystats* — Cek statistik personal (streak, poin, achievements, seasonal progress).",
 	},
 	{
 		emoji:   "🎖️",

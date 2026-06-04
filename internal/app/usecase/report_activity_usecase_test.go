@@ -131,6 +131,13 @@ func TestStreak_FirstReport(t *testing.T) {
 	if !containsSubstring(msg, "Pemula") {
 		t.Errorf("Expected message to contain achievement 'Pemula', got '%s'", msg)
 	}
+	// Points: 10 base + 5 first season + 10 Pemula + 25 Konsisten = 50
+	if r.TotalPoints != 50 {
+		t.Errorf("First report: expected TotalPoints=50, got %d", r.TotalPoints)
+	}
+	if r.SeasonalPoints != 15 {
+		t.Errorf("First report: expected SeasonalPoints=15, got %d", r.SeasonalPoints)
+	}
 }
 
 func TestStreak_ConsecutiveDay_StreakIncreases(t *testing.T) {

@@ -37,6 +37,8 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	now := time.Now()
 	today := domain.GetToday(now)
 
+	streakFreezeUsed := false
+
 	if report != nil {
 		lastReport := report.LastReportDate
 		lastReportDate := domain.GetToday(lastReport)
@@ -61,6 +63,12 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			// Consecutive week — streak continues
 			report.Streak++
 			report.ComebackStreak++ // also increment comeback streak if active
+		} else if weeksSinceLastReport == 2 && report.StreakFreezes > 0 {
+			// Exactly 1 week missed — auto-consume streak freeze to protect streak
+			report.StreakFreezes--
+			report.Streak++
+			report.ComebackStreak++
+			streakFreezeUsed = true
 		} else {
 			// Missed week(s) — streak resets
 			report.InactiveDays = daysSinceLastReport
@@ -68,6 +76,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			report.Streak = 1
 		}
 		report.ActivityCount++
+		report.SeasonalActivityCount++
 
 		// Handle Centurion Cycle Transition
 		isNewCycle := false
@@ -86,16 +95,19 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		}
 	} else {
 		report = &domain.Report{
-			UserID:         userID,
-			Name:           name,
-			Streak:         1,
-			ActivityCount:  1,
-			LastReportDate: now,
-			MaxStreak:      0,
-			TotalPoints:    0,
-			Achievements:   "",
-			ComebackStreak: 1,
-			InactiveDays:   0,
+			UserID:                userID,
+			Name:                  name,
+			Streak:                1,
+			ActivityCount:         1,
+			SeasonalActivityCount: 1,
+			LastReportDate:        now,
+			MaxStreak:             0,
+			TotalPoints:           0,
+			SeasonalPoints:        0,
+			Achievements:          "",
+			ComebackStreak:        1,
+			InactiveDays:          0,
+			StreakFreezes:         1,
 		}
 	}
 
@@ -113,7 +125,21 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		}
 	}
 
-	// 2. Store old level to detect level-up
+	// 2. Calculate base EXP + bonuses
+	basePoints := 10
+	streakBonus := 2 * (report.Streak - 1)
+	if streakBonus < 0 {
+		streakBonus = 0
+	}
+	seasonalFirstBonus := 0
+	if report.SeasonalActivityCount == 1 {
+		seasonalFirstBonus = 5
+	}
+	reportPoints := basePoints + streakBonus + seasonalFirstBonus
+	report.TotalPoints += reportPoints
+	report.SeasonalPoints += reportPoints
+
+	// 3. Store old level to detect level-up
 	oldLevel := domain.GetLevel(report.TotalPoints)
 
 	// 3. Check for new standard achievements
@@ -125,7 +151,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		report.Achievements = domain.AddAchievement(report.Achievements, ach.ID)
 		report.TotalPoints += ach.Points
 		pointsGained += ach.Points
-		unlockedNames = append(unlockedNames, fmt.Sprintf("%s (%d pts)", ach.Name, ach.Points))
+		unlockedNames = append(unlockedNames, fmt.Sprintf("%s %s (%d pts)", ach.DisplayEmoji, ach.Name, ach.Points))
 	}
 
 	// 4. Check for new comeback achievements
@@ -134,7 +160,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		report.Achievements = domain.AddAchievement(report.Achievements, ach.ID)
 		report.TotalPoints += ach.Points
 		pointsGained += ach.Points
-		unlockedNames = append(unlockedNames, fmt.Sprintf("%s (%d pts)", ach.Name, ach.Points))
+		unlockedNames = append(unlockedNames, fmt.Sprintf("%s %s (%d pts)", ach.DisplayEmoji, ach.Name, ach.Points))
 	}
 
 	// 5. Detect level-up
@@ -165,13 +191,22 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			response += "\n🔥 Comeback Challenge dimulai! Ayo bangun streak-mu kembali!"
 		}
 	} else {
-		// Normal report message
+		// Normal report message with EXP breakdown
 		cyclePrefix := ""
 		if report.CenturionCycles > 0 {
 			cyclePrefix = fmt.Sprintf("[C%d] ", report.CenturionCycles+1)
 		}
 
-		response = fmt.Sprintf("Laporan diterima, %s%s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)", cyclePrefix, name, report.ActivityCount, report.Streak)
+		expBreakdown := fmt.Sprintf("⭐ +%d pts", basePoints)
+		if streakBonus > 0 {
+			expBreakdown += fmt.Sprintf(" (streak bonus +%d)", streakBonus)
+		}
+		if seasonalFirstBonus > 0 {
+			expBreakdown += " (first season report +5)"
+		}
+
+		response = fmt.Sprintf("Laporan diterima, %s%s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)\n%s",
+			cyclePrefix, name, report.ActivityCount, report.Streak, expBreakdown)
 	}
 
 	// 7. Add Centurion Milestone Message
@@ -193,6 +228,10 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	}
 
 	// Append Gamification Notifications
+	if streakFreezeUsed {
+		response += fmt.Sprintf("\n\n❄️ *Streak Freeze terpakai!* Streak kamu aman. (Sisa freeze: %d)", report.StreakFreezes)
+	}
+
 	if newRecord {
 		response += fmt.Sprintf("\n\n🏆 New Personal Best Streak: %d minggu!", report.Streak)
 	}
@@ -202,14 +241,38 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	}
 
 	if len(unlockedNames) > 0 {
-		response += "\n\n🎉 ACHIEVEMENT UNLOCKED! 🎉"
-		for _, name := range unlockedNames {
-			response += fmt.Sprintf("\n🏅 %s", name)
+		freezeAwarded := false
+		for _, ach := range newAchievements {
+			if ach.ID == "streak_4" && report.StreakFreezes < 2 {
+				report.StreakFreezes++
+				freezeAwarded = true
+			}
 		}
+		response += "\n\n🎉 *ACHIEVEMENT UNLOCKED!* 🎉"
+
+		for _, ach := range newAchievements {
+			response += fmt.Sprintf("\n\n%s *%s* (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
+			if ach.UnlockMessage != "" {
+				response += fmt.Sprintf("\n_%s_", ach.UnlockMessage)
+			}
+		}
+		for _, ach := range comebackAchievements {
+			response += fmt.Sprintf("\n\n%s *%s* (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
+			if ach.UnlockMessage != "" {
+				response += fmt.Sprintf("\n_%s_", ach.UnlockMessage)
+			}
+		}
+
+		if freezeAwarded {
+			response += fmt.Sprintf("\n\n❄️ Bonus: +1 Streak Freeze! (Total: %d)", report.StreakFreezes)
+		}
+
+		response += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
 	}
 
-	if pointsGained > 0 {
-		response += fmt.Sprintf("\n\n⭐ +%d points (Total: %d)", pointsGained, report.TotalPoints)
+	totalPointsGained := reportPoints + pointsGained
+	if totalPointsGained > 0 {
+		response += fmt.Sprintf("\n\n💰 Total: +%d points (Lifetime: %d | Season: %d)", totalPointsGained, report.TotalPoints, report.SeasonalPoints)
 	}
 
 	// Show progress bar
