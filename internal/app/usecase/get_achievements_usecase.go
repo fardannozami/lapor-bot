@@ -45,7 +45,7 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 		count := stats[ach.ID]
 		var icon string
 		if count > 0 {
-			icon = "🏅"
+			icon = ach.DisplayEmoji
 		} else {
 			icon = "🔒"
 		}
@@ -59,7 +59,7 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 		count := stats[ach.ID]
 		var icon string
 		if count > 0 {
-			icon = "✅"
+			icon = ach.DisplayEmoji
 		} else {
 			icon = "🔒"
 		}

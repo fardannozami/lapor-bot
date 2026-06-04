@@ -93,6 +93,11 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{Text: text}, err
 	}
 
+	if strings.Contains(msg, "#leaderboard-seasonal") {
+		text, err := uc.leaderboardUC.ExecuteSeasonal(ctx)
+		return MessageResponse{Text: text}, err
+	}
+
 	if strings.Contains(msg, "#leaderboard") {
 		text, err := uc.leaderboardUC.Execute(ctx)
 		return MessageResponse{Text: text}, err

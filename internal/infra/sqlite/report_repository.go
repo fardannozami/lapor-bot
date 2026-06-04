@@ -22,7 +22,9 @@ func NewReportRepository(db *sql.DB) *ReportRepository {
 
 const selectColumns = `user_id, name, streak, activity_count, last_report_date, 
 	COALESCE(max_streak, 0), COALESCE(total_points, 0), COALESCE(achievements, ''),
-	COALESCE(comeback_streak, 0), COALESCE(inactive_days, 0), COALESCE(centurion_cycles, 0)`
+	COALESCE(comeback_streak, 0), COALESCE(inactive_days, 0), COALESCE(centurion_cycles, 0),
+	COALESCE(seasonal_points, 0), COALESCE(seasonal_activity_count, 0),
+	COALESCE(streak_freezes, 0)`
 
 func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, error) {
 	var report domain.Report
@@ -31,6 +33,8 @@ func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, e
 		&report.UserID, &report.Name, &report.Streak, &report.ActivityCount,
 		&lastReportDate, &report.MaxStreak, &report.TotalPoints, &report.Achievements,
 		&report.ComebackStreak, &report.InactiveDays, &report.CenturionCycles,
+		&report.SeasonalPoints, &report.SeasonalActivityCount,
+		&report.StreakFreezes,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -55,8 +59,8 @@ func (r *ReportRepository) GetReport(ctx context.Context, userID string) (*domai
 
 func upsertReport(ctx context.Context, execer execContexter, report *domain.Report) error {
 	query := `
-		INSERT INTO user_reports (user_id, name, streak, activity_count, last_report_date, max_streak, total_points, achievements, comeback_streak, inactive_days, centurion_cycles)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_reports (user_id, name, streak, activity_count, last_report_date, max_streak, total_points, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, streak_freezes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			name = excluded.name,
 			streak = excluded.streak,
@@ -67,12 +71,16 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 			achievements = excluded.achievements,
 			comeback_streak = excluded.comeback_streak,
 			inactive_days = excluded.inactive_days,
-			centurion_cycles = excluded.centurion_cycles
+			centurion_cycles = excluded.centurion_cycles,
+			seasonal_points = excluded.seasonal_points,
+			seasonal_activity_count = excluded.seasonal_activity_count,
+			streak_freezes = excluded.streak_freezes
 	`
 	_, err := execer.ExecContext(ctx, query,
 		report.UserID, report.Name, report.Streak, report.ActivityCount,
 		report.LastReportDate.Format(time.RFC3339), report.MaxStreak, report.TotalPoints,
 		report.Achievements, report.ComebackStreak, report.InactiveDays, report.CenturionCycles,
+		report.SeasonalPoints, report.SeasonalActivityCount, report.StreakFreezes,
 	)
 	return err
 }
@@ -178,11 +186,15 @@ func (r *ReportRepository) GetInactiveUsers(ctx context.Context, days int) ([]*d
 	return scanReports(rows)
 }
 
+// ResetSeasonalCounters clears only seasonal data, preserving lifetime progress.
+// This replaces the old destructive reset that deleted all user data.
 func (r *ReportRepository) ResetAllReports(ctx context.Context) error {
-	if _, err := r.db.ExecContext(ctx, `DELETE FROM activity_logs`); err != nil {
-		return err
-	}
-	_, err := r.db.ExecContext(ctx, `DELETE FROM user_reports`)
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE user_reports
+		SET seasonal_points = 0,
+		    seasonal_activity_count = 0,
+		    streak_freezes = 1
+	`)
 	return err
 }
 
@@ -246,6 +258,9 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN comeback_streak INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN inactive_days INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN centurion_cycles INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_points INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_activity_count INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN streak_freezes INTEGER DEFAULT 1")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE strava_accounts ADD COLUMN name TEXT")
 
 	// Run data migrations
