@@ -1,5 +1,10 @@
 package usecase
 
+import (
+	"fmt"
+	"time"
+)
+
 type BroadcastUpdateUsecase struct{}
 
 func NewBroadcastUpdateUsecase() *BroadcastUpdateUsecase {
@@ -7,28 +12,36 @@ func NewBroadcastUpdateUsecase() *BroadcastUpdateUsecase {
 }
 
 func (uc *BroadcastUpdateUsecase) Execute() string {
-	return `📢 *PENGUMUMAN PENTING: SESSION 1 BERAKHIR!* ⚠️
+	seasonNumber, _ := GetCurrentSessionInfo(time.Now())
+	nextSeason, _ := GetCurrentSessionInfo(GetNextResetTime(time.Now()))
+
+	return fmt.Sprintf(`📢 *PENGUMUMAN SEASON CHALLENGE* ⚠️
 
 Halo para pejuang keringat! 🏋️‍♂️
 
-Kami ingin mengumumkan bahwa *Session 1* dari challenge "30 Days of Sweat" akan *resmi berakhir pada tanggal 30 April 2026*.
+Season %d sedang berjalan. Setelah season berjalan selesai, bot akan otomatis lanjut ke Season %d dan seterusnya setiap 4 bulan.
 
 ⏰ *Jadwal Penting:*
-• 📅 *30 April 2026* — Hari terakhir Session 1
-• 🔄 *1 Mei 2026* — Session 2 dimulai dari NOL
+• 📅 Season berjalan: *Season %d*
+• 🔄 Reset berikutnya: *Season %d* dimulai dari seasonal progress baru
 
-🗑️ *Yang Akan Di-Reset pada Session 2:*
-• 🏆 Leaderboard — reset total
-• 🔥 Streak mingguan — mulai dari 0
-• 📊 Jumlah hari aktif — mulai dari 0
-• 🏅 Achievements — reset semua
-• ⭐ Points & Level — mulai dari awal
-• 🛡️ Centurion Cycles — reset
+🗑️ *Yang Akan Di-Reset Saat Season Baru:*
+• 📊 Seasonal Points
+• 📅 Seasonal Activity
+• ⚔️ Seasonal Max Streak
+• 🏅 Season Badges
+• 🏆 Rank & Seasonal Leaderboard
+
+💾 *Yang Tetap Aman:*
+• ⭐ Total Points, EXP & Level lifetime
+• 🔥 Streak mingguan
+• 🏅 Achievement archive
+• 🛡️ Centurion Cycles
 
 💡 *Artinya:*
-Semua data akan *dihapus* dan kita akan mulai dari awal lagi di Session 2. Ini adalah kesempatan baru bagi semua orang untuk bersaing dari titik yang sama! 🎯
+Seasonal ranking mulai dari awal, tapi progres lifetime tetap lanjut. Ini kesempatan baru untuk berburu rank tanpa kehilangan level! 🎯
 
-📌 Manfaatkan sisa waktu di Session 1 ini sebaik mungkin. Laporkan aktivitas terakhirmu sebelum 30 April!
+📌 Manfaatkan Season %d ini sebaik mungkin. Laporkan aktivitasmu dengan #lapor!
 
-*Session 2 dimulai 1 Mei 2026. Siap-siap untuk petualangan baru!* 🚀🔥`
+*Semangat Season %d!* 🚀🔥`, seasonNumber, nextSeason, seasonNumber, nextSeason, seasonNumber, seasonNumber)
 }

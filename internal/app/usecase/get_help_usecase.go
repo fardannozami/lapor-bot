@@ -61,6 +61,27 @@ func NewGetHelpUsecase() *GetHelpUsecase {
 }
 
 func (uc *GetHelpUsecase) Execute() string {
+	return `🤖 *Command Lapor Bot*
+
+📝 #lapor — laporan aktivitas harian
+❌ #cancel — batalkan laporan hari ini
+📊 #mystats — statistik personal
+🏆 #leaderboard — leaderboard lifetime
+📅 #leaderboard-weekly — leaderboard minggu ini
+🏹 #leaderboard-seasonal — leaderboard season
+🎖️ #ranks — rank hunter season
+🏅 #achievements — detail badge dan syarat unlock
+🔄 #comeback — progress comeback challenge
+🧭 #jobs — daftar job
+🧭 #job [id] — pilih job hunter
+✨ #motivasi — quote motivasi
+🏃 #strava — hubungkan Strava via chat pribadi
+✏️ #setname [nama] — ubah nama tampil
+📚 #tutorial — cara pakai bot lengkap
+❓ #help — list command ini`
+}
+
+func (uc *GetHelpUsecase) ExecuteTutorial() string {
 	msg := "📚 *Panduan Penggunaan Lapor Bot* 📚\n\n"
 	msg += "Halo! Aku adalah bot untuk melacak aktivitas harian workout dan olahraga grup ini.\n"
 	msg += "Kamu bisa menggunakan perintah berikut:\n\n"
@@ -69,6 +90,10 @@ func (uc *GetHelpUsecase) Execute() string {
 		msg += fmt.Sprintf("%d. %s *%s*\n%s\n\n", i+1, section.emoji, section.title, section.content)
 	}
 
+	msg += "⚔️ *Level Numerik*\n"
+	msg += "Level lifetime dimulai dari Lv.0 dan naik dari total points/EXP. Semakin tinggi level, EXP yang dibutuhkan makin besar: `5×level² + 50×level + 100`. Season boleh reset, tapi level lifetime tetap lanjut.\n\n"
+	msg += "🏅 *Badge*\n"
+	msg += "Notifikasi #lapor hanya menampilkan badge terbaru supaya ringkas. Untuk syarat, poin, dan cerita unlock lengkap, buka #achievements.\n\n"
 	msg += "_Catatan: Bot hanya merespon di grup yang sudah dikonfigurasi. Semangat terus! 💪_"
 	return msg
 }

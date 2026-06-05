@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
 )
@@ -39,9 +40,12 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 		}
 	}
 
+	seasonNumber, _ := GetCurrentSessionInfo(time.Now())
+
 	sb := strings.Builder{}
-	sb.WriteString("🎖️ *Season Badge Challenge*\n")
-	sb.WriteString("Badge di bawah ini reset setiap season. Level & EXP lifetime tetap aman.\n\n")
+	sb.WriteString(fmt.Sprintf("🎖️ *Season Badge Challenge — Season %d*\n", seasonNumber))
+	sb.WriteString("Badge di bawah ini reset setiap season. Level & EXP lifetime tetap aman.\n")
+	sb.WriteString("Notifikasi #lapor hanya menampilkan badge terbaru; detail lengkapnya ada di sini.\n\n")
 
 	for _, ach := range domain.AllSeasonAchievements {
 		count := stats[ach.ID]
@@ -52,8 +56,25 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 			icon = "🔒"
 		}
 
-		sb.WriteString(fmt.Sprintf("%s %s — %s (%d/%d member)\n", icon, ach.Name, ach.Description, count, totalMembers))
+		sb.WriteString(fmt.Sprintf("%s *%s* (+%d pts)\n", icon, ach.Name, ach.Points))
+		sb.WriteString(fmt.Sprintf("   Syarat: %s (%d/%d member)\n", ach.Description, count, totalMembers))
+		if ach.UnlockMessage != "" {
+			sb.WriteString(fmt.Sprintf("   _%s_\n", ach.UnlockMessage))
+		}
+		sb.WriteString("\n")
 	}
+
+	sb.WriteString("🔄 *Comeback Badges*\n")
+	for _, ach := range domain.AllComebackAchievements {
+		sb.WriteString(fmt.Sprintf("%s *%s* (+%d pts)\n", ach.DisplayEmoji, ach.Name, ach.Points))
+		sb.WriteString(fmt.Sprintf("   Syarat: absen minimal %d hari, lalu comeback streak %d minggu.\n", ach.MinInactiveDays, ach.MinComebackStreak))
+		if ach.UnlockMessage != "" {
+			sb.WriteString(fmt.Sprintf("   _%s_\n", ach.UnlockMessage))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("⚔️ Level numerik memakai EXP lifetime: Lv berikutnya butuh `5×level² + 50×level + 100` EXP.")
 
 	return sb.String(), nil
 }

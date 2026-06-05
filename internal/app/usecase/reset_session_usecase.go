@@ -24,19 +24,22 @@ func NewResetSessionUsecase(repo domain.ReportRepository) *ResetSessionUsecase {
 	return &ResetSessionUsecase{repo: repo}
 }
 
-// GetCurrentSessionInfo returns the current session number and its start date.
-// Sessions cycle every 4 months starting from January 2026.
-// Session 1: Jan 1, 2026 - Apr 30, 2026
-// Session 2: May 1, 2026 - Aug 31, 2026
-// Session 3: Sep 1, 2026 - Dec 31, 2026
-// Session 4: Jan 1, 2027 - Apr 30, 2027
+// GetCurrentSessionInfo returns the current season number and its start date.
+// Seasons cycle every 4 months. This bot's public season counter starts from
+// the current launch season so members see Season 1 first, then Season 2 after
+// the next reset.
+// Season 1: May 1, 2026 - Aug 31, 2026
+// Season 2: Sep 1, 2026 - Dec 31, 2026
+// Season 3: Jan 1, 2027 - Apr 30, 2027
 // ...and so on.
 func GetCurrentSessionInfo(now time.Time) (sessionNumber int, sessionStart time.Time) {
 	loc := time.FixedZone("WIB", 7*3600)
 	now = now.In(loc)
 
-	// Base: Session 1 starts Jan 1, 2026
+	// Base: Season 1 starts with this bot's launch season.
 	baseYear := 2026
+	baseMonth := time.May
+	baseStart := time.Date(baseYear, baseMonth, 1, 0, 0, 0, 0, loc)
 	baseSession := 1
 
 	// Find which session period we're in
@@ -57,18 +60,24 @@ func GetCurrentSessionInfo(now time.Time) (sessionNumber int, sessionStart time.
 	if currentStart.IsZero() {
 		currentStart = time.Date(year-1, time.September, 1, 0, 0, 0, 0, loc)
 	}
+	if currentStart.Before(baseStart) {
+		currentStart = baseStart
+	}
 
 	// Calculate session number from base
 	// Each year has 3 sessions. Calculate total sessions elapsed.
 	yearDiff := currentStart.Year() - baseYear
 	monthIndex := 0
+	baseMonthIndex := 0
 	for i, m := range SessionResetMonths {
 		if currentStart.Month() == m {
 			monthIndex = i
-			break
+		}
+		if baseMonth == m {
+			baseMonthIndex = i
 		}
 	}
-	sessionNumber = baseSession + (yearDiff * 3) + monthIndex
+	sessionNumber = baseSession + (yearDiff * len(SessionResetMonths)) + (monthIndex - baseMonthIndex)
 
 	return sessionNumber, currentStart
 }
@@ -92,46 +101,20 @@ func GetNextResetTime(now time.Time) time.Time {
 	return time.Date(year+1, SessionResetMonths[0], 1, 0, 0, 0, 0, loc)
 }
 
-// Execute resets all report data and sends an announcement to the group.
+// Execute resets seasonal report data and sends an announcement to the group.
 func (uc *ResetSessionUsecase) Execute(ctx context.Context, client *whatsmeow.Client, groupID string, sessionNumber int) error {
-	log.Printf("[SESSION RESET] Starting Season %d reset — clearing all report data...", sessionNumber)
+	log.Printf("[SESSION RESET] Starting Season %d reset — clearing seasonal data...", sessionNumber)
 
 	// Reset all reports in the database
 	if err := uc.repo.ResetAllReports(ctx); err != nil {
 		return fmt.Errorf("failed to reset all reports: %w", err)
 	}
 
-	log.Printf("[SESSION RESET] All report data has been cleared for Season %d!", sessionNumber)
+	log.Printf("[SESSION RESET] Seasonal data has been reset for Season %d!", sessionNumber)
 
 	// Send announcement to the group
 	if groupID != "" && client != nil && client.IsConnected() {
-		announcement := fmt.Sprintf(`🔄 *SEASON %d TELAH DIMULAI!* 🔄
-
-Halo para pejuang keringat! 🏋️‍♂️
-
-Season %d telah resmi berakhir! 🎉
-
-✅ *Yang di-reset:*
-• 📊 Seasonal Points — mulai dari 0
-• 📅 Seasonal Activity — mulai dari 0
-• ⚔️ Seasonal Max Streak — mulai dari 0
-• 🏅 Season Badges — mulai berburu dari awal
-• 🏆 Rank & Seasonal Leaderboard — reset
-
-💾 *Yang tetap tersimpan:*
-• 🔥 Streak mingguan — lanjutkan!
-• ⭐ Total Points & Level — lifetime progress aman
-• 🏅 Achievement archive — yang sudah pernah unlock tetap tersimpan
-• 🛡️ Centurion Cycles — tetap berlaku
-
-❄️ *Streak Freeze* — reset ke 1 tiap season. Dapat +1 lagi saat capai 4 minggu streak!
-
-🆕 *Season %d dimulai SEKARANG!*
-Semua peserta mulai dari titik yang sama untuk seasonal ranking. Tapi level dan EXP lifetime kamu tetap ada! 💪
-
-📌 Langsung laporkan aktivitas pertamamu di Season %d dengan mengirim #lapor!
-
-*Semangat Season %d!* 🚀🔥`, sessionNumber, sessionNumber-1, sessionNumber, sessionNumber, sessionNumber)
+		announcement := buildSeasonResetAnnouncement(sessionNumber)
 
 		targetJID, _ := types.ParseJID(groupID)
 		msg := &waE2E.Message{
@@ -146,6 +129,41 @@ Semua peserta mulai dari titik yang sama untuk seasonal ranking. Tapi level dan 
 	}
 
 	return nil
+}
+
+func buildSeasonResetAnnouncement(sessionNumber int) string {
+	seasonTransition := "Season perdana telah resmi dimulai. Semua hunter mulai berburu dari titik yang sama! 🎉"
+	if sessionNumber > 1 {
+		seasonTransition = fmt.Sprintf("Season %d telah resmi berakhir! 🎉", sessionNumber-1)
+	}
+
+	return fmt.Sprintf(`🔄 *SEASON %d TELAH DIMULAI!* 🔄
+
+Halo para pejuang keringat! 🏋️‍♂️
+
+%s
+
+✅ *Yang di-reset:*
+• 📊 Seasonal Points — mulai dari 0
+• 📅 Seasonal Activity — mulai dari 0
+• ⚔️ Seasonal Max Streak — mulai dari 0
+• 🏅 Season Badges — mulai berburu dari awal
+• 🏆 Rank & Seasonal Leaderboard — reset
+
+💾 *Yang tetap tersimpan:*
+• 🔥 Streak mingguan — lanjutkan!
+• ⭐ Total Points, EXP & Level — lifetime progress aman
+• 🏅 Achievement archive — yang sudah pernah unlock tetap tersimpan
+• 🛡️ Centurion Cycles — tetap berlaku
+
+❄️ *Streak Freeze* — reset ke 1 tiap season. Dapat +1 lagi saat capai 4 minggu streak!
+
+🆕 *Season %d dimulai SEKARANG!*
+Semua peserta mulai dari titik yang sama untuk seasonal ranking. Tapi level dan EXP lifetime kamu tetap ada! 💪
+
+📌 Langsung laporkan aktivitas pertamamu di Season %d dengan mengirim #lapor!
+
+*Semangat Season %d!* 🚀🔥`, sessionNumber, seasonTransition, sessionNumber, sessionNumber, sessionNumber)
 }
 
 // ScheduleSessionReset starts a background goroutine that automatically resets

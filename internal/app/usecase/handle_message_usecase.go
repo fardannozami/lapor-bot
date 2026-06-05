@@ -62,6 +62,11 @@ func NewHandleMessageUsecase(
 func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, message string) (MessageResponse, error) {
 	msg := strings.ToLower(strings.TrimSpace(message))
 
+	if strings.Contains(msg, "#tutorial") {
+		text := uc.helpUC.ExecuteTutorial()
+		return MessageResponse{Text: text}, nil
+	}
+
 	if strings.Contains(msg, "#help") {
 		text := uc.helpUC.Execute()
 		return MessageResponse{Text: text}, nil

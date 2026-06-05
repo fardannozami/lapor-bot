@@ -14,6 +14,7 @@ type Report struct {
 	LastReportDate        time.Time `json:"last_report_date" db:"last_report_date"`
 	MaxStreak             int       `json:"max_streak" db:"max_streak"`
 	TotalPoints           int       `json:"total_points" db:"total_points"`
+	Level                 int       `json:"level" db:"level"`
 	Achievements          string    `json:"achievements" db:"achievements"`
 	ComebackStreak        int       `json:"comeback_streak" db:"comeback_streak"`
 	InactiveDays          int       `json:"inactive_days" db:"inactive_days"`
