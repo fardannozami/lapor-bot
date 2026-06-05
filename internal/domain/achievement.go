@@ -326,6 +326,13 @@ type ComebackAchievement struct {
 	MinComebackStreak int
 }
 
+// BadgeSummary is a compact display model for recent badge notifications.
+type BadgeSummary struct {
+	ID           string
+	Name         string
+	DisplayEmoji string
+}
+
 // AllComebackAchievements defines achievements for users who return after inactivity.
 var AllComebackAchievements = []ComebackAchievement{
 	{
@@ -392,6 +399,48 @@ func AddAchievement(achievements string, id string) string {
 		return id
 	}
 	return achievements + "," + id
+}
+
+// FindBadgeSummary returns compact badge display data by ID.
+func FindBadgeSummary(id string) (BadgeSummary, bool) {
+	for _, a := range AllSeasonAchievements {
+		if a.ID == id {
+			return BadgeSummary{ID: a.ID, Name: a.Name, DisplayEmoji: a.DisplayEmoji}, true
+		}
+	}
+	for _, a := range AllComebackAchievements {
+		if a.ID == id {
+			return BadgeSummary{ID: a.ID, Name: a.Name, DisplayEmoji: a.DisplayEmoji}, true
+		}
+	}
+	for _, a := range AllAchievements {
+		if a.ID == id {
+			return BadgeSummary{ID: a.ID, Name: a.Name, DisplayEmoji: a.DisplayEmoji}, true
+		}
+	}
+	return BadgeSummary{}, false
+}
+
+// RecentAchievementSummaries returns the latest achieved badges in newest-first order.
+func RecentAchievementSummaries(achievements string, limit int) []BadgeSummary {
+	if achievements == "" || limit <= 0 {
+		return nil
+	}
+
+	ids := strings.Split(achievements, ",")
+	summaries := make([]BadgeSummary, 0, limit)
+	seen := make(map[string]bool, limit)
+	for i := len(ids) - 1; i >= 0 && len(summaries) < limit; i-- {
+		id := strings.TrimSpace(ids[i])
+		if id == "" || seen[id] {
+			continue
+		}
+		if summary, ok := FindBadgeSummary(id); ok {
+			summaries = append(summaries, summary)
+			seen[id] = true
+		}
+	}
+	return summaries
 }
 
 // CheckNewAchievements evaluates all achievements against the report and returns newly unlocked ones.

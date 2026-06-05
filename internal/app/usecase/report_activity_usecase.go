@@ -120,6 +120,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	if report.MaxStreak == 0 {
 		report.MaxStreak = 1
 	}
+	oldNumericLevel := domain.NumericLevelFromTotalPoints(report.TotalPoints)
 
 	// 1. Update Max Streak
 	newRecord := false
@@ -144,13 +145,9 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	report.TotalPoints += reportPoints
 	report.SeasonalPoints += reportPoints
 
-	// 3. Store old level to detect level-up
-	oldLevel := domain.GetLevel(report.TotalPoints)
-
 	// 3. Check for new season badges. Badge progress resets every season, but
 	// lifetime EXP/level remains preserved.
 	newAchievements := domain.CheckNewSeasonAchievements(report)
-	var unlockedNames []string
 	pointsGained := 0
 
 	for _, ach := range newAchievements {
@@ -161,7 +158,6 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		report.TotalPoints += ach.Points
 		report.SeasonalPoints += ach.Points
 		pointsGained += ach.Points
-		unlockedNames = append(unlockedNames, fmt.Sprintf("%s %s (%d pts)", ach.DisplayEmoji, ach.Name, ach.Points))
 	}
 
 	// 4. Check for new comeback achievements
@@ -170,7 +166,6 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		report.Achievements = domain.AddAchievement(report.Achievements, ach.ID)
 		report.TotalPoints += ach.Points
 		pointsGained += ach.Points
-		unlockedNames = append(unlockedNames, fmt.Sprintf("%s %s (%d pts)", ach.DisplayEmoji, ach.Name, ach.Points))
 	}
 
 	freezeAwarded := false
@@ -181,9 +176,10 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		}
 	}
 
-	// 5. Detect level-up
-	newLevel := domain.GetLevel(report.TotalPoints)
-	leveledUp := newLevel.Tier > oldLevel.Tier
+	// 5. Persist numeric RPG level. It is derived from lifetime EXP, then stored
+	// so the value remains available across season resets and deployments.
+	report.Level = domain.NumericLevelFromTotalPoints(report.TotalPoints)
+	leveledUp := report.Level > oldNumericLevel
 
 	if err := uc.repo.UpsertReportWithActivity(ctx, report, today); err != nil {
 		return "", err
@@ -201,7 +197,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		if report.JobClass != "" {
 			response += fmt.Sprintf("🧭 Job: %s\n", domain.FormatJobClass(report.JobClass))
 		}
-		response += fmt.Sprintf("\n📊 Level: %s (Total: %d pts)\n", domain.FormatLevel(report.TotalPoints), report.TotalPoints)
+		response += fmt.Sprintf("\n📊 Level: Lv.%d • %s (Total: %d pts)\n", report.Level, domain.FormatLevel(report.TotalPoints), report.TotalPoints)
 		response += fmt.Sprintf("📅 Total hari aktif: %d\n", report.ActivityCount)
 
 		// Show comeback challenge info
@@ -261,29 +257,23 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	}
 
 	if leveledUp {
-		response += fmt.Sprintf("\n\n⬆️ LEVEL UP! %s → %s %s", oldLevel.Name, newLevel.Name, newLevel.Icon)
+		response += fmt.Sprintf("\n\n⚔️ *LEVEL UP!* Lv.%d → Lv.%d", oldNumericLevel, report.Level)
 	}
 
-	if len(unlockedNames) > 0 {
-		response += "\n\n🎉 *SEASON BADGE UNLOCKED!* 🎉"
-
+	if len(newAchievements)+len(comebackAchievements) > 0 {
+		response += "\n\n🏅 *Badge baru:*"
 		for _, ach := range newAchievements {
-			response += fmt.Sprintf("\n\n%s *%s* (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
-			if ach.UnlockMessage != "" {
-				response += fmt.Sprintf("\n_%s_", ach.UnlockMessage)
-			}
+			response += fmt.Sprintf("\n%s %s (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
 		}
 		for _, ach := range comebackAchievements {
-			response += fmt.Sprintf("\n\n%s *%s* (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
-			if ach.UnlockMessage != "" {
-				response += fmt.Sprintf("\n_%s_", ach.UnlockMessage)
-			}
+			response += fmt.Sprintf("\n%s %s (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
 		}
 
 		if freezeAwarded {
 			response += fmt.Sprintf("\n\n❄️ Bonus: +1 Streak Freeze! (Total: %d)", report.StreakFreezes)
 		}
 
+		response += "\nDetail badge & cerita unlock: #achievements"
 		response += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
 	}
 
@@ -293,8 +283,8 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	}
 
 	// Show progress bar
-	progressBar := domain.FormatProgressBar(report.TotalPoints)
-	response += fmt.Sprintf("\n%s", progressBar)
+	response += fmt.Sprintf("\n%s", domain.FormatNumericLevelProgressBar(report.TotalPoints))
+	response += fmt.Sprintf("\n%s", domain.FormatProgressBar(report.TotalPoints))
 
 	return response, nil
 }

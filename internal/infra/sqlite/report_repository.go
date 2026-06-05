@@ -21,7 +21,7 @@ func NewReportRepository(db *sql.DB) *ReportRepository {
 }
 
 const selectColumns = `user_id, name, COALESCE(job_class, ''), streak, activity_count, last_report_date, 
-	COALESCE(max_streak, 0), COALESCE(total_points, 0), COALESCE(achievements, ''),
+	COALESCE(max_streak, 0), COALESCE(total_points, 0), COALESCE(level, 0), COALESCE(achievements, ''),
 	COALESCE(comeback_streak, 0), COALESCE(inactive_days, 0), COALESCE(centurion_cycles, 0),
 	COALESCE(seasonal_points, 0), COALESCE(seasonal_activity_count, 0),
 	COALESCE(seasonal_max_streak, 0), COALESCE(seasonal_achievements, ''),
@@ -32,7 +32,7 @@ func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, e
 	var lastReportDate string
 	err := scanner.Scan(
 		&report.UserID, &report.Name, &report.JobClass, &report.Streak, &report.ActivityCount,
-		&lastReportDate, &report.MaxStreak, &report.TotalPoints, &report.Achievements,
+		&lastReportDate, &report.MaxStreak, &report.TotalPoints, &report.Level, &report.Achievements,
 		&report.ComebackStreak, &report.InactiveDays, &report.CenturionCycles,
 		&report.SeasonalPoints, &report.SeasonalActivityCount,
 		&report.SeasonalMaxStreak, &report.SeasonalAchievements,
@@ -61,8 +61,8 @@ func (r *ReportRepository) GetReport(ctx context.Context, userID string) (*domai
 
 func upsertReport(ctx context.Context, execer execContexter, report *domain.Report) error {
 	query := `
-		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, level, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			name = excluded.name,
 			job_class = excluded.job_class,
@@ -71,6 +71,7 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 			last_report_date = excluded.last_report_date,
 			max_streak = excluded.max_streak,
 			total_points = excluded.total_points,
+			level = excluded.level,
 			achievements = excluded.achievements,
 			comeback_streak = excluded.comeback_streak,
 			inactive_days = excluded.inactive_days,
@@ -84,7 +85,7 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 	_, err := execer.ExecContext(ctx, query,
 		report.UserID, report.Name, report.JobClass, report.Streak, report.ActivityCount,
 		report.LastReportDate.Format(time.RFC3339), report.MaxStreak, report.TotalPoints,
-		report.Achievements, report.ComebackStreak, report.InactiveDays, report.CenturionCycles,
+		report.Level, report.Achievements, report.ComebackStreak, report.InactiveDays, report.CenturionCycles,
 		report.SeasonalPoints, report.SeasonalActivityCount, report.SeasonalMaxStreak,
 		report.SeasonalAchievements, report.StreakFreezes,
 	)
@@ -263,6 +264,7 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN job_class TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN max_streak INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN total_points INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN level INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN achievements TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN comeback_streak INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN inactive_days INTEGER DEFAULT 0")
@@ -279,6 +281,9 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 		return err
 	}
 	if err := r.MigrateCenturionPrestige(ctx); err != nil {
+		return err
+	}
+	if err := r.MigrateNumericLevels(ctx); err != nil {
 		return err
 	}
 
@@ -354,6 +359,56 @@ func (r *ReportRepository) MigrateCenturionPrestige(ctx context.Context) error {
 
 	_, err = r.db.ExecContext(ctx, "INSERT INTO sys_migrations (name) VALUES ('centurion_prestige_v1')")
 	return err
+}
+
+func (r *ReportRepository) MigrateNumericLevels(ctx context.Context) error {
+	var exists int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sys_migrations WHERE name = 'numeric_level_v1'").Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists > 0 {
+		return nil
+	}
+
+	rows, err := r.db.QueryContext(ctx, `SELECT user_id, COALESCE(total_points, 0) FROM user_reports`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type levelUpdate struct {
+		userID string
+		level  int
+	}
+	var updates []levelUpdate
+	for rows.Next() {
+		var userID string
+		var totalPoints int
+		if err := rows.Scan(&userID, &totalPoints); err != nil {
+			return err
+		}
+		updates = append(updates, levelUpdate{userID: userID, level: domain.NumericLevelFromTotalPoints(totalPoints)})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	for _, update := range updates {
+		if _, err := tx.ExecContext(ctx, `UPDATE user_reports SET level = ? WHERE user_id = ?`, update.level, update.userID); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO sys_migrations (name) VALUES ('numeric_level_v1')"); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 // ResolveLIDToPhone looks up a LID in the whatsmeow_lid_map table and returns the phone number.

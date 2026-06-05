@@ -1,6 +1,9 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Level represents a gamification level that users progress through.
 type Level struct {
@@ -25,6 +28,60 @@ type JobClass struct {
 	Icon        string
 	Description string
 	Trait       string
+}
+
+// NumericLevelProgress represents persistent lifetime RPG level progress.
+// The level itself is season-independent; only lifetime points move it forward.
+type NumericLevelProgress struct {
+	Level       int
+	CurrentXP   int
+	RequiredXP  int
+	TotalPoints int
+}
+
+const (
+	levelXPQuadratic = 5
+	levelXPLinear    = 50
+	levelXPBase      = 100
+)
+
+// XPForNextNumericLevel returns the EXP required to advance from level N to N+1.
+// It follows the battle-tested quadratic chatbot curve: 5L² + 50L + 100.
+// Level 0 starts at 100 EXP so new deployments can begin cleanly from Lv.0.
+func XPForNextNumericLevel(level int) int {
+	if level < 0 {
+		level = 0
+	}
+	return levelXPQuadratic*level*level + levelXPLinear*level + levelXPBase
+}
+
+// GetNumericLevelProgress derives the persistent numeric RPG level from lifetime points.
+// The existing points/EXP value remains the source of truth, so old data migrates safely.
+func GetNumericLevelProgress(totalPoints int) NumericLevelProgress {
+	if totalPoints < 0 {
+		totalPoints = 0
+	}
+
+	level := 0
+	remaining := totalPoints
+	for {
+		required := XPForNextNumericLevel(level)
+		if remaining < required {
+			return NumericLevelProgress{
+				Level:       level,
+				CurrentXP:   remaining,
+				RequiredXP:  required,
+				TotalPoints: totalPoints,
+			}
+		}
+		remaining -= required
+		level++
+	}
+}
+
+// NumericLevelFromTotalPoints returns only the persistent numeric level.
+func NumericLevelFromTotalPoints(totalPoints int) int {
+	return GetNumericLevelProgress(totalPoints).Level
 }
 
 // AllLevels defines the progression tiers in ascending order.
@@ -160,4 +217,28 @@ func FormatProgressBar(totalPoints int) string {
 	}
 
 	return fmt.Sprintf("[%s] %d/%d pts → %s %s", bar, totalPoints, next.MinPoints, next.Name, next.Icon)
+}
+
+// FormatNumericLevelProgressBar returns compact Solo-Leveling-style lifetime progress.
+func FormatNumericLevelProgressBar(totalPoints int) string {
+	progress := GetNumericLevelProgress(totalPoints)
+	barLen := 10
+	filled := 0
+	if progress.RequiredXP > 0 {
+		filled = (progress.CurrentXP * barLen) / progress.RequiredXP
+	}
+	if filled > barLen {
+		filled = barLen
+	}
+
+	var bar strings.Builder
+	for i := 0; i < barLen; i++ {
+		if i < filled {
+			bar.WriteString("█")
+		} else {
+			bar.WriteString("░")
+		}
+	}
+
+	return fmt.Sprintf("Lv.%d [%s] %d/%d EXP", progress.Level, bar.String(), progress.CurrentXP, progress.RequiredXP)
 }

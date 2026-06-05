@@ -95,7 +95,8 @@ Bot hanya merespon perintah berikut di dalam grup yang telah dikonfigurasi (`GRO
 | `#job [id]` | Memilih hunter job. Contoh: `#job ranger`. |
 | `#comeback` | Menampilkan status comeback challenge setelah absen. |
 | `#motivasi` | Menampilkan pesan motivasi acak untuk semangat berolahraga. |
-| `#help` | Menampilkan panduan penggunaan bot dan daftar command. |
+| `#help` | Menampilkan list command yang tersedia. |
+| `#tutorial` | Menampilkan panduan lengkap cara memakai bot. |
 | `#strava` | Menghubungkan akun Strava untuk laporan otomatis. |
 | `#setname [nama]` | Mengubah nama tampilan di leaderboard. |
 
@@ -103,7 +104,7 @@ Bot hanya merespon perintah berikut di dalam grup yang telah dikonfigurasi (`GRO
 - **Season Ranks (`#ranks`)**: Rank ala hunter dihitung dari seasonal points dan reset setiap season.
 - **Hunter Jobs (`#jobs`, `#job [id]`)**: Pilih job profile seperti fighter, tanker, assassin, mage, ranger, healer, atau necromancer. Job tampil di `#mystats` dan laporan harian.
 - **Season Badges**: Badge reset setiap season supaya semua member mulai berburu dari awal.
-- **Lifetime Level & EXP**: Total poin, level, streak mingguan, dan progress penting user tetap tersimpan lintas season.
+- **Lifetime Level & EXP**: Total poin dan level numerik (`Lv.0+`) tetap tersimpan lintas season. EXP naik level memakai kurva `5×level² + 50×level + 100` agar makin tinggi level makin lama naiknya.
 - **Milestone Notification**: Dapat notifikasi khusus saat mencapai streak tertenu (7, 14, 30 hari, dst).
 - **Leaderboard**: Bersaing dengan teman untuk streak tertinggi.
 

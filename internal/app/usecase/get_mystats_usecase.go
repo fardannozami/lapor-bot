@@ -39,7 +39,7 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 		return "", err
 	}
 
-	_, sessionStart := GetCurrentSessionInfo(now)
+	seasonNumber, sessionStart := GetCurrentSessionInfo(now)
 	seasonStart := time.Date(sessionStart.Year(), sessionStart.Month(), sessionStart.Day(), 0, 0, 0, 0, time.UTC)
 	seasonEnd := GetNextResetTime(now)
 	seasonEntries, err := uc.repo.GetActivityCountsByDateRange(ctx, seasonStart, seasonEnd)
@@ -67,11 +67,16 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 	sb.WriteString(fmt.Sprintf("📊 Statistik kamu, %s:\n\n", report.Name))
 
 	// Level display
-	sb.WriteString(fmt.Sprintf("🎖️ Level: %s (lifetime)\n", domain.FormatLevel(report.TotalPoints)))
+	actualLevel := domain.NumericLevelFromTotalPoints(report.TotalPoints)
+	if report.Level != actualLevel {
+		report.Level = actualLevel
+	}
+	sb.WriteString(fmt.Sprintf("🎖️ Level: Lv.%d • %s (lifetime)\n", report.Level, domain.FormatLevel(report.TotalPoints)))
 	sb.WriteString(fmt.Sprintf("🧭 Job: %s\n", domain.FormatJobClass(report.JobClass)))
-	sb.WriteString(fmt.Sprintf("📈 %s\n\n", domain.FormatProgressBar(report.TotalPoints)))
+	sb.WriteString(fmt.Sprintf("📈 %s\n", domain.FormatNumericLevelProgressBar(report.TotalPoints)))
+	sb.WriteString(fmt.Sprintf("📊 %s\n\n", domain.FormatProgressBar(report.TotalPoints)))
 
-	sb.WriteString(fmt.Sprintf("🏹 Rank season: %s\n", domain.FormatSeasonRank(report.SeasonalPoints)))
+	sb.WriteString(fmt.Sprintf("🏹 Rank Season %d: %s\n", seasonNumber, domain.FormatSeasonRank(report.SeasonalPoints)))
 	sb.WriteString(fmt.Sprintf("🌟 Poin season: %d\n", report.SeasonalPoints))
 	sb.WriteString(fmt.Sprintf("🏅 Badge season: %d/%d\n", seasonBadgeCount, len(domain.AllSeasonAchievements)))
 	sb.WriteString(fmt.Sprintf("🗓️ Hari season: %d\n", seasonCount))
@@ -92,6 +97,13 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 	sb.WriteString(fmt.Sprintf("📅 Total hari aktif (lifetime): %d\n", report.ActivityCount))
 	sb.WriteString(fmt.Sprintf("⭐ Total poin (lifetime): %d\n", report.TotalPoints))
 
+	if recentBadges := domain.RecentAchievementSummaries(report.Achievements, 3); len(recentBadges) > 0 {
+		sb.WriteString("\n🏅 Badge terbaru:\n")
+		for _, badge := range recentBadges {
+			sb.WriteString(fmt.Sprintf("%s %s\n", badge.DisplayEmoji, badge.Name))
+		}
+	}
+
 	// Comeback status
 	if report.InactiveDays > 0 && report.ComebackStreak > 0 && report.ComebackStreak < 30 {
 		sb.WriteString(fmt.Sprintf("\n🔄 Comeback streak: %d minggu (setelah %d hari absen)\n", report.ComebackStreak, report.InactiveDays))
@@ -109,8 +121,8 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 		}
 	}
 
-	sb.WriteString("\nLihat ranking season: #ranks\n")
-	sb.WriteString("Lihat daftar badge: #achievements")
+	sb.WriteString(fmt.Sprintf("\nLihat ranking Season %d: #ranks\n", seasonNumber))
+	sb.WriteString("Detail semua badge: #achievements")
 
 	return sb.String(), nil
 }

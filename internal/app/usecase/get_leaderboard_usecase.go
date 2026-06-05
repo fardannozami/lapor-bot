@@ -30,7 +30,6 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 
 	// Session-aware start date (auto-cycles every 4 months)
 	sessionNumber, sessionStart := GetCurrentSessionInfo(now)
-	_ = sessionNumber
 	startDate := time.Date(sessionStart.Year(), sessionStart.Month(), sessionStart.Day(), 0, 0, 0, 0, time.UTC)
 
 	challengeDay := int(displayDate.Sub(startDate).Hours()/24) + 1
@@ -84,7 +83,7 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 
 		seasonalInfo := ""
 		if r.SeasonalPoints > 0 {
-			seasonalInfo = fmt.Sprintf(" | Season: %d pts", r.SeasonalPoints)
+			seasonalInfo = fmt.Sprintf(" | Season %d: %d pts", sessionNumber, r.SeasonalPoints)
 		}
 
 		if weeksSinceLastReport <= 1 {
@@ -107,7 +106,7 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 	}
 
 	now := time.Now()
-	_, sessionStart := GetCurrentSessionInfo(now)
+	seasonNumber, sessionStart := GetCurrentSessionInfo(now)
 	_ = sessionStart
 
 	// Sort by seasonal points descending
@@ -119,7 +118,7 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 	})
 
 	sb := strings.Builder{}
-	sb.WriteString("🏆 *Seasonal Leaderboard*\n\n")
+	sb.WriteString(fmt.Sprintf("🏆 *Season %d Leaderboard*\n\n", seasonNumber))
 
 	if len(reports) == 0 {
 		sb.WriteString("Belum ada yang aktif di season ini.\n")
