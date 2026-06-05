@@ -8,6 +8,7 @@ import (
 type Report struct {
 	UserID                string    `json:"user_id" db:"user_id"`
 	Name                  string    `json:"name" db:"name"`
+	JobClass              string    `json:"job_class" db:"job_class"`
 	Streak                int       `json:"streak" db:"streak"`
 	ActivityCount         int       `json:"activity_count" db:"activity_count"`
 	LastReportDate        time.Time `json:"last_report_date" db:"last_report_date"`
@@ -19,6 +20,8 @@ type Report struct {
 	CenturionCycles       int       `json:"centurion_cycles" db:"centurion_cycles"`
 	SeasonalPoints        int       `json:"seasonal_points" db:"seasonal_points"`
 	SeasonalActivityCount int       `json:"seasonal_activity_count" db:"seasonal_activity_count"`
+	SeasonalMaxStreak     int       `json:"seasonal_max_streak" db:"seasonal_max_streak"`
+	SeasonalAchievements  string    `json:"seasonal_achievements" db:"seasonal_achievements"`
 	StreakFreezes         int       `json:"streak_freezes" db:"streak_freezes"`
 }
 

@@ -88,8 +88,11 @@ Bot hanya merespon perintah berikut di dalam grup yang telah dikonfigurasi (`GRO
 | `#cancel` | Membatalkan laporan hari ini. Hanya bisa digunakan di hari yang sama. |
 | `#leaderboard` | Menampilkan klasemen streak, daftar yang "Keep Streak" 🔥 dan "Lose Streak" 💔. |
 | `#leaderboard-weekly` | Menampilkan klasemen total hari aktif minggu ini. |
-| `#mystats` | Menampilkan statistik personal (streak, poin, achievements). |
-| `#achievements` | Menampilkan daftar semua achievement dan progress member. |
+| `#ranks` | Menampilkan ranking hunter selama season berjalan. |
+| `#mystats` | Menampilkan statistik personal ringkas (level, rank, streak, poin). |
+| `#achievements` | Menampilkan daftar badge season dan progress member. |
+| `#jobs` | Menampilkan daftar hunter jobs yang bisa dipilih. |
+| `#job [id]` | Memilih hunter job. Contoh: `#job ranger`. |
 | `#comeback` | Menampilkan status comeback challenge setelah absen. |
 | `#motivasi` | Menampilkan pesan motivasi acak untuk semangat berolahraga. |
 | `#help` | Menampilkan panduan penggunaan bot dan daftar command. |
@@ -97,7 +100,10 @@ Bot hanya merespon perintah berikut di dalam grup yang telah dikonfigurasi (`GRO
 | `#setname [nama]` | Mengubah nama tampilan di leaderboard. |
 
 ### Fitur Gamifikasi 🏅
-- **Points & Achievements**: Dapatkan poin dan badge unik dengan menjaga streak dan aktif melapor.
+- **Season Ranks (`#ranks`)**: Rank ala hunter dihitung dari seasonal points dan reset setiap season.
+- **Hunter Jobs (`#jobs`, `#job [id]`)**: Pilih job profile seperti fighter, tanker, assassin, mage, ranger, healer, atau necromancer. Job tampil di `#mystats` dan laporan harian.
+- **Season Badges**: Badge reset setiap season supaya semua member mulai berburu dari awal.
+- **Lifetime Level & EXP**: Total poin, level, streak mingguan, dan progress penting user tetap tersimpan lintas season.
 - **Milestone Notification**: Dapat notifikasi khusus saat mencapai streak tertenu (7, 14, 30 hari, dst).
 - **Leaderboard**: Bersaing dengan teman untuk streak tertinggi.
 
@@ -126,4 +132,3 @@ Kontribusi sangat dipersilakan! Silakan ikuti langkah-langkah berikut:
 5.  Buat **Pull Request**.
 
 Jangan ragu untuk membuka _Issue_ jika menemukan bug atau memiliki saran fitur baru.
-

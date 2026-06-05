@@ -127,16 +127,16 @@ func TestStreak_FirstReport(t *testing.T) {
 	if !containsSubstring(msg, expected) {
 		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg)
 	}
-	// Should also have unlocked "Pemula" achievement
-	if !containsSubstring(msg, "Pemula") {
-		t.Errorf("Expected message to contain achievement 'Pemula', got '%s'", msg)
+	// Should also have unlocked the first season badge.
+	if !containsSubstring(msg, "Awakened Hunter") {
+		t.Errorf("Expected message to contain season badge 'Awakened Hunter', got '%s'", msg)
 	}
-	// Points: 10 base + 5 first season + 10 Pemula + 25 Konsisten = 50
+	// Points: 10 base + 5 first season + 10 Awakened Hunter + 25 E-Rank Consistency = 50
 	if r.TotalPoints != 50 {
 		t.Errorf("First report: expected TotalPoints=50, got %d", r.TotalPoints)
 	}
-	if r.SeasonalPoints != 15 {
-		t.Errorf("First report: expected SeasonalPoints=15, got %d", r.SeasonalPoints)
+	if r.SeasonalPoints != 50 {
+		t.Errorf("First report: expected SeasonalPoints=50, got %d", r.SeasonalPoints)
 	}
 }
 

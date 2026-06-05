@@ -58,16 +58,28 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 
 	weeklyCount := getActivityCount(weeklyEntries)
 	seasonCount := getActivityCount(seasonEntries)
+	seasonBadgeCount := 0
+	if report.SeasonalAchievements != "" {
+		seasonBadgeCount = len(strings.Split(report.SeasonalAchievements, ","))
+	}
 
 	sb := strings.Builder{}
 	sb.WriteString(fmt.Sprintf("📊 Statistik kamu, %s:\n\n", report.Name))
 
 	// Level display
-	sb.WriteString(fmt.Sprintf("🎖️ Level: %s\n", domain.FormatLevel(report.TotalPoints)))
+	sb.WriteString(fmt.Sprintf("🎖️ Level: %s (lifetime)\n", domain.FormatLevel(report.TotalPoints)))
+	sb.WriteString(fmt.Sprintf("🧭 Job: %s\n", domain.FormatJobClass(report.JobClass)))
 	sb.WriteString(fmt.Sprintf("📈 %s\n\n", domain.FormatProgressBar(report.TotalPoints)))
+
+	sb.WriteString(fmt.Sprintf("🏹 Rank season: %s\n", domain.FormatSeasonRank(report.SeasonalPoints)))
+	sb.WriteString(fmt.Sprintf("🌟 Poin season: %d\n", report.SeasonalPoints))
+	sb.WriteString(fmt.Sprintf("🏅 Badge season: %d/%d\n", seasonBadgeCount, len(domain.AllSeasonAchievements)))
+	sb.WriteString(fmt.Sprintf("🗓️ Hari season: %d\n", seasonCount))
+	sb.WriteString(fmt.Sprintf("📆 Hari minggu ini: %d\n\n", weeklyCount))
 
 	sb.WriteString(fmt.Sprintf("🔥 Streak saat ini: %d minggu\n", report.Streak))
 	sb.WriteString(fmt.Sprintf("🏆 Streak tertinggi: %d minggu\n", report.MaxStreak))
+	sb.WriteString(fmt.Sprintf("⚔️ Streak terbaik season: %d minggu\n", report.SeasonalMaxStreak))
 	streakFreezeInfo := fmt.Sprintf("❄️ Streak Freeze: %d", report.StreakFreezes)
 	if report.StreakFreezes == 0 {
 		streakFreezeInfo += " (capai 4 minggu streak untuk dapat +1 freeze!)"
@@ -78,11 +90,7 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 	}
 	sb.WriteString(streakFreezeInfo + "\n")
 	sb.WriteString(fmt.Sprintf("📅 Total hari aktif (lifetime): %d\n", report.ActivityCount))
-	sb.WriteString(fmt.Sprintf("🗓️ Total hari season: %d\n", seasonCount))
-	sb.WriteString(fmt.Sprintf("📆 Total mingguan: %d\n", weeklyCount))
 	sb.WriteString(fmt.Sprintf("⭐ Total poin (lifetime): %d\n", report.TotalPoints))
-	sb.WriteString(fmt.Sprintf("🌟 Seasonal poin: %d\n", report.SeasonalPoints))
-	sb.WriteString(fmt.Sprintf("📊 Seasonal activity: %d\n", report.SeasonalActivityCount))
 
 	// Comeback status
 	if report.InactiveDays > 0 && report.ComebackStreak > 0 && report.ComebackStreak < 30 {
@@ -101,34 +109,8 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 		}
 	}
 
-	sb.WriteString("\n🏅 *Achievements & Progress*\n")
-
-	// Show all standard achievements with status
-	for _, a := range domain.AllAchievements {
-		if domain.HasAchievement(report.Achievements, a.ID) {
-			sb.WriteString(fmt.Sprintf("%s %s — %s (%d pts)\n", a.DisplayEmoji, a.Name, a.Description, a.Points))
-		} else {
-			sb.WriteString(fmt.Sprintf("🔒 %s — %s (%d pts)\n", a.Name, a.Description, a.Points))
-		}
-	}
-
-	// Show comeback achievements with progress
-	sb.WriteString("\n🔄 *Comeback Achievements*\n")
-	sb.WriteString("_Khusus untuk yang kembali setelah absen!_\n")
-	for _, a := range domain.AllComebackAchievements {
-		if domain.HasAchievement(report.Achievements, a.ID) {
-			sb.WriteString(fmt.Sprintf("%s %s — %s (%d pts)\n", a.DisplayEmoji, a.Name, a.Description, a.Points))
-		} else if report.InactiveDays >= a.MinInactiveDays {
-			remaining := a.MinComebackStreak - report.ComebackStreak
-			if remaining > 0 {
-				sb.WriteString(fmt.Sprintf("🎯 %s — %d minggu lagi (%d pts)\n", a.Name, remaining, a.Points))
-			} else {
-				sb.WriteString(fmt.Sprintf("%s %s — Siap unlock! (%d pts)\n", a.DisplayEmoji, a.Name, a.Points))
-			}
-		} else {
-			sb.WriteString(fmt.Sprintf("🔒 %s — butuh absen >%d hari dulu (%d pts)\n", a.Name, a.MinInactiveDays, a.Points))
-		}
-	}
+	sb.WriteString("\nLihat ranking season: #ranks\n")
+	sb.WriteString("Lihat daftar badge: #achievements")
 
 	return sb.String(), nil
 }

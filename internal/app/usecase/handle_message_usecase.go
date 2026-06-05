@@ -26,6 +26,7 @@ type HandleMessageUsecase struct {
 	broadcastUpdateUC   *BroadcastUpdateUsecase
 	motivationUC        *GetMotivationUsecase
 	helpUC              *GetHelpUsecase
+	jobUC               *JobUsecase
 }
 
 func NewHandleMessageUsecase(
@@ -54,6 +55,7 @@ func NewHandleMessageUsecase(
 		broadcastUpdateUC:   broadcastUpdateUC,
 		motivationUC:        motivationUC,
 		helpUC:              helpUC,
+		jobUC:               NewJobUsecase(leaderboardUC.repo),
 	}
 }
 
@@ -81,6 +83,20 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{Text: text}, nil
 	}
 
+	if strings.Contains(msg, "#jobs") {
+		return MessageResponse{Text: uc.jobUC.List()}, nil
+	}
+
+	if strings.Contains(msg, "#job") {
+		idx := strings.Index(msg, "#job")
+		jobID := strings.TrimSpace(msg[idx+len("#job"):])
+		if jobID == "" {
+			return MessageResponse{Text: "Pilih job dengan format: #job <id>. Cek daftar job dengan #jobs."}, nil
+		}
+		text, err := uc.jobUC.Select(ctx, userID, name, jobID)
+		return MessageResponse{Text: text}, err
+	}
+
 	if strings.Contains(msg, "#setname") {
 		idx := strings.Index(msg, "#setname")
 		newName := strings.TrimSpace(message[idx+len("#setname"):])
@@ -95,6 +111,11 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 
 	if strings.Contains(msg, "#leaderboard-seasonal") {
 		text, err := uc.leaderboardUC.ExecuteSeasonal(ctx)
+		return MessageResponse{Text: text}, err
+	}
+
+	if strings.Contains(msg, "#ranks") {
+		text, err := uc.leaderboardUC.ExecuteRanks(ctx)
 		return MessageResponse{Text: text}, err
 	}
 

@@ -182,6 +182,137 @@ var AllAchievements = []Achievement{
 	},
 }
 
+// AllSeasonAchievements defines resettable season badges. Lifetime level/EXP is
+// still preserved, but these badge unlock states reset at the season boundary.
+var AllSeasonAchievements = []Achievement{
+	{
+		ID:            "first_report",
+		Name:          "Awakened Hunter",
+		Description:   "Laporan pertama di season ini",
+		Points:        10,
+		DisplayEmoji:  "🐣",
+		UnlockMessage: "Awakening dimulai! Satu laporan pertama membuka gerbang dungeon season ini. Terus naikkan rank-mu! 🚪⚔️",
+		Check:         func(r *Report) bool { return r.SeasonalActivityCount >= 1 },
+	},
+	{
+		ID:            "streak_1",
+		Name:          "E-Rank Consistency",
+		Description:   "1 minggu streak di season ini",
+		Points:        25,
+		DisplayEmoji:  "🔥",
+		UnlockMessage: "Quest mingguan pertama selesai. Api disiplinmu sudah menyala — jangan biarkan padam!",
+		Check:         func(r *Report) bool { return r.SeasonalMaxStreak >= 1 },
+	},
+	{
+		ID:            "streak_2",
+		Name:          "D-Rank Momentum",
+		Description:   "2 minggu streak di season ini",
+		Points:        50,
+		DisplayEmoji:  "⚡",
+		UnlockMessage: "Momentum terbentuk! Dua minggu berturut-turut membuktikan kamu bukan hunter biasa. ⚡",
+		Check:         func(r *Report) bool { return r.SeasonalMaxStreak >= 2 },
+	},
+	{
+		ID:            "streak_3",
+		Name:          "C-Rank Grinder",
+		Description:   "3 minggu streak di season ini",
+		Points:        75,
+		DisplayEmoji:  "💎",
+		UnlockMessage: "Tiga minggu grinding! Stat disiplinmu naik drastis. Dungeon rasa malas mulai terasa kecil. 💎",
+		Check:         func(r *Report) bool { return r.SeasonalMaxStreak >= 3 },
+	},
+	{
+		ID:            "streak_4",
+		Name:          "B-Rank Vanguard",
+		Description:   "4 minggu streak di season ini",
+		Points:        100,
+		DisplayEmoji:  "🛡️",
+		UnlockMessage: "Sebulan penuh bertahan di garis depan. Kamu layak membawa tameng B-Rank Vanguard! 🛡️",
+		Check:         func(r *Report) bool { return r.SeasonalMaxStreak >= 4 },
+	},
+	{
+		ID:            "streak_8",
+		Name:          "A-Rank Hunter",
+		Description:   "8 minggu streak di season ini",
+		Points:        150,
+		DisplayEmoji:  "🏛️",
+		UnlockMessage: "Delapan minggu tanpa menyerah. Aura A-Rank mulai terasa — kamu jadi standar baru di grup! 🏛️",
+		Check:         func(r *Report) bool { return r.SeasonalMaxStreak >= 8 },
+	},
+	{
+		ID:            "streak_12",
+		Name:          "S-Rank Hunter",
+		Description:   "12 minggu streak di season ini",
+		Points:        300,
+		DisplayEmoji:  "⚔️",
+		UnlockMessage: "S-RANK! Dua belas minggu menaklukkan quest. Ini bukan motivasi sesaat — ini sistem hidup. ⚔️👑",
+		Check:         func(r *Report) bool { return r.SeasonalMaxStreak >= 12 },
+	},
+	{
+		ID:            "activity_10",
+		Name:          "Daily Quest x10",
+		Description:   "10 hari aktif di season ini",
+		Points:        20,
+		DisplayEmoji:  "🌟",
+		UnlockMessage: "10 daily quest selesai! Hal kecil yang diulang mulai jadi kekuatan besar. 🌟",
+		Check:         func(r *Report) bool { return r.SeasonalActivityCount >= 10 },
+	},
+	{
+		ID:            "activity_25",
+		Name:          "Dungeon Grinder",
+		Description:   "25 hari aktif di season ini",
+		Points:        50,
+		DisplayEmoji:  "⭐",
+		UnlockMessage: "25 hari aktif! Kamu terus masuk dungeon meski tidak selalu mudah. Respect, hunter. ⭐",
+		Check:         func(r *Report) bool { return r.SeasonalActivityCount >= 25 },
+	},
+	{
+		ID:            "activity_50",
+		Name:          "Raid Captain",
+		Description:   "50 hari aktif di season ini",
+		Points:        100,
+		DisplayEmoji:  "🏅",
+		UnlockMessage: "50 hari aktif dalam satu season. Kamu bukan cuma ikut raid — kamu memimpin ritmenya! 🏅",
+		Check:         func(r *Report) bool { return r.SeasonalActivityCount >= 50 },
+	},
+	{
+		ID:            "activity_100",
+		Name:          "Season Monarch",
+		Description:   "100 hari aktif di season ini",
+		Points:        200,
+		DisplayEmoji:  "💯",
+		UnlockMessage: "MONARCH OF THE SEASON! 100 hari aktif adalah bukti bahwa sistemmu sudah melampaui mood. 💯👑",
+		Check:         func(r *Report) bool { return r.SeasonalActivityCount >= 100 },
+	},
+	{
+		ID:            "streak_16",
+		Name:          "Season Conqueror",
+		Description:   "16 minggu streak di season ini",
+		Points:        400,
+		DisplayEmoji:  "👑",
+		UnlockMessage: "SEASON CONQUEROR! Kamu menaklukkan seluruh season dengan konsistensi. LEGEND! 👑🔥",
+		Check:         func(r *Report) bool { return r.SeasonalMaxStreak >= 16 },
+	},
+	{
+		ID:            "season_hunter",
+		Name:          "Point Hunter",
+		Description:   "Raih 300+ poin dalam season ini",
+		Points:        50,
+		DisplayEmoji:  "🏹",
+		UnlockMessage: "300 poin season! Kamu memburu progress seperti hunter yang tahu targetnya. 🏹🎯",
+		Check:         func(r *Report) bool { return r.SeasonalPoints >= 300 },
+	},
+	{
+		ID:            "season_master",
+		Name:          "Shadow Monarch",
+		Description:   "Raih 500+ poin dalam season ini",
+		Points:        100,
+		DisplayEmoji:  "🌑",
+		UnlockMessage: "500 poin season! Bayangan alasan sudah kamu taklukkan. Rise. 🌑",
+		Check:         func(r *Report) bool { return r.SeasonalPoints >= 500 },
+	},
+}
+
 // ComebackAchievement represents achievements earned by returning after inactivity.
 // These are checked separately because they need InactiveDays context.
 type ComebackAchievement struct {
@@ -268,6 +399,17 @@ func CheckNewAchievements(report *Report) []Achievement {
 	var newlyUnlocked []Achievement
 	for _, a := range AllAchievements {
 		if !HasAchievement(report.Achievements, a.ID) && a.Check(report) {
+			newlyUnlocked = append(newlyUnlocked, a)
+		}
+	}
+	return newlyUnlocked
+}
+
+// CheckNewSeasonAchievements evaluates resettable season badges.
+func CheckNewSeasonAchievements(report *Report) []Achievement {
+	var newlyUnlocked []Achievement
+	for _, a := range AllSeasonAchievements {
+		if !HasAchievement(report.SeasonalAchievements, a.ID) && a.Check(report) {
 			newlyUnlocked = append(newlyUnlocked, a)
 		}
 	}
