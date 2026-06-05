@@ -114,18 +114,20 @@ Season %d telah resmi berakhir! 🎉
 ✅ *Yang di-reset:*
 • 📊 Seasonal Points — mulai dari 0
 • 📅 Seasonal Activity — mulai dari 0
-• 🏆 Seasonal Leaderboard — reset
+• ⚔️ Seasonal Max Streak — mulai dari 0
+• 🏅 Season Badges — mulai berburu dari awal
+• 🏆 Rank & Seasonal Leaderboard — reset
 
 💾 *Yang tetap tersimpan:*
 • 🔥 Streak mingguan — lanjutkan!
 • ⭐ Total Points & Level — lifetime progress aman
-• 🏅 Achievements — yang sudah unlock tetap dimiliki
+• 🏅 Achievement archive — yang sudah pernah unlock tetap tersimpan
 • 🛡️ Centurion Cycles — tetap berlaku
 
 ❄️ *Streak Freeze* — reset ke 1 tiap season. Dapat +1 lagi saat capai 4 minggu streak!
 
 🆕 *Season %d dimulai SEKARANG!*
-Semua peserta mulai dari titik yang sama untuk seasonal ranking. Tapi level dan achievement lifetime kamu tetap ada! 💪
+Semua peserta mulai dari titik yang sama untuk seasonal ranking. Tapi level dan EXP lifetime kamu tetap ada! 💪
 
 📌 Langsung laporkan aktivitas pertamamu di Season %d dengan mengirim #lapor!
 

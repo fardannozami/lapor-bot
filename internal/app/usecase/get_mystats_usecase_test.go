@@ -123,10 +123,10 @@ func TestGetMyStatsUsecase_IncludesSeasonAndWeeklyCounts(t *testing.T) {
 	if !repo.calls[1][0].Equal(seasonStart) || !repo.calls[1][1].Equal(seasonEnd) {
 		t.Fatalf("expected season range %v - %v, got %v - %v", seasonStart, seasonEnd, repo.calls[1][0], repo.calls[1][1])
 	}
-	if !contains(result, "🗓️ Total hari season: 8") {
+	if !contains(result, "🗓️ Hari season: 8") {
 		t.Fatalf("expected season count in response, got %q", result)
 	}
-	if !contains(result, "📆 Total mingguan: 3") {
+	if !contains(result, "📆 Hari minggu ini: 3") {
 		t.Fatalf("expected weekly count in response, got %q", result)
 	}
 }

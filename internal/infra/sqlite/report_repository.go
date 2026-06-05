@@ -20,20 +20,22 @@ func NewReportRepository(db *sql.DB) *ReportRepository {
 	return &ReportRepository{db: db}
 }
 
-const selectColumns = `user_id, name, streak, activity_count, last_report_date, 
+const selectColumns = `user_id, name, COALESCE(job_class, ''), streak, activity_count, last_report_date, 
 	COALESCE(max_streak, 0), COALESCE(total_points, 0), COALESCE(achievements, ''),
 	COALESCE(comeback_streak, 0), COALESCE(inactive_days, 0), COALESCE(centurion_cycles, 0),
 	COALESCE(seasonal_points, 0), COALESCE(seasonal_activity_count, 0),
+	COALESCE(seasonal_max_streak, 0), COALESCE(seasonal_achievements, ''),
 	COALESCE(streak_freezes, 0)`
 
 func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, error) {
 	var report domain.Report
 	var lastReportDate string
 	err := scanner.Scan(
-		&report.UserID, &report.Name, &report.Streak, &report.ActivityCount,
+		&report.UserID, &report.Name, &report.JobClass, &report.Streak, &report.ActivityCount,
 		&lastReportDate, &report.MaxStreak, &report.TotalPoints, &report.Achievements,
 		&report.ComebackStreak, &report.InactiveDays, &report.CenturionCycles,
 		&report.SeasonalPoints, &report.SeasonalActivityCount,
+		&report.SeasonalMaxStreak, &report.SeasonalAchievements,
 		&report.StreakFreezes,
 	)
 	if err == sql.ErrNoRows {
@@ -59,10 +61,11 @@ func (r *ReportRepository) GetReport(ctx context.Context, userID string) (*domai
 
 func upsertReport(ctx context.Context, execer execContexter, report *domain.Report) error {
 	query := `
-		INSERT INTO user_reports (user_id, name, streak, activity_count, last_report_date, max_streak, total_points, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, streak_freezes)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			name = excluded.name,
+			job_class = excluded.job_class,
 			streak = excluded.streak,
 			activity_count = excluded.activity_count,
 			last_report_date = excluded.last_report_date,
@@ -74,13 +77,16 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 			centurion_cycles = excluded.centurion_cycles,
 			seasonal_points = excluded.seasonal_points,
 			seasonal_activity_count = excluded.seasonal_activity_count,
+			seasonal_max_streak = excluded.seasonal_max_streak,
+			seasonal_achievements = excluded.seasonal_achievements,
 			streak_freezes = excluded.streak_freezes
 	`
 	_, err := execer.ExecContext(ctx, query,
-		report.UserID, report.Name, report.Streak, report.ActivityCount,
+		report.UserID, report.Name, report.JobClass, report.Streak, report.ActivityCount,
 		report.LastReportDate.Format(time.RFC3339), report.MaxStreak, report.TotalPoints,
 		report.Achievements, report.ComebackStreak, report.InactiveDays, report.CenturionCycles,
-		report.SeasonalPoints, report.SeasonalActivityCount, report.StreakFreezes,
+		report.SeasonalPoints, report.SeasonalActivityCount, report.SeasonalMaxStreak,
+		report.SeasonalAchievements, report.StreakFreezes,
 	)
 	return err
 }
@@ -193,6 +199,8 @@ func (r *ReportRepository) ResetAllReports(ctx context.Context) error {
 		UPDATE user_reports
 		SET seasonal_points = 0,
 		    seasonal_activity_count = 0,
+		    seasonal_max_streak = 0,
+		    seasonal_achievements = '',
 		    streak_freezes = 1
 	`)
 	return err
@@ -252,6 +260,7 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	// Simple migration: try to add columns if they don't exist
 	// Ignore error if they already exist
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN activity_count INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN job_class TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN max_streak INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN total_points INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN achievements TEXT DEFAULT ''")
@@ -260,6 +269,8 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN centurion_cycles INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_points INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_activity_count INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_max_streak INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_achievements TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN streak_freezes INTEGER DEFAULT 1")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE strava_accounts ADD COLUMN name TEXT")
 

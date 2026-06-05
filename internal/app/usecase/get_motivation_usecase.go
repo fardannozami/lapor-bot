@@ -78,6 +78,12 @@ var motivationalQuotes = []string{
 	"🏀 \"Kalau aku punya masalah, setelah bermain pikiranku jadi lebih jernih. Olahraga itu seperti terapi.\" — Michael Jordan",
 	"🌿 \"Hidup sehat bukan tujuan yang harus dicapai, melainkan cara untuk menjalani hidup setiap hari.\" — Anonim",
 	"🔁 \"Hasil datang seiring waktu, bukan dalam semalam. Kerja keras, tetap konsisten.\" — Anonim",
+	"🫀 \"Mereka yang tidak menyediakan waktu untuk berolahraga pada akhirnya harus menyediakan waktu untuk sakit.\" — Edward Stanley",
+	"🏃 \"Jika olahraga bisa dikemas dalam pil, itu akan menjadi obat paling banyak diresepkan di dunia.\" — Robert Butler",
+	"🌤️ \"Bergeraklah bukan karena membenci tubuhmu, tapi karena kamu menghargai hidup yang ditopangnya.\" — Anonim",
+	"🧱 \"Latihan hari ini adalah suara kecil yang berkata: aku sedang membangun diriku, bukan menghukum diriku.\" — Anonim",
+	"🥗 \"Kesehatan bukan segalanya, tapi tanpa kesehatan segalanya terasa lebih berat.\" — Arthur Schopenhauer",
+	"🧭 \"Tubuh yang aktif menolong pikiran tetap jernih. Saat ragu, mulai dari berjalan kaki.\" — Anonim",
 }
 
 type GetMotivationUsecase struct {

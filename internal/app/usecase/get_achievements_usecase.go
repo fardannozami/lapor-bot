@@ -27,11 +27,12 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 		return "Belum ada member yang aktif.", nil
 	}
 
-	// Calculate stats for each achievement
+	// Calculate season badge stats. Lifetime achievements are preserved in the
+	// database, but the visible badge race resets every season.
 	stats := make(map[string]int)
 	for _, r := range reports {
-		if r.Achievements != "" {
-			ids := strings.Split(r.Achievements, ",")
+		if r.SeasonalAchievements != "" {
+			ids := strings.Split(r.SeasonalAchievements, ",")
 			for _, id := range ids {
 				stats[strings.TrimSpace(id)]++
 			}
@@ -39,23 +40,10 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 	}
 
 	sb := strings.Builder{}
-	sb.WriteString("🎖️ *Daftar Achievement Challenge*\n\n")
+	sb.WriteString("🎖️ *Season Badge Challenge*\n")
+	sb.WriteString("Badge di bawah ini reset setiap season. Level & EXP lifetime tetap aman.\n\n")
 
-	for _, ach := range domain.AllAchievements {
-		count := stats[ach.ID]
-		var icon string
-		if count > 0 {
-			icon = ach.DisplayEmoji
-		} else {
-			icon = "🔒"
-		}
-
-		sb.WriteString(fmt.Sprintf("%s %s — %s (%d/%d member)\n", icon, ach.Name, ach.Description, count, totalMembers))
-	}
-
-	sb.WriteString("\n🔄 *Comeback Achievements*\n")
-	sb.WriteString("_Kembali aktif setelah absen & bangun streak lagi!_\n\n")
-	for _, ach := range domain.AllComebackAchievements {
+	for _, ach := range domain.AllSeasonAchievements {
 		count := stats[ach.ID]
 		var icon string
 		if count > 0 {

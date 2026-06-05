@@ -154,3 +154,66 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 
 	return sb.String(), nil
 }
+
+// ExecuteRanks returns a concise season ranking for the #ranks command.
+func (uc *GetLeaderboardUsecase) ExecuteRanks(ctx context.Context) (string, error) {
+	reports, err := uc.repo.GetAllReports(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	now := time.Now()
+	seasonNumber, _ := GetCurrentSessionInfo(now)
+	nextReset := GetNextResetTime(now)
+
+	sort.Slice(reports, func(i, j int) bool {
+		if reports[i].SeasonalPoints == reports[j].SeasonalPoints {
+			if reports[i].SeasonalActivityCount == reports[j].SeasonalActivityCount {
+				return reports[i].Name < reports[j].Name
+			}
+			return reports[i].SeasonalActivityCount > reports[j].SeasonalActivityCount
+		}
+		return reports[i].SeasonalPoints > reports[j].SeasonalPoints
+	})
+
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("🏹 *Season %d Ranks*\n", seasonNumber))
+	sb.WriteString(fmt.Sprintf("Reset badge/rank: %s\n", nextReset.Format("02-01-2006")))
+	sb.WriteString("Level & EXP lifetime tetap aman.\n\n")
+
+	rank := 1
+	for _, r := range reports {
+		if r.SeasonalPoints == 0 && r.SeasonalActivityCount == 0 {
+			continue
+		}
+
+		badges := 0
+		if r.SeasonalAchievements != "" {
+			badges = len(strings.Split(r.SeasonalAchievements, ","))
+		}
+
+		sb.WriteString(fmt.Sprintf(
+			"%d. %s — %s | %d pts | %d hari | %d badge\n",
+			rank,
+			r.Name,
+			domain.FormatSeasonRank(r.SeasonalPoints),
+			r.SeasonalPoints,
+			r.SeasonalActivityCount,
+			badges,
+		))
+
+		rank++
+		if rank > 10 {
+			break
+		}
+	}
+
+	if rank == 1 {
+		sb.WriteString("Belum ada hunter aktif season ini. Mulai dengan #lapor 💪")
+		return sb.String(), nil
+	}
+
+	sb.WriteString("\nRank dihitung dari seasonal points. Badge season ikut menambah poin, lalu reset saat season baru.")
+
+	return sb.String(), nil
+}

@@ -421,8 +421,56 @@ func TestHandleMessage_GamificationCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error for #achievements: %v", err)
 	}
-	if msg.Text == "" || !containsSubstring(msg.Text, "Daftar Achievement") {
+	if msg.Text == "" || !containsSubstring(msg.Text, "Season Badge Challenge") {
 		t.Errorf("#achievements response invalid: %s", msg.Text)
+	}
+}
+
+func TestHandleMessage_JobCommands(t *testing.T) {
+	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
+	reportUC := usecase.NewReportActivityUsecase(repo)
+	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	updateNameUC := usecase.NewUpdateNameUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase())
+
+	ctx := context.Background()
+
+	msg, err := handleUC.Execute(ctx, "user1", "Hunter", "#jobs")
+	if err != nil {
+		t.Fatalf("unexpected error for #jobs: %v", err)
+	}
+	if !containsSubstring(msg.Text, "Daftar Hunter Jobs") || !containsSubstring(msg.Text, "#job ranger") {
+		t.Fatalf("#jobs response should include job list and selection example, got %q", msg.Text)
+	}
+
+	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "#job ranger")
+	if err != nil {
+		t.Fatalf("unexpected error for #job: %v", err)
+	}
+	if !containsSubstring(msg.Text, "Job dipilih") || !containsSubstring(msg.Text, "Ranger") {
+		t.Fatalf("#job response should confirm selected job, got %q", msg.Text)
+	}
+	if repo.reports["user1"].JobClass != "ranger" {
+		t.Fatalf("expected stored job ranger, got %q", repo.reports["user1"].JobClass)
+	}
+
+	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "#mystats")
+	if err != nil {
+		t.Fatalf("unexpected error for #mystats: %v", err)
+	}
+	if !containsSubstring(msg.Text, "Job: Ranger") {
+		t.Fatalf("#mystats should include selected job, got %q", msg.Text)
+	}
+
+	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "#lapor")
+	if err != nil {
+		t.Fatalf("unexpected error for #lapor: %v", err)
+	}
+	if !containsSubstring(msg.Text, "Job: Ranger") {
+		t.Fatalf("#lapor should include selected job, got %q", msg.Text)
 	}
 }
 

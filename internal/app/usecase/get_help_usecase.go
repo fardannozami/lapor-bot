@@ -20,12 +20,17 @@ var helpSections = []struct {
 	{
 		emoji:   "🏆",
 		title:   "Leaderboard & Statistik",
-		content: "*#leaderboard* — Lihat klasemen lifetime (total hari aktif).\n*#leaderboard-weekly* — Lihat klasemen total hari aktif minggu ini.\n*#leaderboard-seasonal* — Lihat klasemen seasonal points.\n*#mystats* — Cek statistik personal (streak, poin, achievements, seasonal progress).",
+		content: "*#leaderboard* — Lihat klasemen lifetime (total hari aktif).\n*#leaderboard-weekly* — Lihat klasemen total hari aktif minggu ini.\n*#leaderboard-seasonal* — Lihat klasemen seasonal points.\n*#ranks* — Lihat ranking hunter selama season ini.\n*#mystats* — Cek statistik personal ringkas.",
 	},
 	{
 		emoji:   "🎖️",
 		title:   "Achievements",
-		content: "*#achievements* — Lihat daftar semua achievement yang tersedia.\n*#comeback* — Cek progress comeback challenge-mu setelah absen.\n\n🏅 Kumpulkan badge dengan menjaga streak dan total hari aktif!",
+		content: "*#achievements* — Lihat daftar badge season yang tersedia. Badge reset tiap season; level dan EXP lifetime tetap aman.\n*#comeback* — Cek progress comeback challenge-mu setelah absen.\n\n🏅 Kumpulkan badge dengan menjaga streak dan total hari aktif selama season!",
+	},
+	{
+		emoji:   "🧭",
+		title:   "Hunter Jobs",
+		content: "*#jobs* — Lihat daftar job yang bisa dipilih.\n*#job [id]* — Pilih job untuk profilmu. Contoh: `#job ranger`\n\nJob tersedia: fighter, tank, assassin, mage, ranger, healer, necromancer. Job tampil di #mystats dan laporan #lapor.",
 	},
 	{
 		emoji:   "✨",

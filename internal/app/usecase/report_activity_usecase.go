@@ -77,6 +77,9 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		}
 		report.ActivityCount++
 		report.SeasonalActivityCount++
+		if report.Streak > report.SeasonalMaxStreak {
+			report.SeasonalMaxStreak = report.Streak
+		}
 
 		// Handle Centurion Cycle Transition
 		isNewCycle := false
@@ -100,11 +103,13 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			Streak:                1,
 			ActivityCount:         1,
 			SeasonalActivityCount: 1,
+			SeasonalMaxStreak:     1,
 			LastReportDate:        now,
 			MaxStreak:             0,
 			TotalPoints:           0,
 			SeasonalPoints:        0,
 			Achievements:          "",
+			SeasonalAchievements:  "",
 			ComebackStreak:        1,
 			InactiveDays:          0,
 			StreakFreezes:         1,
@@ -142,14 +147,19 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	// 3. Store old level to detect level-up
 	oldLevel := domain.GetLevel(report.TotalPoints)
 
-	// 3. Check for new standard achievements
-	newAchievements := domain.CheckNewAchievements(report)
+	// 3. Check for new season badges. Badge progress resets every season, but
+	// lifetime EXP/level remains preserved.
+	newAchievements := domain.CheckNewSeasonAchievements(report)
 	var unlockedNames []string
 	pointsGained := 0
 
 	for _, ach := range newAchievements {
-		report.Achievements = domain.AddAchievement(report.Achievements, ach.ID)
+		report.SeasonalAchievements = domain.AddAchievement(report.SeasonalAchievements, ach.ID)
+		if !domain.HasAchievement(report.Achievements, ach.ID) {
+			report.Achievements = domain.AddAchievement(report.Achievements, ach.ID)
+		}
 		report.TotalPoints += ach.Points
+		report.SeasonalPoints += ach.Points
 		pointsGained += ach.Points
 		unlockedNames = append(unlockedNames, fmt.Sprintf("%s %s (%d pts)", ach.DisplayEmoji, ach.Name, ach.Points))
 	}
@@ -161,6 +171,14 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		report.TotalPoints += ach.Points
 		pointsGained += ach.Points
 		unlockedNames = append(unlockedNames, fmt.Sprintf("%s %s (%d pts)", ach.DisplayEmoji, ach.Name, ach.Points))
+	}
+
+	freezeAwarded := false
+	for _, ach := range newAchievements {
+		if ach.ID == "streak_4" && report.StreakFreezes < 2 {
+			report.StreakFreezes++
+			freezeAwarded = true
+		}
 	}
 
 	// 5. Detect level-up
@@ -180,6 +198,9 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		response = fmt.Sprintf("🎉 WELCOME BACK, %s! 🎉\n", name)
 		response += fmt.Sprintf("Kamu kembali setelah %d hari absen. Itu butuh keberanian! 💪\n", report.InactiveDays)
 		response += "Streak kamu direset, tapi totalmu tetap tersimpan.\n"
+		if report.JobClass != "" {
+			response += fmt.Sprintf("🧭 Job: %s\n", domain.FormatJobClass(report.JobClass))
+		}
 		response += fmt.Sprintf("\n📊 Level: %s (Total: %d pts)\n", domain.FormatLevel(report.TotalPoints), report.TotalPoints)
 		response += fmt.Sprintf("📅 Total hari aktif: %d\n", report.ActivityCount)
 
@@ -207,6 +228,9 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 
 		response = fmt.Sprintf("Laporan diterima, %s%s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)\n%s",
 			cyclePrefix, name, report.ActivityCount, report.Streak, expBreakdown)
+		if report.JobClass != "" {
+			response += fmt.Sprintf("\n🧭 Job: %s", domain.FormatJobClass(report.JobClass))
+		}
 	}
 
 	// 7. Add Centurion Milestone Message
@@ -241,14 +265,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	}
 
 	if len(unlockedNames) > 0 {
-		freezeAwarded := false
-		for _, ach := range newAchievements {
-			if ach.ID == "streak_4" && report.StreakFreezes < 2 {
-				report.StreakFreezes++
-				freezeAwarded = true
-			}
-		}
-		response += "\n\n🎉 *ACHIEVEMENT UNLOCKED!* 🎉"
+		response += "\n\n🎉 *SEASON BADGE UNLOCKED!* 🎉"
 
 		for _, ach := range newAchievements {
 			response += fmt.Sprintf("\n\n%s *%s* (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
