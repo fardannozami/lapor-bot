@@ -62,8 +62,11 @@ func (uc *ComebackChallengeUsecase) Execute(ctx context.Context, userID, name st
 	sb.WriteString(fmt.Sprintf("\n📊 Level: %s\n", domain.FormatLevel(report.TotalPoints)))
 	sb.WriteString(fmt.Sprintf("📈 %s\n", domain.FormatProgressBar(report.TotalPoints)))
 
-	// Motivational closer
-	sb.WriteString("\n💪 Terus semangat! Setiap hari laporan membawamu lebih dekat ke achievement baru!")
+	// Motivational closer — draw from the shared 300-quote pool so the message
+	// stays fresh across requests without bloating the package with another
+	// hardcoded slice.
+	sb.WriteString("\n💪 ")
+	sb.WriteString(RandomQuote())
 
 	return sb.String(), nil
 }

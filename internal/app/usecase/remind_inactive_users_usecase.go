@@ -29,6 +29,13 @@ var motivationsShort = []string{
 	"Olahraga sedikit lebih baik daripada tidak sama sekali. Ditunggu laporannya! 🏃‍♂️",
 	"Ingat target awalmu! Ayo bangun dan mulai beraktivitas lagi! 🌟",
 	"Jangan biarkan streak-mu hilang begitu saja. Yuk olahraga! 👟",
+	"Belum terlambat untuk mulai lagi. Tubuhmu selalu siap, yang perlu dimulai adalah langkah pertamamu! 🚶",
+	"Hujan, malas, sibuk? Tetap sempatkan 15 menit gerak. Streak tidak menunggu mood! ⏰",
+	"Hari ini adalah hari yang sempurna untuk buktiin ke diri sendiri bahwa kamu bisa! 💪",
+	"Liat teman-teman yang sudah lapor duluan. Yuk, join mereka hari ini! 🌟",
+	"Badan yang segar dimulai dari keputusan kecil hari ini. Yuk mulai! ☀️",
+	"10 menit workout di rumah = tetap on track. Nggak perlu sempurna, yang penting mulai! 🏠",
+	"Sapa hari ini dengan satu gerakan kecil. Streak-mu menunggumu! 🔥",
 }
 
 var motivationsLong = []string{
@@ -37,6 +44,13 @@ var motivationsLong = []string{
 	"Banyak yang udah comeback dan makin keren! Giliranmu sekarang 🏆",
 	"Kamu pernah streak tinggi, pasti bisa lagi! Ayo buktikan! ⚡",
 	"Tubuhmu merindukanmu berolahraga. Yuk mulai hari ini! 🌅",
+	"Waktu terbaik untuk restart adalah SEKARANG. Riwayat absen tidak menghapus kemampuanmu. 💫",
+	"Versi dirimu yang dulu pernah streak tinggi masih ada di dalam. Panggil dia keluar! 🦁",
+	"Hampir semua orang pernah berhenti. Yang membedakan juara adalah mereka yang selalu kembali. 🥇",
+	"Jangan bandingkan progressmu dengan orang lain. Bandingkan dengan dirimu 3 bulan lalu. Itu saja ukurannya. ⚖️",
+	"Mulai dari 1 hari. Kalau 1 hari terlalu berat, mulai dari 10 menit. Yang penting tidak nol. 🎯",
+	"Yang penting bukan berapa kali kamu jatuh, tapi berapa kali kamu berdiri lagi. Ayo berdiri! 🌅",
+	"Hutang motivasi ke dirimu yang dulu pernah berjuang untuk streak itu. Bayar dengan satu laporan hari ini. 💎",
 }
 
 // inactiveUserInfo holds pre-computed info for an inactive user.
