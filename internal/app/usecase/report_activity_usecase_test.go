@@ -127,6 +127,9 @@ func TestStreak_FirstReport(t *testing.T) {
 	if !containsSubstring(msg, expected) {
 		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg)
 	}
+	if !containsSubstring(msg, "💬 _\"") {
+		t.Errorf("Expected every #lapor response to contain random motivation, got '%s'", msg)
+	}
 	// Should also have unlocked the first season badge.
 	if !containsSubstring(msg, "Awakened Hunter") {
 		t.Errorf("Expected message to contain season badge 'Awakened Hunter', got '%s'", msg)
@@ -221,10 +224,15 @@ func TestStreak_SameDay_Rejected(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// Should be rejected with warning
-	expected := "Diana sudah laporan hari ini, ayo jangan curang! 😉"
-	if msg != expected {
+	// Should be rejected with warning, cancel guidance, and motivation.
+	if !containsSubstring(msg, "Diana sudah laporan hari ini, ayo jangan curang! 😉") {
 		t.Errorf("Same day: expected rejection message, got '%s'", msg)
+	}
+	if !containsSubstring(msg, "#cancel") {
+		t.Errorf("Same day: expected #cancel guidance, got '%s'", msg)
+	}
+	if !containsSubstring(msg, "💬 _\"") {
+		t.Errorf("Same day: expected motivation, got '%s'", msg)
 	}
 
 	// Values should NOT change
@@ -234,6 +242,105 @@ func TestStreak_SameDay_Rejected(t *testing.T) {
 	}
 	if r.ActivityCount != 15 {
 		t.Errorf("Same day: ActivityCount should remain 15, got %d", r.ActivityCount)
+	}
+}
+
+func TestStreak_SameDay_UsesStoredNameWhenIncomingNameUnknown(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	repo.reports["user1"] = &domain.Report{
+		UserID:         "user1",
+		Name:           "Budi",
+		Streak:         3,
+		ActivityCount:  8,
+		LastReportDate: time.Now(),
+	}
+
+	msg, err := uc.Execute(ctx, "user1", "Unknown", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !containsSubstring(msg, "Budi sudah laporan hari ini") {
+		t.Fatalf("Duplicate #lapor should use stored name instead of incoming Unknown, got %q", msg)
+	}
+	if containsSubstring(msg, "Unknown sudah laporan hari ini") {
+		t.Fatalf("Duplicate #lapor should not show Unknown when stored name exists, got %q", msg)
+	}
+}
+
+func TestStreak_SameDay_HealsUnknownStoredName(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	repo.reports["user1"] = &domain.Report{
+		UserID:         "user1",
+		Name:           "Unknown",
+		Streak:         3,
+		ActivityCount:  8,
+		LastReportDate: time.Now(),
+	}
+
+	msg, err := uc.Execute(ctx, "user1", "Budi", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !containsSubstring(msg, "Budi sudah laporan hari ini") {
+		t.Fatalf("Duplicate #lapor should use incoming valid name when stored name is Unknown, got %q", msg)
+	}
+	if repo.reports["user1"].Name != "Budi" {
+		t.Fatalf("Duplicate #lapor should persist healed name, got %q", repo.reports["user1"].Name)
+	}
+	if repo.reports["user1"].ActivityCount != 8 {
+		t.Fatalf("Duplicate #lapor must not change activity count, got %d", repo.reports["user1"].ActivityCount)
+	}
+}
+
+func TestStreak_FirstReport_DoesNotPersistUnknownName(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	msg, err := uc.Execute(ctx, "user1", "Unknown", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if repo.reports["user1"].Name != "Teman" {
+		t.Fatalf("First #lapor should persist safe fallback name, got %q", repo.reports["user1"].Name)
+	}
+	if containsSubstring(msg, "Unknown") {
+		t.Fatalf("First #lapor should not show Unknown fallback, got %q", msg)
+	}
+}
+
+func TestStreak_ExistingUnknownStoredNameWithUnknownIncomingNormalizesToTeman(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	repo.reports["user1"] = &domain.Report{
+		UserID:         "user1",
+		Name:           "Unknown",
+		Streak:         3,
+		ActivityCount:  8,
+		LastReportDate: time.Now().AddDate(0, 0, -7),
+	}
+
+	msg, err := uc.Execute(ctx, "user1", "Unknown", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if repo.reports["user1"].Name != "Teman" {
+		t.Fatalf("Expected stored name normalized to Teman, got %q", repo.reports["user1"].Name)
+	}
+	if containsSubstring(msg, "Unknown") {
+		t.Fatalf("Response should not show Unknown, got %q", msg)
 	}
 }
 

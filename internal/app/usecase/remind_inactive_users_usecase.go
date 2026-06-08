@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"sort"
 	"strings"
 	"time"
 
@@ -91,18 +92,7 @@ func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsm
 		users = append(users, inactiveUserInfo{user: user, daysInactive: daysInactive})
 	}
 
-	// Bucket into tiers
-	var critical, warning, mild []inactiveUserInfo
-	for _, u := range users {
-		switch {
-		case u.daysInactive >= tierCriticalDays:
-			critical = append(critical, u)
-		case u.daysInactive >= tierWarningDays:
-			warning = append(warning, u)
-		default:
-			mild = append(mild, u)
-		}
-	}
+	weeklyGroups := groupInactiveUsersByWeeks(users)
 
 	// Collect hall of fame - users with max streak >= 4 weeks (notable achievers)
 	var hallOfFame []inactiveUserInfo
@@ -123,7 +113,7 @@ func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsm
 		}
 	}
 
-	messageText, mentions := BuildReminderMessage(users, critical, warning, mild, hallOfFame, comebackCounts)
+	messageText, mentions := BuildReminderMessage(users, weeklyGroups, hallOfFame, comebackCounts)
 
 	targetJID, _ := types.ParseJID(groupID)
 	msg := &waE2E.Message{
@@ -148,7 +138,8 @@ func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsm
 // Extracted as a pure function for testability.
 func BuildReminderMessage(
 	users []inactiveUserInfo,
-	critical, warning, mild, hallOfFame []inactiveUserInfo,
+	weeklyGroups map[int][]inactiveUserInfo,
+	hallOfFame []inactiveUserInfo,
 	comebackCounts map[string]int,
 ) (string, []string) {
 	var sb strings.Builder
@@ -167,23 +158,7 @@ func BuildReminderMessage(
 		sb.WriteString("Kalian pernah buktiin bisa konsisten, pasti bisa lagi!\n")
 	}
 
-	// Critical tier: 2+ months
-	if len(critical) > 0 {
-		sb.WriteString(fmt.Sprintf("\n🔴 *Sudah 2+ bulan absen* (%d orang)\n", len(critical)))
-		writeTierUsers(&sb, critical, &mentions)
-	}
-
-	// Warning tier: 1-2 months
-	if len(warning) > 0 {
-		sb.WriteString(fmt.Sprintf("\n🟠 *Sudah 1-2 bulan absen* (%d orang)\n", len(warning)))
-		writeTierUsers(&sb, warning, &mentions)
-	}
-
-	// Mild tier: 1-4 weeks
-	if len(mild) > 0 {
-		sb.WriteString(fmt.Sprintf("\n🟡 *Sudah 1-4 minggu absen* (%d orang)\n", len(mild)))
-		writeTierUsers(&sb, mild, &mentions)
-	}
+	writeWeeklyInactiveGroups(&sb, weeklyGroups, &mentions)
 
 	// Grouped comeback achievement hints
 	if len(comebackCounts) > 0 {
@@ -216,8 +191,52 @@ func BuildReminderMessage(
 	return sb.String(), mentions
 }
 
-// writeTierUsers writes a compact comma-separated list of @mentions for a tier.
-func writeTierUsers(sb *strings.Builder, users []inactiveUserInfo, mentions *[]string) {
+func groupInactiveUsersByWeeks(users []inactiveUserInfo) map[int][]inactiveUserInfo {
+	groups := make(map[int][]inactiveUserInfo)
+	for _, user := range users {
+		weeksInactive := user.daysInactive / 7
+		if weeksInactive < 1 {
+			weeksInactive = 1
+		}
+		if weeksInactive > 3 {
+			weeksInactive = 3
+		}
+		groups[weeksInactive] = append(groups[weeksInactive], user)
+	}
+	return groups
+}
+
+func writeWeeklyInactiveGroups(sb *strings.Builder, groups map[int][]inactiveUserInfo, mentions *[]string) {
+	if len(groups) == 0 {
+		return
+	}
+
+	weeks := make([]int, 0, len(groups))
+	for week := range groups {
+		weeks = append(weeks, week)
+	}
+	sort.Ints(weeks)
+
+	sb.WriteString("\n📅 *List belum olahraga / streak terputus:*\n")
+	for _, week := range weeks {
+		users := groups[week]
+		sb.WriteString(fmt.Sprintf("\n%s (%d orang)\n", weeklyReminderTitle(week), len(users)))
+		writeMentionList(sb, users, mentions)
+	}
+}
+
+func weeklyReminderTitle(week int) string {
+	if week <= 1 {
+		return "🟡 *1 minggu belum lapor*"
+	}
+	if week == 2 {
+		return "🟠 *2 minggu belum lapor*"
+	}
+	return "🔴 *3+ minggu belum lapor*"
+}
+
+// writeMentionList writes a compact comma-separated list of @mentions.
+func writeMentionList(sb *strings.Builder, users []inactiveUserInfo, mentions *[]string) {
 	for i, u := range users {
 		if i > 0 {
 			sb.WriteString(", ")

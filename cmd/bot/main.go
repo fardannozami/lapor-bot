@@ -89,10 +89,7 @@ func main() {
 			userID = senderJID.User
 		}
 
-		pushName := evt.Info.PushName
-		if pushName == "" {
-			pushName = "Unknown" // Fallback name
-		}
+		pushName := senderDisplayName(ctx, client, senderJID, evt.Info.SenderAlt, evt.Info.PushName)
 
 		// Get message content
 		msg := ""
@@ -346,4 +343,40 @@ func main() {
 	}
 
 	os.Exit(0)
+}
+
+func senderDisplayName(ctx context.Context, client *whatsmeow.Client, senderJID, senderAlt types.JID, pushName string) string {
+	if name := validDisplayName(pushName); name != "" {
+		return name
+	}
+
+	for _, jid := range []types.JID{senderJID, senderAlt} {
+		if jid.IsEmpty() || client == nil || client.Store == nil || client.Store.Contacts == nil {
+			continue
+		}
+
+		contact, err := client.Store.Contacts.GetContact(ctx, jid.ToNonAD())
+		if err != nil || !contact.Found {
+			continue
+		}
+		if name := validDisplayName(contact.FullName); name != "" {
+			return name
+		}
+		if name := validDisplayName(contact.PushName); name != "" {
+			return name
+		}
+		if name := validDisplayName(contact.BusinessName); name != "" {
+			return name
+		}
+	}
+
+	return "Teman"
+}
+
+func validDisplayName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "-" || strings.EqualFold(name, "unknown") || strings.EqualFold(name, "user") {
+		return ""
+	}
+	return name
 }
