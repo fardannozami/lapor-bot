@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,9 +14,9 @@ func TestBuildReminderMessage(t *testing.T) {
 
 	// Simulate the same users from the real announcement
 	testUsers := []struct {
-		id          string
-		name        string
-		maxStreak   int
+		id           string
+		name         string
+		maxStreak    int
 		daysInactive int
 	}{
 		// Critical tier (60+ days)
@@ -58,7 +59,7 @@ func TestBuildReminderMessage(t *testing.T) {
 		{"6287868126244", "Mochammad Rizqi", 4, 33},
 		{"6281264808425", "fajar setiawan", 1, 33},
 		{"628986389685", "Agus Setyawan", 1, 32},
-		{"6285769476484", "M Idrus Salam", 1, 28},  // actually mild (< 30)
+		{"6285769476484", "M Idrus Salam", 1, 28}, // actually mild (< 30)
 		// Mild tier (7-29 days)
 		{"6281329262095", "Haddawi", 2, 21},
 		{"6285724230162", "fajardsutera", 4, 20},
@@ -84,18 +85,7 @@ func TestBuildReminderMessage(t *testing.T) {
 		})
 	}
 
-	// Bucket into tiers
-	var critical, warning, mild []inactiveUserInfo
-	for _, u := range users {
-		switch {
-		case u.daysInactive >= tierCriticalDays:
-			critical = append(critical, u)
-		case u.daysInactive >= tierWarningDays:
-			warning = append(warning, u)
-		default:
-			mild = append(mild, u)
-		}
-	}
+	weeklyGroups := groupInactiveUsersByWeeks(users)
 
 	// Hall of fame
 	var hallOfFame []inactiveUserInfo
@@ -116,15 +106,14 @@ func TestBuildReminderMessage(t *testing.T) {
 		}
 	}
 
-	msg, mentions := BuildReminderMessage(users, critical, warning, mild, hallOfFame, comebackCounts)
+	msg, mentions := BuildReminderMessage(users, weeklyGroups, hallOfFame, comebackCounts)
 
 	// Print the actual message so you can see it
 	fmt.Println("=== GENERATED MESSAGE ===")
 	fmt.Println(msg)
 	fmt.Println("=== END MESSAGE ===")
 	fmt.Printf("\nTotal mentions: %d\n", len(mentions))
-	fmt.Printf("Critical: %d, Warning: %d, Mild: %d, Hall of Fame: %d\n",
-		len(critical), len(warning), len(mild), len(hallOfFame))
+	fmt.Printf("Weekly groups: %d, Hall of Fame: %d\n", len(weeklyGroups), len(hallOfFame))
 
 	// Basic assertions
 	if len(mentions) == 0 {
@@ -133,8 +122,13 @@ func TestBuildReminderMessage(t *testing.T) {
 	if msg == "" {
 		t.Error("expected message to be non-empty")
 	}
-	if len(critical) == 0 {
-		t.Error("expected critical tier to have users")
+	if len(weeklyGroups) == 0 {
+		t.Error("expected weekly groups to have users")
+	}
+	for _, want := range []string{"1 minggu belum lapor", "2 minggu belum lapor", "3+ minggu belum lapor"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("expected weekly reminder to contain %q, got %q", want, msg)
+		}
 	}
 	if len(hallOfFame) == 0 {
 		t.Error("expected hall of fame to have users")

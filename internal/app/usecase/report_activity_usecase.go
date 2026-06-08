@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,14 +41,29 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	streakFreezeUsed := false
 
 	if report != nil {
+		storedName := report.Name
+		name = reportName(storedName, name)
+		shouldUpdateStoredName := isUnknownName(storedName) && strings.TrimSpace(storedName) != name
+		if shouldUpdateStoredName {
+			report.Name = name
+		}
+
 		lastReport := report.LastReportDate
 		lastReportDate := domain.GetToday(lastReport)
 
 		if lastReportDate.Equal(today) {
+			if shouldUpdateStoredName {
+				if err := uc.repo.UpsertReport(ctx, report); err != nil {
+					return "", err
+				}
+			}
+
 			duplicateMsg := fmt.Sprintf("%s sudah laporan hari ini, ayo jangan curang! 😉", name)
 			if workout != nil {
 				duplicateMsg += "\n" + uc.formatWorkout(workout)
 			}
+			duplicateMsg += "\n\nKalau tadi salah lapor, ketik #cancel untuk membatalkan laporan hari ini. 🙏"
+			duplicateMsg += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
 			return duplicateMsg, nil
 		}
 
@@ -89,7 +105,8 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			isNewCycle = true
 		}
 
-		// report.Name = name // Removed: don't update name during report
+		// Keep manually configured names stable. Placeholder names were healed above
+		// when WhatsApp later provided a real push/contact name.
 		report.LastReportDate = now
 		name = report.Name // Use the stored name for the response message
 
@@ -97,6 +114,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			// Special handling for new cycle can be added here or in the response construction
 		}
 	} else {
+		name = reportName("", name)
 		report = &domain.Report{
 			UserID:                userID,
 			Name:                  name,
@@ -274,8 +292,9 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		}
 
 		response += "\nDetail badge & cerita unlock: #achievements"
-		response += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
 	}
+
+	response += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
 
 	totalPointsGained := reportPoints + pointsGained
 	if totalPointsGained > 0 {
@@ -287,6 +306,28 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	response += fmt.Sprintf("\n%s", domain.FormatProgressBar(report.TotalPoints))
 
 	return response, nil
+}
+
+func reportName(storedName, incomingName string) string {
+	storedName = strings.TrimSpace(storedName)
+	incomingName = strings.TrimSpace(incomingName)
+
+	if !isUnknownName(storedName) {
+		return storedName
+	}
+	if !isUnknownName(incomingName) {
+		return incomingName
+	}
+	return "Teman"
+}
+
+func isUnknownName(name string) bool {
+	clean := strings.TrimSpace(name)
+	return clean == "" ||
+		clean == "-" ||
+		strings.EqualFold(clean, "unknown") ||
+		strings.EqualFold(clean, "teman") ||
+		strings.EqualFold(clean, "user")
 }
 
 func (uc *ReportActivityUsecase) formatWorkout(workout *domain.HevyWorkout) string {
