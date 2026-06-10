@@ -63,7 +63,8 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	// Header
 	sb := strings.Builder{}
 	dateStr := displayDate.Format("02-01-2006")
-	sb.WriteString(fmt.Sprintf("30 Days of Sweat Challenge – Day %d (%s)\n\n", challengeDay, dateStr))
+	seasonNumber, _ := GetCurrentSessionInfo(now)
+	sb.WriteString(fmt.Sprintf("Season %d Hidup Sehat SWE Growth – Day %d (%s)\n\n", seasonNumber, challengeDay, dateStr))
 
 	// Recap
 	sb.WriteString(fmt.Sprintf("Recap day %d:\n", challengeDay))

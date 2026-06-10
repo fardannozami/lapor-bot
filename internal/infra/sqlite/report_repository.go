@@ -98,8 +98,11 @@ func (r *ReportRepository) UpsertReport(ctx context.Context, report *domain.Repo
 
 func logActivity(ctx context.Context, execer execContexter, userID string, activityDate time.Time) error {
 	query := `
-		INSERT OR IGNORE INTO activity_logs (user_id, activity_date, created_at)
-		VALUES (?, ?, ?)
+		INSERT INTO activity_logs (user_id, activity_date, created_at, report_count)
+		VALUES (?, ?, ?, 1)
+		ON CONFLICT(user_id, activity_date) DO UPDATE SET
+			report_count = report_count + 1,
+			created_at = excluded.created_at
 	`
 	_, err := execer.ExecContext(ctx, query, userID, activityDate.Format(time.DateOnly), time.Now().UTC().Format(time.RFC3339))
 	return err
@@ -227,6 +230,7 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 			user_id TEXT NOT NULL,
 			activity_date TEXT NOT NULL,
 			created_at TEXT NOT NULL,
+			report_count INTEGER NOT NULL DEFAULT 1,
 			PRIMARY KEY (user_id, activity_date),
 			FOREIGN KEY (user_id) REFERENCES user_reports(user_id) ON DELETE CASCADE
 		);
@@ -274,6 +278,7 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_max_streak INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_achievements TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN streak_freezes INTEGER DEFAULT 1")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN report_count INTEGER NOT NULL DEFAULT 1")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE strava_accounts ADD COLUMN name TEXT")
 
 	// Run data migrations
@@ -498,12 +503,59 @@ func (r *ReportRepository) DeleteActivityLog(ctx context.Context, userID string,
 	return err
 }
 
+func (r *ReportRepository) DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error) {
+	date := activityDate.Format(time.DateOnly)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	err = tx.QueryRowContext(ctx, `SELECT COALESCE(report_count, 1) FROM activity_logs WHERE user_id = ? AND activity_date = ?`, userID, date).Scan(&count)
+	if err == sql.ErrNoRows {
+		_ = tx.Rollback()
+		return 0, nil
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, err
+	}
+
+	remaining := count - 1
+	if remaining > 0 {
+		if _, err := tx.ExecContext(ctx, `UPDATE activity_logs SET report_count = ? WHERE user_id = ? AND activity_date = ?`, remaining, userID, date); err != nil {
+			_ = tx.Rollback()
+			return 0, err
+		}
+	} else {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM activity_logs WHERE user_id = ? AND activity_date = ?`, userID, date); err != nil {
+			_ = tx.Rollback()
+			return 0, err
+		}
+	}
+
+	return remaining, tx.Commit()
+}
+
 func (r *ReportRepository) DeleteReport(ctx context.Context, userID string) error {
 	if _, err := r.db.ExecContext(ctx, `DELETE FROM activity_logs WHERE user_id = ?`, userID); err != nil {
 		return err
 	}
 	_, err := r.db.ExecContext(ctx, `DELETE FROM user_reports WHERE user_id = ?`, userID)
 	return err
+}
+
+func (r *ReportRepository) GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error) {
+	query := `SELECT COALESCE(report_count, 1) FROM activity_logs WHERE user_id = ? AND activity_date = ?`
+	var count int
+	err := r.db.QueryRowContext(ctx, query, userID, date.Format(time.DateOnly)).Scan(&count)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func (r *ReportRepository) GetStravaAccountByUserID(ctx context.Context, userID string) (*domain.StravaAccount, error) {

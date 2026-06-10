@@ -13,6 +13,9 @@ type cancelReportRepoStub struct {
 	dates          []time.Time
 	deletedLog     bool
 	deletedLogDate time.Time
+	latestDeleted  bool
+	dailyCount     int
+	remainingCount int
 	deletedReport  bool
 	upsertedReport *domain.Report
 }
@@ -65,7 +68,18 @@ func (r *cancelReportRepoStub) GetUserActivityDates(ctx context.Context, userID 
 func (r *cancelReportRepoStub) DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error {
 	r.deletedLog = true
 	r.deletedLogDate = activityDate
+	r.dailyCount = 0
 	return nil
+}
+
+func (r *cancelReportRepoStub) DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error) {
+	r.latestDeleted = true
+	r.deletedLogDate = activityDate
+	if r.dailyCount > 0 {
+		r.dailyCount--
+	}
+	r.remainingCount = r.dailyCount
+	return r.remainingCount, nil
 }
 
 func (r *cancelReportRepoStub) DeleteReport(ctx context.Context, userID string) error {
@@ -83,6 +97,10 @@ func (r *cancelReportRepoStub) GetStravaAccountByAthleteID(ctx context.Context, 
 
 func (r *cancelReportRepoStub) GetStravaAccountByUserID(ctx context.Context, userID string) (*domain.StravaAccount, error) {
 	return nil, nil
+}
+
+func (r *cancelReportRepoStub) GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error) {
+	return r.dailyCount, nil
 }
 
 func TestCancelReport_NoReport(t *testing.T) {
@@ -185,7 +203,8 @@ func TestCancelReport_SingleDay_CancelsWithoutDeletingAll(t *testing.T) {
 			Streak:         1,
 			TotalPoints:    10,
 		},
-		dates: []time.Time{today},
+		dates:      []time.Time{today},
+		dailyCount: 1,
 	}
 	uc := NewCancelReportUsecase(repo)
 
@@ -242,7 +261,8 @@ func TestCancelReport_MultipleDays_Recalculates(t *testing.T) {
 			Streak:         2,
 			TotalPoints:    20,
 		},
-		dates: []time.Time{lastWeek, today},
+		dates:      []time.Time{lastWeek, today},
+		dailyCount: 1,
 	}
 	uc := NewCancelReportUsecase(repo)
 

@@ -113,6 +113,10 @@ func (m *mockReportRepo) DeleteActivityLog(ctx context.Context, userID string, a
 	return nil
 }
 
+func (m *mockReportRepo) DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error) {
+	return 0, nil
+}
+
 func (m *mockReportRepo) GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error) {
 	return nil, nil
 }
@@ -120,6 +124,10 @@ func (m *mockReportRepo) GetUserActivityDates(ctx context.Context, userID string
 func (m *mockReportRepo) DeleteReport(ctx context.Context, userID string) error {
 	delete(m.reports, userID)
 	return nil
+}
+
+func (m *mockReportRepo) GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error) {
+	return 0, nil
 }
 
 func TestHandleMessage_LaporCommand(t *testing.T) {
@@ -234,8 +242,8 @@ func TestHandleMessage_LeaderboardCommand(t *testing.T) {
 	if msg.Text == "" {
 		t.Error("#leaderboard should return a response")
 	}
-	if !containsSubstring(msg.Text, "30 Days of Sweat Challenge") {
-		t.Errorf("Response should contain '30 Days of Sweat Challenge', got '%s'", msg.Text)
+	if !containsSubstring(msg.Text, "Hidup Sehat SWE Growth") {
+		t.Errorf("Response should contain 'Hidup Sehat SWE Growth', got '%s'", msg.Text)
 	}
 }
 

@@ -338,6 +338,27 @@ var (
 	"📚 \"Kamu adalah rata-rata dari 5 orang yang paling sering kamu habiskan waktumu. Pilih yang gerak, bukan yang malas.\" — Jim Rohn",
 	"📚 \"Apa yang kita lakukan berulang-ulang membentuk siapa kita. Karena itu, keunggulan bukan tindakan, tapi kebiasaan.\" — Aristoteles",
 	"📚 \"Tubuh yang sehat adalah tamu pelayan; jiwa yang jernih adalah tuan rumah. Rawat keduanya, dan hidupmu akan lengkap.\" — Anonim",
+
+	"🌾 \"Padi tidak tumbuh karena ditarik, tapi karena dirawat tiap hari. Begitu juga tubuhmu.\" — Pepatah Timur",
+	"🫖 \"Kesehatan adalah teh hangat kehidupan: sederhana, sering diabaikan, tapi paling terasa saat hilang.\" — Anonim",
+	"🧘 \"Pikiran yang tenang lebih mudah lahir dari tubuh yang dirawat daripada tubuh yang terus diabaikan.\" — Anonim",
+	"🪷 \"Sehat bukan proyek 30 hari. Sehat adalah cara kita menghormati hari-hari yang masih diberi.\" — Anonim",
+	"🌙 \"Orang bijak tidur sebelum tubuhnya memohon, makan sebelum rakus, dan bergerak sebelum sakit memaksa.\" — Pepatah",
+	"🧱 \"Tubuh sehat dibangun seperti rumah tua yang kuat: satu bata kebiasaan kecil setiap hari.\" — Anonim",
+	"🌊 \"Air yang mengalir jarang membusuk. Tubuh yang bergerak jarang menyerah pada kaku.\" — Pepatah Kuno",
+	"🕯️ \"Rawat energimu seperti api kecil: beri udara, beri bahan bakar, jangan biarkan padam.\" — Anonim",
+	"🍃 \"Makanan baik, tidur cukup, dan langkah kecil adalah doa yang ditulis tubuh untuk masa depanmu.\" — Anonim",
+	"🧭 \"Jangan tunggu dokter menjadi alarm. Jadikan kebiasaan sehat sebagai kompas sebelum tubuh tersesat.\" — Anonim",
+	"🏡 \"Tubuhmu adalah rumah pertama. Sebelum mengejar dunia, rapikan rumahmu sendiri.\" — Anonim",
+	"🪙 \"Kesehatan adalah tabungan yang bunganya dibayar di usia tua. Setor sedikit hari ini.\" — Anonim",
+	"🦉 \"Orang kuat tahu kapan berlatih. Orang bijak tahu kapan istirahat. Orang sehat belajar keduanya.\" — Anonim",
+	"🌻 \"Sinar matahari, air putih, napas panjang, dan jalan kaki: obat lama yang masih bekerja.\" — Anonim",
+	"🧵 \"Kebiasaan sehat adalah benang halus. Sendiri tampak kecil, bersama-sama menjadi kain hidup yang kuat.\" — Anonim",
+	"🗿 \"Bangsa kuno membangun monumen dengan kesabaran. Bangun kesehatanmu dengan cara yang sama.\" — Anonim",
+	"🥣 \"Makanlah untuk merawat, bukan melampiaskan. Bergeraklah untuk bersyukur, bukan menghukum.\" — Anonim",
+	"🪨 \"Disiplin sehat bukan rantai. Ia adalah pagar yang menjaga hidupmu tetap bebas.\" — Anonim",
+	"🌱 \"Hari tanpa gerak bukan kegagalan, tapi sinyal lembut untuk kembali menyiram akar.\" — Anonim",
+	"🫀 \"Detak jantungmu bekerja tanpa cuti. Beri dia alasan untuk terus kuat.\" — Anonim",
 	}
 )
 

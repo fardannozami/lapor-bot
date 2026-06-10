@@ -20,6 +20,14 @@ func NewCancelReportUsecase(repo domain.ReportRepository) *CancelReportUsecase {
 }
 
 func (uc *CancelReportUsecase) Execute(ctx context.Context, userID, name string) (string, error) {
+	return uc.cancelToday(ctx, userID, name, false)
+}
+
+func (uc *CancelReportUsecase) ExecuteAll(ctx context.Context, userID, name string) (string, error) {
+	return uc.cancelToday(ctx, userID, name, true)
+}
+
+func (uc *CancelReportUsecase) cancelToday(ctx context.Context, userID, name string, all bool) (string, error) {
 	report, err := uc.repo.GetReport(ctx, userID)
 	if err != nil {
 		return "", err
@@ -44,6 +52,36 @@ func (uc *CancelReportUsecase) Execute(ctx context.Context, userID, name string)
 
 	if len(dates) == 0 {
 		return fmt.Sprintf("Halo %s, tidak ada aktivitas yang tercatat.", report.Name), nil
+	}
+
+	dailyCount, err := uc.repo.GetDailyActivityCount(ctx, userID, today)
+	if err != nil {
+		return "", err
+	}
+	if dailyCount == 0 {
+		return fmt.Sprintf("Halo %s, tidak menemukan laporan untuk hari ini.", report.Name), nil
+	}
+
+	if !all && dailyCount > 1 {
+		remainingReports, err := uc.repo.DeleteLatestActivityLog(ctx, userID, today)
+		if err != nil {
+			return "", err
+		}
+		if remainingReports == 0 {
+			return uc.cancelToday(ctx, userID, name, true)
+		}
+
+		removeRepeatReportPoints(report)
+		if err := uc.repo.UpsertReport(ctx, report); err != nil {
+			return "", err
+		}
+
+		msg := fmt.Sprintf("✅ Laporan terakhir hari ini telah dibatalkan, %s.\n\n", report.Name)
+		msg += fmt.Sprintf("📌 Sisa laporan hari ini: %d/%d\n", remainingReports, MaxDailyReports)
+		msg += fmt.Sprintf("📅 Total hari aktif tetap: %d\n", report.ActivityCount)
+		msg += fmt.Sprintf("⭐ Total poin sekarang: %d\n", report.TotalPoints)
+		msg += "\nKalau ingin menghapus semua laporan hari ini, ketik #cancel-all."
+		return msg, nil
 	}
 
 	remainingDates := removeDate(dates, today)
@@ -78,7 +116,10 @@ func (uc *CancelReportUsecase) Execute(ctx context.Context, userID, name string)
 		return "", err
 	}
 
-	msg := fmt.Sprintf("✅ Laporan hari ini telah dibatalkan, %s.\n\n", report.Name)
+	msg := fmt.Sprintf("✅ Semua laporan hari ini telah dibatalkan, %s.\n\n", report.Name)
+	if !all {
+		msg = fmt.Sprintf("✅ Laporan hari ini telah dibatalkan, %s.\n\n", report.Name)
+	}
 	msg += fmt.Sprintf("📅 Total hari aktif: %d\n", newReport.ActivityCount)
 	msg += fmt.Sprintf("🔥 Streak saat ini: %d minggu\n", newReport.Streak)
 	msg += fmt.Sprintf("⭐ Total poin: %d\n", newReport.TotalPoints)
@@ -89,6 +130,19 @@ func (uc *CancelReportUsecase) Execute(ctx context.Context, userID, name string)
 
 	msg += "\n_Kamu bisa lapor lagi hari ini dengan #lapor._"
 	return msg, nil
+}
+
+func removeRepeatReportPoints(report *domain.Report) {
+	const repeatReportPoints = 5
+	report.TotalPoints -= repeatReportPoints
+	if report.TotalPoints < 0 {
+		report.TotalPoints = 0
+	}
+	report.SeasonalPoints -= repeatReportPoints
+	if report.SeasonalPoints < 0 {
+		report.SeasonalPoints = 0
+	}
+	report.Level = domain.NumericLevelFromTotalPoints(report.TotalPoints)
 }
 
 func removeDate(dates []time.Time, target time.Time) []time.Time {
