@@ -64,6 +64,10 @@ func (r *weeklyLeaderboardRepoStub) DeleteActivityLog(ctx context.Context, userI
 	return nil
 }
 
+func (r *weeklyLeaderboardRepoStub) DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error) {
+	return 0, nil
+}
+
 func (r *weeklyLeaderboardRepoStub) DeleteReport(ctx context.Context, userID string) error {
 	return nil
 }
@@ -78,6 +82,10 @@ func (r *weeklyLeaderboardRepoStub) GetStravaAccountByAthleteID(ctx context.Cont
 
 func (r *weeklyLeaderboardRepoStub) GetStravaAccountByUserID(ctx context.Context, userID string) (*domain.StravaAccount, error) {
 	return nil, nil
+}
+
+func (r *weeklyLeaderboardRepoStub) GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error) {
+	return 0, nil
 }
 
 func TestGetWeeklyLeaderboardUsecase_UsesSundayWeekRange(t *testing.T) {

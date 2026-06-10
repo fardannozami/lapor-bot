@@ -72,9 +72,20 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{Text: text}, nil
 	}
 
+	if strings.Contains(msg, "#lapor-kemarin") {
+		workout := domain.ParseHevy(message)
+		text, err := uc.reportUC.ExecuteYesterday(ctx, userID, name, workout)
+		return MessageResponse{Text: text}, err
+	}
+
 	if strings.Contains(msg, "#lapor") {
 		workout := domain.ParseHevy(message)
 		text, err := uc.reportUC.Execute(ctx, userID, name, workout)
+		return MessageResponse{Text: text}, err
+	}
+
+	if strings.Contains(msg, "#cancel-all") {
+		text, err := uc.cancelUC.ExecuteAll(ctx, userID, name)
 		return MessageResponse{Text: text}, err
 	}
 

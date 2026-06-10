@@ -74,7 +74,7 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("⚔️ Level numerik memakai EXP lifetime: Lv berikutnya butuh `5×level² + 50×level + 100` EXP.")
+	sb.WriteString("⚔️ Level numerik naik dari total EXP lifetime. Semakin tinggi level, semakin banyak EXP yang dibutuhkan.")
 
 	return sb.String(), nil
 }

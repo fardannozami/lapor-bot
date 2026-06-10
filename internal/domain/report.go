@@ -75,8 +75,11 @@ type ReportRepository interface {
 	ResolveLIDToPhone(ctx context.Context, lid string) string
 
 	DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error
+	DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error)
 	GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error)
 	DeleteReport(ctx context.Context, userID string) error
+
+	GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error)
 
 	// Strava Integration
 	UpsertStravaAccount(ctx context.Context, account *StravaAccount) error

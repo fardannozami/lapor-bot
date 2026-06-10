@@ -12,6 +12,7 @@ import (
 type mockRepo struct {
 	reports        map[string]*domain.Report
 	activityCounts []domain.ActivityLeaderboardEntry
+	dailyCounts    map[string]int
 }
 
 func (m *mockRepo) GetReport(ctx context.Context, userID string) (*domain.Report, error) {
@@ -25,6 +26,11 @@ func (m *mockRepo) UpsertReport(ctx context.Context, report *domain.Report) erro
 
 func (m *mockRepo) UpsertReportWithActivity(ctx context.Context, report *domain.Report, activityDate time.Time) error {
 	m.reports[report.UserID] = report
+	key := report.UserID + "|" + activityDate.Format(time.DateOnly)
+	if m.dailyCounts == nil {
+		m.dailyCounts = make(map[string]int)
+	}
+	m.dailyCounts[key]++
 	return nil
 }
 
@@ -81,8 +87,20 @@ func (m *mockRepo) DeleteActivityLog(ctx context.Context, userID string, activit
 	return nil
 }
 
+func (m *mockRepo) DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error) {
+	return 0, nil
+}
+
 func (m *mockRepo) DeleteReport(ctx context.Context, userID string) error {
 	return nil
+}
+
+func (m *mockRepo) GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error) {
+	key := userID + "|" + date.Format(time.DateOnly)
+	if m.dailyCounts == nil {
+		return 0, nil
+	}
+	return m.dailyCounts[key], nil
 }
 
 // =============================================================================
@@ -101,7 +119,7 @@ func (m *mockRepo) DeleteReport(ctx context.Context, userID string) error {
 // =============================================================================
 
 func TestStreak_FirstReport(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
@@ -144,7 +162,7 @@ func TestStreak_FirstReport(t *testing.T) {
 }
 
 func TestStreak_ConsecutiveDay_StreakIncreases(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
@@ -174,7 +192,7 @@ func TestStreak_ConsecutiveDay_StreakIncreases(t *testing.T) {
 }
 
 func TestStreak_MissedDay_StreakResets(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
@@ -203,8 +221,8 @@ func TestStreak_MissedDay_StreakResets(t *testing.T) {
 	}
 }
 
-func TestStreak_SameDay_Rejected(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+func TestStreak_SameDay_SecondReport(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
@@ -217,25 +235,24 @@ func TestStreak_SameDay_Rejected(t *testing.T) {
 		ActivityCount:  15,
 		LastReportDate: now,
 	}
+	// Simulate that the user already has 1 activity logged today
+	repo.dailyCounts["user1|"+domain.GetToday(now).Format(time.DateOnly)] = 1
 
-	// Try to report again same day
+	// Report again same day (second report)
 	msg, err := uc.Execute(ctx, "user1", "Diana", nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// Should be rejected with warning, cancel guidance, and motivation.
-	if !containsSubstring(msg, "Diana sudah laporan hari ini, ayo jangan curang! 😉") {
-		t.Errorf("Same day: expected rejection message, got '%s'", msg)
+	// Should accept but with halved XP
+	if !containsSubstring(msg, "Laporan diterima (laporan ke-2 hari ini)") {
+		t.Errorf("Same day: expected repeat report message, got '%s'", msg)
 	}
-	if !containsSubstring(msg, "#cancel") {
-		t.Errorf("Same day: expected #cancel guidance, got '%s'", msg)
-	}
-	if !containsSubstring(msg, "💬 _\"") {
-		t.Errorf("Same day: expected motivation, got '%s'", msg)
+	if !containsSubstring(msg, "repeat report, ½ XP") {
+		t.Errorf("Same day: expected halved XP note, got '%s'", msg)
 	}
 
-	// Values should NOT change
+	// Values should NOT change (streak and activity count stay same)
 	r := repo.reports["user1"]
 	if r.Streak != 7 {
 		t.Errorf("Same day: Streak should remain 7, got %d", r.Streak)
@@ -245,8 +262,35 @@ func TestStreak_SameDay_Rejected(t *testing.T) {
 	}
 }
 
+func TestStreak_SameDay_MaxReportsReached(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	now := time.Now()
+	repo.reports["user1"] = &domain.Report{
+		UserID:         "user1",
+		Name:           "Diana",
+		Streak:         7,
+		ActivityCount:  15,
+		LastReportDate: now,
+	}
+	// Simulate that the user already has 3 activities logged today (max)
+	repo.dailyCounts["user1|"+domain.GetToday(now).Format(time.DateOnly)] = 3
+
+	// Fourth report should be rejected
+	msg, err := uc.Execute(ctx, "user1", "Diana", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !containsSubstring(msg, "sudah laporan 3x hari ini") {
+		t.Errorf("Expected max limit message, got '%s'", msg)
+	}
+}
+
 func TestStreak_SameDay_UsesStoredNameWhenIncomingNameUnknown(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
@@ -263,16 +307,16 @@ func TestStreak_SameDay_UsesStoredNameWhenIncomingNameUnknown(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if !containsSubstring(msg, "Budi sudah laporan hari ini") {
-		t.Fatalf("Duplicate #lapor should use stored name instead of incoming Unknown, got %q", msg)
+	if !containsSubstring(msg, "Budi") {
+		t.Fatalf("Duplicate #lapor should use stored name, got %q", msg)
 	}
-	if containsSubstring(msg, "Unknown sudah laporan hari ini") {
-		t.Fatalf("Duplicate #lapor should not show Unknown when stored name exists, got %q", msg)
+	if containsSubstring(msg, "Unknown") {
+		t.Fatalf("Duplicate #lapor should not show Unknown, got %q", msg)
 	}
 }
 
 func TestStreak_SameDay_HealsUnknownStoredName(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
@@ -289,8 +333,8 @@ func TestStreak_SameDay_HealsUnknownStoredName(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if !containsSubstring(msg, "Budi sudah laporan hari ini") {
-		t.Fatalf("Duplicate #lapor should use incoming valid name when stored name is Unknown, got %q", msg)
+	if !containsSubstring(msg, "Budi") {
+		t.Fatalf("Duplicate #lapor should use incoming valid name, got %q", msg)
 	}
 	if repo.reports["user1"].Name != "Budi" {
 		t.Fatalf("Duplicate #lapor should persist healed name, got %q", repo.reports["user1"].Name)
@@ -301,7 +345,7 @@ func TestStreak_SameDay_HealsUnknownStoredName(t *testing.T) {
 }
 
 func TestStreak_FirstReport_DoesNotPersistUnknownName(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
@@ -319,7 +363,7 @@ func TestStreak_FirstReport_DoesNotPersistUnknownName(t *testing.T) {
 }
 
 func TestStreak_ExistingUnknownStoredNameWithUnknownIncomingNormalizesToTeman(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
@@ -345,7 +389,7 @@ func TestStreak_ExistingUnknownStoredNameWithUnknownIncomingNormalizesToTeman(t 
 }
 
 func TestStreak_LongGap_StreakResets(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
@@ -387,7 +431,7 @@ func TestStreak_LongGap_StreakResets(t *testing.T) {
 // =============================================================================
 
 func TestLeaderboard_RanksByActivityCount(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewGetLeaderboardUsecase(repo)
 	ctx := context.Background()
 
@@ -448,7 +492,7 @@ func TestLeaderboard_RanksByActivityCount(t *testing.T) {
 // =============================================================================
 
 func TestCenturion_PrestigeTransition(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
@@ -502,7 +546,7 @@ func TestCenturion_PrestigeTransition(t *testing.T) {
 }
 
 func TestLeaderboard_CenturionSorting(t *testing.T) {
-	repo := &mockRepo{reports: make(map[string]*domain.Report)}
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewGetLeaderboardUsecase(repo)
 	ctx := context.Background()
 

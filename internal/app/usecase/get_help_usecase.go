@@ -10,12 +10,12 @@ var helpSections = []struct {
 	{
 		emoji:   "📝",
 		title:   "Melaporkan Aktivitas",
-		content: "*#lapor* — Laporkan workout atau aktivitas harianmu.\nContoh: `#lapor` atau `#lapor Push Day`\n\n🔄 Setiap laporan yang valid akan menambah streak mingguanmu dan total hari aktif.\n❄️ *Streak Freeze* — kamu punya 1 freeze gratis per season. Freeze otomatis melindungi 1 minggu absen. Dapatkan +1 freeze lagi saat kamu mencapai 4 minggu streak!",
+		content: "*#lapor* — Laporkan workout atau aktivitas harianmu.\nContoh: `#lapor` atau `#lapor Push Day`\n\n🔄 Setiap laporan yang valid akan menambah streak mingguanmu dan total hari aktif.\n❄️ *Streak Freeze* — kamu punya 1 freeze gratis per season. Freeze otomatis melindungi 1 minggu absen. Dapatkan +1 freeze lagi saat kamu mencapai 4 minggu streak!\n\n📌 *Max 3x laporan per hari*: Kamu bisa lapor maksimal 3x dalam sehari. Laporan ke-2 dan ke-3 tetap dihitung 1 hari tapi XP dibagi 2.\n📌 *#lapor-kemarin* — Laporan khusus untuk hari kemarin. Sama seperti #lapor, XP dibagi 2. Max 3x per hari.",
 	},
 	{
 		emoji:   "❌",
 		title:   "Membatalkan Laporan",
-		content: "*#cancel* — Batalkan laporan hari ini jika kamu salah lapor.\nHanya bisa digunakan pada hari yang sama dengan laporan.",
+		content: "*#cancel* — Batalkan laporan terakhir hari ini jika kamu salah input. Kalau hari ini ada 2-3 laporan, hanya laporan paling akhir yang dihapus.\n*#cancel-all* — Hapus semua laporan hari ini dan hitung ulang progresmu.\nHanya bisa digunakan pada hari yang sama dengan laporan.",
 	},
 	{
 		emoji:   "🏆",
@@ -63,8 +63,10 @@ func NewGetHelpUsecase() *GetHelpUsecase {
 func (uc *GetHelpUsecase) Execute() string {
 	return `🤖 *Command Lapor Bot*
 
-📝 #lapor — laporan aktivitas harian
+📝 #lapor — laporan aktivitas harian (max 3x/hari)
+📌 #lapor-kemarin — laporan khusus hari kemarin (max 3x/hari)
 ❌ #cancel — batalkan laporan hari ini
+🧹 #cancel-all — batalkan semua laporan hari ini
 📊 #mystats — statistik personal
 🏆 #leaderboard — leaderboard lifetime
 📅 #leaderboard-weekly — leaderboard minggu ini
@@ -91,7 +93,7 @@ func (uc *GetHelpUsecase) ExecuteTutorial() string {
 	}
 
 	msg += "⚔️ *Level Numerik*\n"
-	msg += "Level lifetime dimulai dari Lv.0 dan naik dari total points/EXP. Semakin tinggi level, EXP yang dibutuhkan makin besar: `5×level² + 50×level + 100`. Season boleh reset, tapi level lifetime tetap lanjut.\n\n"
+	msg += "Level lifetime dimulai dari Lv.0 dan naik dari total points/EXP. Semakin tinggi level, semakin banyak EXP yang dibutuhkan untuk naik level. Season boleh reset, tapi level lifetime tetap lanjut.\n\n"
 	msg += "🏅 *Badge*\n"
 	msg += "Notifikasi #lapor hanya menampilkan badge terbaru supaya ringkas. Untuk syarat, poin, dan cerita unlock lengkap, buka #achievements.\n\n"
 	msg += "_Catatan: Bot hanya merespon di grup yang sudah dikonfigurasi. Semangat terus! 💪_"

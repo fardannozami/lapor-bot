@@ -64,6 +64,10 @@ func (r *myStatsRepoStub) DeleteActivityLog(ctx context.Context, userID string, 
 	return nil
 }
 
+func (r *myStatsRepoStub) DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error) {
+	return 0, nil
+}
+
 func (r *myStatsRepoStub) DeleteReport(ctx context.Context, userID string) error {
 	return nil
 }
@@ -78,6 +82,10 @@ func (r *myStatsRepoStub) GetStravaAccountByAthleteID(ctx context.Context, athle
 
 func (r *myStatsRepoStub) GetStravaAccountByUserID(ctx context.Context, userID string) (*domain.StravaAccount, error) {
 	return nil, nil
+}
+
+func (r *myStatsRepoStub) GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error) {
+	return 0, nil
 }
 
 func TestGetMyStatsUsecase_IncludesSeasonAndWeeklyCounts(t *testing.T) {
