@@ -50,6 +50,60 @@ func TestDailyScheduleNext(t *testing.T) {
 	}
 }
 
+func TestWeeklyScheduleNext(t *testing.T) {
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+
+	// Mock "now" at Monday 06:00 WIB on June 15, 2026
+	nowMondayMorning := time.Date(2026, time.June, 15, 6, 0, 0, 0, loc)
+
+	tests := []struct {
+		name     string
+		now      time.Time
+		schedule WeeklySchedule
+		expected time.Time
+	}{
+		{
+			name:     "Monday 06:00 to Monday 07:00 (same day, later)",
+			now:      nowMondayMorning,
+			schedule: WeeklySchedule{Weekday: time.Monday, Hour: 7, Minute: 0, Loc: loc},
+			expected: time.Date(2026, time.June, 15, 7, 0, 0, 0, loc),
+		},
+		{
+			name:     "Monday 07:00 to Monday 07:00 (exact time, rolls to next week)",
+			now:      time.Date(2026, time.June, 15, 7, 0, 0, 0, loc),
+			schedule: WeeklySchedule{Weekday: time.Monday, Hour: 7, Minute: 0, Loc: loc},
+			expected: time.Date(2026, time.June, 22, 7, 0, 0, 0, loc),
+		},
+		{
+			name:     "Monday 08:00 to Monday 07:00 (same day, past, rolls to next week)",
+			now:      time.Date(2026, time.June, 15, 8, 0, 0, 0, loc),
+			schedule: WeeklySchedule{Weekday: time.Monday, Hour: 7, Minute: 0, Loc: loc},
+			expected: time.Date(2026, time.June, 22, 7, 0, 0, 0, loc),
+		},
+		{
+			name:     "Sunday 23:59 to Monday 07:00 (next day)",
+			now:      time.Date(2026, time.June, 14, 23, 59, 0, 0, loc),
+			schedule: WeeklySchedule{Weekday: time.Monday, Hour: 7, Minute: 0, Loc: loc},
+			expected: time.Date(2026, time.June, 15, 7, 0, 0, 0, loc),
+		},
+		{
+			name:     "Tuesday 12:00 to Monday 07:00 (rolls to next week)",
+			now:      time.Date(2026, time.June, 16, 12, 0, 0, 0, loc),
+			schedule: WeeklySchedule{Weekday: time.Monday, Hour: 7, Minute: 0, Loc: loc},
+			expected: time.Date(2026, time.June, 22, 7, 0, 0, 0, loc),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.schedule.Next(tt.now)
+			if !got.Equal(tt.expected) {
+				t.Errorf("Next() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestParseDaily(t *testing.T) {
 	loc := time.UTC
 

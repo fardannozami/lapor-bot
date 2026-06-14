@@ -35,6 +35,31 @@ func (d DailySchedule) Next(now time.Time) time.Time {
 	return today
 }
 
+// WeeklySchedule fires once per week on the specified weekday, hour, and minute
+// in the given location.
+type WeeklySchedule struct {
+	Weekday time.Weekday
+	Hour    int
+	Minute  int
+	Loc     *time.Location
+}
+
+func (w WeeklySchedule) Next(now time.Time) time.Time {
+	nowInLoc := now.In(w.Loc)
+	target := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), w.Hour, w.Minute, 0, 0, w.Loc)
+	
+	daysDiff := int(w.Weekday) - int(nowInLoc.Weekday())
+	if daysDiff < 0 {
+		daysDiff += 7
+	}
+	target = target.AddDate(0, 0, daysDiff)
+	
+	if !target.After(nowInLoc) {
+		target = target.AddDate(0, 0, 7)
+	}
+	return target
+}
+
 // Job is a single scheduled task.
 type Job struct {
 	Name    string

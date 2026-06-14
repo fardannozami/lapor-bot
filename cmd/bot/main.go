@@ -32,6 +32,11 @@ func main() {
 	// 1. Load Config
 	cfg := config.Load()
 
+	jakartaLoc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		log.Fatalf("Failed to load Asia/Jakarta timezone: %v", err)
+	}
+
 	// 2. Logger
 	logger := walog.Stdout("Client", "INFO", true)
 
@@ -53,6 +58,7 @@ func main() {
 	motivationUC := usecase.NewGetMotivationUsecase()
 	helpUC := usecase.NewGetHelpUsecase()
 	goalUC := usecase.NewGoalUsecase(repo)
+	weeklyRanksAnnouncementUC := usecase.NewWeeklyHunterRanksAnnouncementUsecase(repo)
 
 	// Strava Integration
 	stravaClient := strava.NewClient(cfg)
@@ -131,6 +137,27 @@ func main() {
 			}
 
 			log.Printf("[DEBUG] Sending response for !check_inactive: %s", response)
+			resp := &waE2E.Message{
+				Conversation: &response,
+			}
+			if sender != nil {
+				_ = sender.SendNormalPriority(ctx, evt.Info.Chat, resp)
+			} else {
+				_, _ = waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
+			}
+			return
+		}
+
+		if strings.HasPrefix(msg, "!check_weekly_ranks") {
+			log.Printf("[DEBUG] Received !check_weekly_ranks command from %s", evt.Info.Chat.String())
+
+			response, err := weeklyRanksAnnouncementUC.Execute(ctx, time.Now().In(jakartaLoc))
+			if err != nil {
+				log.Printf("Failed to run manual weekly ranks check: %v", err)
+				response = fmt.Sprintf("Gagal menjalankan pengecekan: %v", err)
+			}
+
+			log.Printf("[DEBUG] Sending response for !check_weekly_ranks: %s", response)
 			resp := &waE2E.Message{
 				Conversation: &response,
 			}
@@ -234,10 +261,6 @@ func main() {
 	}, cfg.GroupID)
 
 	// 11. Daily scheduled jobs via the scheduler module
-	jakartaLoc, err := time.LoadLocation("Asia/Jakarta")
-	if err != nil {
-		log.Fatalf("Failed to load Asia/Jakarta timezone: %v", err)
-	}
 
 	morningSchedule, err := scheduler.ParseDaily(cfg.NotifyMorningTime, jakartaLoc)
 	if err != nil {
@@ -338,6 +361,32 @@ func main() {
 			}
 
 			response += usecase.BuildWellnessReminder()
+
+			targetJID, err := types.ParseJID(cfg.GroupID)
+			if err != nil {
+				return fmt.Errorf("invalid GroupID: %w", err)
+			}
+			msg := &waE2E.Message{
+				Conversation: &response,
+			}
+			return sender.SendHighPriority(ctx, targetJID, msg)
+		},
+	})
+
+	sched.AddJob(&scheduler.Job{
+		Name:    "weekly-ranks-announcement",
+		Freq:    scheduler.WeeklySchedule{Weekday: time.Monday, Hour: 7, Minute: 0, Loc: jakartaLoc},
+		Recover: false,
+		Fn: func(ctx context.Context) error {
+			if cfg.GroupID == "" || !waService.IsLoggedIn() || !waService.GetClient().IsConnected() {
+				return fmt.Errorf("not connected or no group configured")
+			}
+			log.Println("[SCHEDULER] Running weekly ranks announcement...")
+			response, err := weeklyRanksAnnouncementUC.Execute(ctx, time.Now().In(jakartaLoc))
+			if err != nil {
+				log.Printf("[SCHEDULER] Weekly ranks announcement failed: %v", err)
+				return err
+			}
 
 			targetJID, err := types.ParseJID(cfg.GroupID)
 			if err != nil {
