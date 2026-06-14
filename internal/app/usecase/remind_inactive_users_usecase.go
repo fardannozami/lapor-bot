@@ -68,6 +68,10 @@ const (
 )
 
 func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsmeow.Client, groupID string) (string, error) {
+	return u.ExecuteAt(ctx, client, groupID, time.Now())
+}
+
+func (u *RemindInactiveUsersUsecase) ExecuteAt(ctx context.Context, client *whatsmeow.Client, groupID string, now time.Time) (string, error) {
 	if groupID == "" {
 		return "", fmt.Errorf("group ID is not configured")
 	}
@@ -81,8 +85,12 @@ func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsm
 		return "Tidak ada user yang tidak laporan lebih dari seminggu. Mantap! 👍", nil
 	}
 
-	now := time.Now()
 	todayDate := domain.GetToday(now)
+	allReports, err := u.repo.GetAllReports(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get all reports for active appreciation: %w", err)
+	}
+	activeToday, _ := splitReportsByToday(allReports, now)
 
 	// Pre-compute days inactive for each user
 	users := make([]inactiveUserInfo, 0, len(inactiveUsers))
@@ -113,9 +121,12 @@ func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsm
 		}
 	}
 
-	messageText, mentions := BuildReminderMessage(users, weeklyGroups, hallOfFame, comebackCounts)
+	messageText, mentions := BuildReminderMessage(users, weeklyGroups, hallOfFame, comebackCounts, activeToday)
 
-	targetJID, _ := types.ParseJID(groupID)
+	targetJID, err := types.ParseJID(groupID)
+	if err != nil {
+		return "", fmt.Errorf("invalid group ID: %w", err)
+	}
 	msg := &waE2E.Message{
 		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
 			Text: &messageText,
@@ -141,6 +152,7 @@ func BuildReminderMessage(
 	weeklyGroups map[int][]inactiveUserInfo,
 	hallOfFame []inactiveUserInfo,
 	comebackCounts map[string]int,
+	activeToday []*domain.Report,
 ) (string, []string) {
 	var sb strings.Builder
 	var mentions []string
@@ -159,6 +171,7 @@ func BuildReminderMessage(
 	}
 
 	writeWeeklyInactiveGroups(&sb, weeklyGroups, &mentions)
+	writeActiveTodayAppreciation(&sb, activeToday)
 
 	// Grouped comeback achievement hints
 	if len(comebackCounts) > 0 {
@@ -204,6 +217,16 @@ func groupInactiveUsersByWeeks(users []inactiveUserInfo) map[int][]inactiveUserI
 		groups[weeksInactive] = append(groups[weeksInactive], user)
 	}
 	return groups
+}
+
+func writeActiveTodayAppreciation(sb *strings.Builder, activeToday []*domain.Report) {
+	if len(activeToday) == 0 {
+		return
+	}
+
+	sb.WriteString("\n👏 *Apresiasi buat yang sudah olahraga hari ini:*\n")
+	sb.WriteString(fmt.Sprintf("Ada *%d orang* yang sudah bergerak dan menabung sehat hari ini. Keren!\n", len(activeToday)))
+	sb.WriteString("Keringat kalian jadi bukti bahwa konsistensi kecil tetap menang dari alasan. Semoga semangatnya nular ke yang belum olahraga — yuk susul sebelum hari selesai! 🔥\n")
 }
 
 func writeWeeklyInactiveGroups(sb *strings.Builder, groups map[int][]inactiveUserInfo, mentions *[]string) {
