@@ -173,7 +173,12 @@ func main() {
 		if strings.HasPrefix(msg, "!check_daily_quest") {
 			log.Printf("[DEBUG] Received !check_daily_quest command from %s", evt.Info.Chat.String())
 
-			err := dailyQuestUC.SendDailyQuests(ctx, time.Now().In(jakartaLoc), waService.GetClient(), sender)
+			targetID := cfg.GroupID
+			if targetID == "" {
+				targetID = evt.Info.Chat.String()
+			}
+
+			err := dailyQuestUC.SendDailyQuests(ctx, time.Now().In(jakartaLoc), waService.GetClient(), sender, targetID)
 			response := "✅ Proses distribusi daily quest selesai dikirim ke seluruh user!"
 			if err != nil {
 				log.Printf("Failed to distribute daily quests: %v", err)
@@ -435,7 +440,7 @@ func main() {
 				return fmt.Errorf("not connected to WhatsApp")
 			}
 			log.Println("[SCHEDULER] Distributing daily quests...")
-			return dailyQuestUC.SendDailyQuests(ctx, time.Now().In(jakartaLoc), waService.GetClient(), sender)
+			return dailyQuestUC.SendDailyQuests(ctx, time.Now().In(jakartaLoc), waService.GetClient(), sender, cfg.GroupID)
 		},
 	})
 

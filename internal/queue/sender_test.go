@@ -38,7 +38,7 @@ func (f *fakeClient) sentCount() int32 {
 
 func TestSendNormalPriority(t *testing.T) {
 	fc := &fakeClient{}
-	sender := newTestSender(fc, context.Background())
+	sender := NewTestSender(fc, context.Background())
 	sender.Start()
 
 	err := sender.SendNormalPriority(context.Background(), types.JID{}, &waE2E.Message{})
@@ -57,7 +57,7 @@ func TestSendNormalPriority(t *testing.T) {
 func TestPriorityOrdering(t *testing.T) {
 	blockC := make(chan struct{})
 	fc := &fakeClient{blockC: blockC}
-	sender := newTestSender(fc, context.Background())
+	sender := NewTestSender(fc, context.Background())
 	sender.Start()
 
 	target := types.JID{}
@@ -84,7 +84,7 @@ func TestChannelFullReturnsError(t *testing.T) {
 	// into a capacity-1 channel so the 3rd fails with a "channel full" error.
 	blockForever := make(chan struct{})
 	fc := &fakeClient{blockC: blockForever}
-	sender := newTestSender(fc, context.Background())
+	sender := NewTestSender(fc, context.Background())
 	sender.normalPriority = make(chan sendRequest, 1)
 	sender.Start()
 
@@ -130,7 +130,7 @@ func TestChannelFullReturnsError(t *testing.T) {
 func TestShutdownDrainsPending(t *testing.T) {
 	blockC := make(chan struct{})
 	fc := &fakeClient{blockC: blockC}
-	sender := newTestSender(fc, context.Background())
+	sender := NewTestSender(fc, context.Background())
 	sender.Start()
 
 	target := types.JID{}

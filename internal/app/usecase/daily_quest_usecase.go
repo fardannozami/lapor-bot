@@ -53,14 +53,27 @@ func (u *DailyQuestUsecase) GetOrGenerateQuestList(ctx context.Context, userID, 
 	return tasks, nil
 }
 
-// SendDailyQuests sends the personalized daily quest to all users at 04:00.
-func (u *DailyQuestUsecase) SendDailyQuests(ctx context.Context, now time.Time, client *whatsmeow.Client, sender *queue.MessageSender) error {
+// SendDailyQuests sends the consolidated daily quest list to the configured group at 04:00.
+func (u *DailyQuestUsecase) SendDailyQuests(ctx context.Context, now time.Time, client *whatsmeow.Client, sender *queue.MessageSender, groupID string) error {
+	if groupID == "" {
+		return fmt.Errorf("group ID is not configured")
+	}
+
 	reports, err := u.repo.GetAllReports(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get reports: %w", err)
 	}
 
 	dateStr := domain.GetToday(now).Format("02-01-2006")
+
+	var sb strings.Builder
+	sb.WriteString("⚔️ *DAILY QUEST HARIAN HUNTER* ⚔️\n")
+	sb.WriteString(fmt.Sprintf("Tanggal: %s\n\n", dateStr))
+	sb.WriteString("Berikut adalah quest harian untuk para Hunter hari ini:\n\n")
+
+	var mentions []string
+	hasQuests := false
+	anyUserWithoutJob := false
 
 	for _, r := range reports {
 		if r == nil {
@@ -73,46 +86,62 @@ func (u *DailyQuestUsecase) SendDailyQuests(ctx context.Context, now time.Time, 
 			continue
 		}
 
-		var sb strings.Builder
-		sb.WriteString("⚔️ *DAILY QUEST HARIAN HUNTER* ⚔️\n")
-		sb.WriteString(fmt.Sprintf("Tanggal: %s\n\n", dateStr))
-		sb.WriteString(fmt.Sprintf("Halo %s, quest harianmu untuk hari ini telah aktif!\n", r.Name))
+		hasQuests = true
+
+		sb.WriteString(fmt.Sprintf("👤 @%s\n", r.UserID))
+		mentions = append(mentions, r.UserID+"@s.whatsapp.net")
 
 		if r.JobClass == "" {
-			sb.WriteString("Job: - (General Quest)\n\n")
+			sb.WriteString("Job: - (General Quest)\n")
+			anyUserWithoutJob = true
 		} else {
-			sb.WriteString(fmt.Sprintf("Job: %s (Lv.%d)\n\n", domain.FormatJobClass(r.JobClass), r.Level))
+			sb.WriteString(fmt.Sprintf("Job: %s (Lv.%d)\n", domain.FormatJobClass(r.JobClass), r.Level))
 		}
 
 		sb.WriteString("📜 *Daftar Quest:*\n")
 		for i, t := range tasks {
-			sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, domain.FormatQuestProgressTask(t)))
+			sb.WriteString(fmt.Sprintf("  %d. %s\n", i+1, domain.FormatQuestProgressTask(t)))
 		}
 
-		sb.WriteString(fmt.Sprintf("\nProgress: %s\n\n", formatQuestProgressBar(tasks)))
-		sb.WriteString("Cara melapor:\n")
-		sb.WriteString("Kirim pesan di GRUP dengan format `#lapor-quest [nama-quest] [jumlah]`.\n")
-		sb.WriteString("Kamu juga bisa melaporkan beberapa quest sekaligus secara bersamaan:\n")
-		sb.WriteString("#lapor-quest\n")
-		sb.WriteString("- push up 10\n")
-		sb.WriteString("- squat 15\n")
+		sb.WriteString(fmt.Sprintf("Progress: %s\n\n", formatQuestProgressBar(tasks)))
+	}
 
-		if r.JobClass == "" {
-			sb.WriteString("\n💡 *Tip:* Kamu belum memilih job. Kumpulkan minimal 50 poin agar bisa memilih job khusus (Fighter, Tanker, Assassin, Mage, Ranger, Healer, Necromancer) untuk mendapatkan quest khusus dengan reward yang lebih besar!\n")
-		}
+	if !hasQuests {
+		return nil
+	}
 
-		sb.WriteString("\nSemangat berlatih dan terus tingkatkan rank-mu! 🔥")
+	sb.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+	sb.WriteString("Cara melapor:\n")
+	sb.WriteString("Kirim pesan di GRUP dengan format `#lapor-quest [nama-quest] [jumlah]`.\n")
+	sb.WriteString("Kamu juga bisa melaporkan beberapa quest sekaligus secara bersamaan:\n")
+	sb.WriteString("#lapor-quest\n")
+	sb.WriteString("- push up 10\n")
+	sb.WriteString("- squat 15\n")
 
-		targetJID := types.NewJID(r.UserID, types.DefaultUserServer)
-		msgText := sb.String()
-		msg := &waE2E.Message{
-			Conversation: &msgText,
-		}
+	if anyUserWithoutJob {
+		sb.WriteString("\n💡 *Tip:* Bagi Hunter yang belum memilih job, kumpulkan minimal 50 poin agar bisa memilih job khusus (Fighter, Tanker, Assassin, Mage, Ranger, Healer, Necromancer) untuk mendapatkan quest khusus dengan reward yang lebih besar!\n")
+	}
 
-		// Send as private message
-		if err := sender.SendNormalPriority(ctx, targetJID, msg); err != nil {
-			log.Printf("[DAILY-QUEST] Failed to send private quest message to %s: %v", r.UserID, err)
-		}
+	sb.WriteString("\nSemangat berlatih dan terus tingkatkan rank-mu! 🔥")
+
+	targetJID, err := types.ParseJID(groupID)
+	if err != nil {
+		return fmt.Errorf("invalid group ID: %w", err)
+	}
+
+	msgText := sb.String()
+	msg := &waE2E.Message{
+		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+			Text: &msgText,
+			ContextInfo: &waE2E.ContextInfo{
+				MentionedJID: mentions,
+			},
+		},
+	}
+
+	// Send to group
+	if err := sender.SendHighPriority(ctx, targetJID, msg); err != nil {
+		return fmt.Errorf("failed to send daily quest to group: %w", err)
 	}
 
 	return nil
@@ -298,11 +327,8 @@ func parseLineFloat(line string) (string, float64) {
 	numStr := matches[1]
 	namePart := strings.Replace(line, numStr, "", 1)
 	namePart = strings.TrimSpace(namePart)
-	// Remove typical units
 	for _, suffix := range []string{"x", "menit", "km", "m", "detik", "langkah", "steps", "ml"} {
-		if strings.HasSuffix(namePart, suffix) {
-			namePart = strings.TrimSuffix(namePart, suffix)
-		}
+		namePart = strings.TrimSuffix(namePart, suffix)
 	}
 	namePart = strings.TrimSpace(namePart)
 

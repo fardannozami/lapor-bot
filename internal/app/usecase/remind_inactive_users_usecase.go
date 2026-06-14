@@ -60,12 +60,7 @@ type inactiveUserInfo struct {
 	daysInactive int
 }
 
-// inactivity tier thresholds
-const (
-	tierCriticalDays = 60 // 2+ months
-	tierWarningDays  = 30 // 1-2 months
-	// everything else is 1-4 weeks (7-29 days)
-)
+
 
 func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsmeow.Client, groupID string) (string, error) {
 	return u.ExecuteAt(ctx, client, groupID, time.Now())

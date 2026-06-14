@@ -27,7 +27,7 @@ type sendRequest struct {
 	errChan chan error
 }
 
-type messageClient interface {
+type MessageClient interface {
 	SendMessage(ctx context.Context, to types.JID, msg *waE2E.Message, extra ...whatsmeow.SendRequestExtra) (whatsmeow.SendResponse, error)
 }
 
@@ -35,7 +35,7 @@ type messageClient interface {
 // priority-aware goroutine so that scheduled notifications are never
 // blocked by concurrent user command replies.
 type MessageSender struct {
-	client         messageClient
+	client         MessageClient
 	highPriority   chan sendRequest
 	normalPriority chan sendRequest
 	ctx            context.Context
@@ -176,8 +176,8 @@ func (s *MessageSender) doSend(req sendRequest) {
 	}
 }
 
-// newTestSender creates a MessageSender with a custom client for testing.
-func newTestSender(client messageClient, parentCtx context.Context) *MessageSender {
+// NewTestSender creates a MessageSender with a custom client for testing.
+func NewTestSender(client MessageClient, parentCtx context.Context) *MessageSender {
 	ctx, cancel := context.WithCancel(parentCtx)
 	return &MessageSender{
 		client:         client,

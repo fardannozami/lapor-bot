@@ -87,11 +87,12 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 	sb.WriteString(fmt.Sprintf("🏆 Streak tertinggi: %d minggu\n", report.MaxStreak))
 	sb.WriteString(fmt.Sprintf("⚔️ Streak terbaik season: %d minggu\n", report.SeasonalMaxStreak))
 	streakFreezeInfo := fmt.Sprintf("❄️ Streak Freeze: %d", report.StreakFreezes)
-	if report.StreakFreezes == 0 {
+	switch report.StreakFreezes {
+	case 0:
 		streakFreezeInfo += " (capai 4 minggu streak untuk dapat +1 freeze!)"
-	} else if report.StreakFreezes == 1 {
+	case 1:
 		streakFreezeInfo += " — otomatis melindungi 1 minggu absen"
-	} else {
+	default:
 		streakFreezeInfo += " (max!)"
 	}
 	sb.WriteString(streakFreezeInfo + "\n")
