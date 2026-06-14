@@ -31,6 +31,7 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 	// Calculate season badge stats. Lifetime achievements are preserved in the
 	// database, but the visible badge race resets every season.
 	stats := make(map[string]int)
+	goalTotal := 0
 	for _, r := range reports {
 		if r.SeasonalAchievements != "" {
 			ids := strings.Split(r.SeasonalAchievements, ",")
@@ -38,6 +39,7 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 				stats[strings.TrimSpace(id)]++
 			}
 		}
+		goalTotal += r.GoalsCompleted
 	}
 
 	seasonNumber, _ := GetCurrentSessionInfo(time.Now())
@@ -73,6 +75,11 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 		}
 		sb.WriteString("\n")
 	}
+
+	sb.WriteString("🎯 *Goal Mingguan*\n")
+	sb.WriteString(fmt.Sprintf("🏆 Total goal tercapai grup: %d\n", goalTotal))
+	sb.WriteString("   Syarat: set #goal, lalu penuhi target hari aktif dalam 7 hari sejak goal dibuat. Laporan dobel di hari yang sama tetap dihitung 1.\n")
+	sb.WriteString("   _Goal adalah quest mingguan: kecil, jelas, dan selesai lewat aksi harian._\n\n")
 
 	sb.WriteString("⚔️ Level numerik naik dari total EXP lifetime. Semakin tinggi level, semakin banyak EXP yang dibutuhkan.")
 

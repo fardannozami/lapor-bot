@@ -20,7 +20,12 @@ var helpSections = []struct {
 	{
 		emoji:   "🏆",
 		title:   "Leaderboard & Statistik",
-		content: "*#leaderboard* — Lihat klasemen lifetime (total hari aktif).\n*#leaderboard-weekly* — Lihat klasemen total hari aktif minggu ini.\n*#leaderboard-seasonal* — Lihat klasemen seasonal points.\n*#ranks* — Lihat ranking hunter selama season ini.\n*#mystats* — Cek statistik personal ringkas.",
+		content: "*#leaderboard* — Lihat klasemen lifetime (total hari aktif).\n*#leaderboard-weekly* — Lihat klasemen total hari aktif minggu ini (Senin—Minggu).\n*#leaderboard-seasonal* — Lihat klasemen seasonal points.\n*#ranks* — Lihat ranking hunter selama season ini.\n*#mystats* — Cek statistik personal ringkas.",
+	},
+	{
+		emoji:   "🎯",
+		title:   "Goal Mingguan",
+		content: "*#goal set [1-7] [aktivitas]* — Tetapkan target hari aktif untuk 7 hari ke depan sejak command dikirim. Contoh: `#goal set 3 Olahraga`.\n*#goal* — Lihat progress, waktu mulai, dan waktu berakhir goal aktif.\n*#goal reset* — Hapus goal aktif kalau ingin set ulang.\n\nAlur: set goal → lapor aktivitas dengan #lapor → cek progress dengan #goal → jika target tercapai, total goals di #mystats bertambah.\nLaporan dobel di hari yang sama tetap dihitung 1. Data goal yang sudah lewat dibersihkan otomatis setiap 00:10.",
 	},
 	{
 		emoji:   "🎖️",
@@ -68,6 +73,9 @@ func (uc *GetHelpUsecase) Execute() string {
 ❌ #cancel — batalkan laporan hari ini
 🧹 #cancel-all — batalkan semua laporan hari ini
 📊 #mystats — statistik personal
+🎯 #goal set [1-7] [aktivitas] — set goal 7 hari sejak sekarang
+🎯 #goal — progress goal aktif
+🔄 #goal reset — reset goal aktif
 🏆 #leaderboard — leaderboard lifetime
 📅 #leaderboard-weekly — leaderboard minggu ini
 🏹 #leaderboard-seasonal — leaderboard season
@@ -96,6 +104,12 @@ func (uc *GetHelpUsecase) ExecuteTutorial() string {
 	msg += "Level lifetime dimulai dari Lv.0 dan naik dari total points/EXP. Semakin tinggi level, semakin banyak EXP yang dibutuhkan untuk naik level. Season boleh reset, tapi level lifetime tetap lanjut.\n\n"
 	msg += "🏅 *Badge*\n"
 	msg += "Notifikasi #lapor hanya menampilkan badge terbaru supaya ringkas. Untuk syarat, poin, dan cerita unlock lengkap, buka #achievements.\n\n"
+	msg += "🎯 *Flow Goal Mingguan*\n"
+	msg += "1. Set target: `#goal set 3 Olahraga` (maksimal 7).\n"
+	msg += "2. Window goal berjalan 7 hari dari waktu kamu set, bukan kalender Senin—Minggu.\n"
+	msg += "3. Lapor aktivitas dengan `#lapor`; laporan dobel di hari yang sama tetap dihitung 1 untuk goal.\n"
+	msg += "4. Cek progress kapan saja dengan `#goal`. Jika ingin ganti target saat masih aktif, pakai `#goal reset` dulu.\n"
+	msg += "5. Saat target tercapai, total goals di `#mystats` dan `#achievements` bertambah.\n\n"
 	msg += "_Catatan: Bot hanya merespon di grup yang sudah dikonfigurasi. Semangat terus! 💪_"
 	return msg
 }

@@ -393,3 +393,291 @@ func TestReportRepository_ConcurrentAccess(t *testing.T) {
 		t.Errorf("Expected ActivityCount=10, got %d", final.ActivityCount)
 	}
 }
+
+func TestReportRepository_RecordGoalActivity_CompletesOncePerRollingWindow(t *testing.T) {
+	_, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	startAt := time.Date(2026, time.June, 8, 16, 30, 0, 0, time.UTC)
+	endAt := startAt.AddDate(0, 0, 7)
+	report := &domain.Report{
+		UserID:         "user1",
+		Name:           "Budi",
+		LastReportDate: startAt,
+		StreakFreezes:  1,
+	}
+	if err := repo.UpsertReport(ctx, report); err != nil {
+		t.Fatalf("upsert report: %v", err)
+	}
+	if err := repo.SetGoal(ctx, &domain.WeeklyGoal{
+		UserID:     "user1",
+		TargetDays: 2,
+		Activity:   "Olahraga",
+		StartAt:    startAt,
+		EndAt:      endAt,
+		CreatedAt:  startAt,
+	}); err != nil {
+		t.Fatalf("set goal: %v", err)
+	}
+
+	if err := repo.LogActivity(ctx, "user1", domain.GetToday(startAt)); err != nil {
+		t.Fatalf("log day 1: %v", err)
+	}
+	completed, err := repo.RecordGoalActivity(ctx, "user1", startAt, "Lari 5km")
+	if err != nil {
+		t.Fatalf("record day 1: %v", err)
+	}
+	if completed {
+		t.Fatal("goal should not complete after one active day")
+	}
+
+	secondDay := startAt.AddDate(0, 0, 1)
+	if err := repo.LogActivity(ctx, "user1", domain.GetToday(secondDay)); err != nil {
+		t.Fatalf("log day 2: %v", err)
+	}
+	completed, err = repo.RecordGoalActivity(ctx, "user1", secondDay, "Gym 45min")
+	if err != nil {
+		t.Fatalf("record day 2: %v", err)
+	}
+	if !completed {
+		t.Fatal("goal should complete after two unique active days")
+	}
+
+	completed, err = repo.RecordGoalActivity(ctx, "user1", secondDay.Add(10*time.Minute), "Laporan kedua")
+	if err != nil {
+		t.Fatalf("record repeat: %v", err)
+	}
+	if completed {
+		t.Fatal("goal completion should only be counted once")
+	}
+
+	updated, err := repo.GetReport(ctx, "user1")
+	if err != nil {
+		t.Fatalf("get report: %v", err)
+	}
+	if updated.GoalsCompleted != 1 {
+		t.Fatalf("expected GoalsCompleted=1, got %d", updated.GoalsCompleted)
+	}
+
+	activities, err := repo.GetGoalActivities(ctx, "user1", startAt, endAt)
+	if err != nil {
+		t.Fatalf("get goal activities: %v", err)
+	}
+	if len(activities) != 2 {
+		t.Fatalf("expected 2 goal activity days, got %d", len(activities))
+	}
+	if activities[0].Activity != "Lari 5km" || activities[1].Activity != "Gym 45min" {
+		t.Fatalf("unexpected activities: %+v", activities)
+	}
+}
+
+func TestReportRepository_SetGoal_RejectsSecondActiveGoal(t *testing.T) {
+	_, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	startAt := time.Date(2026, time.June, 8, 16, 30, 0, 0, time.UTC)
+	first := &domain.WeeklyGoal{
+		UserID:     "user1",
+		TargetDays: 2,
+		Activity:   "Olahraga",
+		StartAt:    startAt,
+		EndAt:      startAt.AddDate(0, 0, 7),
+		CreatedAt:  startAt,
+	}
+	if err := repo.SetGoal(ctx, first); err != nil {
+		t.Fatalf("set first goal: %v", err)
+	}
+
+	secondStart := startAt.Add(time.Minute)
+	err := repo.SetGoal(ctx, &domain.WeeklyGoal{
+		UserID:     "user1",
+		TargetDays: 3,
+		Activity:   "Gym",
+		StartAt:    secondStart,
+		EndAt:      secondStart.AddDate(0, 0, 7),
+		CreatedAt:  secondStart,
+	})
+	if err != domain.ErrActiveGoalExists {
+		t.Fatalf("expected ErrActiveGoalExists, got %v", err)
+	}
+}
+
+func TestReportRepository_RecordGoalActivity_UsesUTCReportDate(t *testing.T) {
+	_, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	wib := time.FixedZone("WIB", 7*60*60)
+	startAt := time.Date(2026, time.June, 8, 20, 0, 0, 0, wib)
+	activityAt := time.Date(2026, time.June, 9, 1, 0, 0, 0, wib)
+	if err := repo.SetGoal(ctx, &domain.WeeklyGoal{
+		UserID:     "user1",
+		TargetDays: 1,
+		Activity:   "Olahraga",
+		StartAt:    startAt,
+		EndAt:      startAt.AddDate(0, 0, 7),
+		CreatedAt:  startAt,
+	}); err != nil {
+		t.Fatalf("set goal: %v", err)
+	}
+	completed, err := repo.RecordGoalActivity(ctx, "user1", activityAt, "Lari malam")
+	if err != nil || !completed {
+		t.Fatalf("expected completion, completed=%v err=%v", completed, err)
+	}
+
+	activities, err := repo.GetGoalActivities(ctx, "user1", startAt, startAt.AddDate(0, 0, 7))
+	if err != nil {
+		t.Fatalf("get goal activities: %v", err)
+	}
+	if len(activities) != 1 {
+		t.Fatalf("expected 1 activity, got %d", len(activities))
+	}
+	want := time.Date(2026, time.June, 8, 0, 0, 0, 0, time.UTC)
+	if !activities[0].Date.Equal(want) {
+		t.Fatalf("expected UTC report date %v, got %v", want, activities[0].Date)
+	}
+}
+
+func TestReportRepository_RecordGoalActivity_CountsFinalPartialDayBeforeEnd(t *testing.T) {
+	_, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	wib := time.FixedZone("WIB", 7*60*60)
+	startAt := time.Date(2026, time.June, 8, 16, 30, 0, 0, wib)
+	endAt := startAt.AddDate(0, 0, 7)
+	if err := repo.SetGoal(ctx, &domain.WeeklyGoal{
+		UserID:     "user1",
+		TargetDays: 1,
+		Activity:   "Olahraga",
+		StartAt:    startAt,
+		EndAt:      endAt,
+		CreatedAt:  startAt,
+	}); err != nil {
+		t.Fatalf("set goal: %v", err)
+	}
+
+	completed, err := repo.RecordGoalActivity(ctx, "user1", endAt.Add(-time.Hour), "Lari final")
+	if err != nil || !completed {
+		t.Fatalf("expected final partial day to count, completed=%v err=%v", completed, err)
+	}
+	completed, err = repo.RecordGoalActivity(ctx, "user1", endAt, "Terlambat")
+	if err != nil {
+		t.Fatalf("record at end: %v", err)
+	}
+	if completed {
+		t.Fatal("activity exactly at end_at should not count as a new completion")
+	}
+}
+
+func TestReportRepository_DeleteActiveGoal_DecrementsCompletedGoal(t *testing.T) {
+	_, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	startAt := time.Date(2026, time.June, 8, 16, 30, 0, 0, time.UTC)
+	endAt := startAt.AddDate(0, 0, 7)
+	report := &domain.Report{
+		UserID:         "user1",
+		Name:           "Budi",
+		LastReportDate: startAt,
+		StreakFreezes:  1,
+	}
+	if err := repo.UpsertReport(ctx, report); err != nil {
+		t.Fatalf("upsert report: %v", err)
+	}
+	if err := repo.SetGoal(ctx, &domain.WeeklyGoal{
+		UserID:     "user1",
+		TargetDays: 1,
+		Activity:   "Olahraga",
+		StartAt:    startAt,
+		EndAt:      endAt,
+		CreatedAt:  startAt,
+	}); err != nil {
+		t.Fatalf("set goal: %v", err)
+	}
+	completed, err := repo.RecordGoalActivity(ctx, "user1", startAt.Add(time.Minute), "Lari")
+	if err != nil || !completed {
+		t.Fatalf("expected completion, completed=%v err=%v", completed, err)
+	}
+
+	if err := repo.DeleteActiveGoal(ctx, "user1", startAt.Add(time.Hour)); err != nil {
+		t.Fatalf("delete active goal: %v", err)
+	}
+	goal, err := repo.GetActiveGoal(ctx, "user1", startAt.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("get active goal: %v", err)
+	}
+	if goal != nil {
+		t.Fatalf("expected goal deleted, got %+v", goal)
+	}
+	updated, err := repo.GetReport(ctx, "user1")
+	if err != nil {
+		t.Fatalf("get report: %v", err)
+	}
+	if updated.GoalsCompleted != 0 {
+		t.Fatalf("expected GoalsCompleted=0 after reset, got %d", updated.GoalsCompleted)
+	}
+}
+
+func TestReportRepository_DeleteActivityLog_ReopensCompletedGoalWhenBelowTarget(t *testing.T) {
+	_, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	startAt := time.Date(2026, time.June, 8, 16, 30, 0, 0, time.UTC)
+	endAt := startAt.AddDate(0, 0, 7)
+	report := &domain.Report{
+		UserID:         "user1",
+		Name:           "Budi",
+		LastReportDate: startAt,
+		StreakFreezes:  1,
+	}
+	if err := repo.UpsertReport(ctx, report); err != nil {
+		t.Fatalf("upsert report: %v", err)
+	}
+	if err := repo.SetGoal(ctx, &domain.WeeklyGoal{
+		UserID:     "user1",
+		TargetDays: 2,
+		Activity:   "Olahraga",
+		StartAt:    startAt,
+		EndAt:      endAt,
+		CreatedAt:  startAt,
+	}); err != nil {
+		t.Fatalf("set goal: %v", err)
+	}
+	if err := repo.LogActivity(ctx, "user1", domain.GetToday(startAt)); err != nil {
+		t.Fatalf("log day 1: %v", err)
+	}
+	if _, err := repo.RecordGoalActivity(ctx, "user1", startAt, "Lari"); err != nil {
+		t.Fatalf("record day 1: %v", err)
+	}
+	secondDay := startAt.AddDate(0, 0, 1)
+	if err := repo.LogActivity(ctx, "user1", domain.GetToday(secondDay)); err != nil {
+		t.Fatalf("log day 2: %v", err)
+	}
+	completed, err := repo.RecordGoalActivity(ctx, "user1", secondDay, "Gym")
+	if err != nil || !completed {
+		t.Fatalf("expected goal completion, completed=%v err=%v", completed, err)
+	}
+
+	if err := repo.DeleteActivityLog(ctx, "user1", domain.GetToday(secondDay)); err != nil {
+		t.Fatalf("delete activity: %v", err)
+	}
+	goal, err := repo.GetActiveGoal(ctx, "user1", startAt.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("get active goal: %v", err)
+	}
+	if goal == nil || goal.CompletedAt != nil {
+		t.Fatalf("expected goal reopened after falling below target, got %+v", goal)
+	}
+	updated, err := repo.GetReport(ctx, "user1")
+	if err != nil {
+		t.Fatalf("get report: %v", err)
+	}
+	if updated.GoalsCompleted != 0 {
+		t.Fatalf("expected GoalsCompleted=0 after cancel, got %d", updated.GoalsCompleted)
+	}
+}

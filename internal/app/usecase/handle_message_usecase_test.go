@@ -48,6 +48,7 @@ func (m *mockLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 type mockReportRepo struct {
 	reports        map[string]*domain.Report
 	activityCounts []domain.ActivityLeaderboardEntry
+	goals          map[string]*domain.WeeklyGoal
 }
 
 func (m *mockReportRepo) GetReport(ctx context.Context, userID string) (*domain.Report, error) {
@@ -128,6 +129,51 @@ func (m *mockReportRepo) DeleteReport(ctx context.Context, userID string) error 
 
 func (m *mockReportRepo) GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error) {
 	return 0, nil
+}
+
+func (m *mockReportRepo) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
+	if m.goals == nil {
+		m.goals = make(map[string]*domain.WeeklyGoal)
+	}
+	m.goals[goal.UserID+"|"+goal.StartAt.Format(time.RFC3339)] = goal
+	return nil
+}
+
+func (m *mockReportRepo) GetActiveGoal(ctx context.Context, userID string, now time.Time) (*domain.WeeklyGoal, error) {
+	for _, goal := range m.goals {
+		if goal.UserID == userID && !now.Before(goal.StartAt) && now.Before(goal.EndAt) {
+			return goal, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockReportRepo) DeleteActiveGoal(ctx context.Context, userID string, now time.Time) error {
+	for key, goal := range m.goals {
+		if goal.UserID == userID && !now.Before(goal.StartAt) && now.Before(goal.EndAt) {
+			delete(m.goals, key)
+		}
+	}
+	return nil
+}
+
+func (m *mockReportRepo) DeleteExpiredGoals(ctx context.Context, now time.Time) (int64, error) {
+	var deleted int64
+	for key, goal := range m.goals {
+		if !goal.EndAt.After(now) {
+			delete(m.goals, key)
+			deleted++
+		}
+	}
+	return deleted, nil
+}
+
+func (m *mockReportRepo) GetGoalActivities(ctx context.Context, userID string, startDate, endDate time.Time) ([]domain.GoalActivity, error) {
+	return nil, nil
+}
+
+func (m *mockReportRepo) RecordGoalActivity(ctx context.Context, userID string, activityDate time.Time, activityText string) (bool, error) {
+	return false, nil
 }
 
 func TestHandleMessage_LaporCommand(t *testing.T) {

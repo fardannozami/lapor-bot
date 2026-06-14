@@ -2,8 +2,11 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+var ErrActiveGoalExists = errors.New("active goal exists")
 
 type Report struct {
 	UserID                string    `json:"user_id" db:"user_id"`
@@ -24,12 +27,28 @@ type Report struct {
 	SeasonalMaxStreak     int       `json:"seasonal_max_streak" db:"seasonal_max_streak"`
 	SeasonalAchievements  string    `json:"seasonal_achievements" db:"seasonal_achievements"`
 	StreakFreezes         int       `json:"streak_freezes" db:"streak_freezes"`
+	GoalsCompleted        int       `json:"goals_completed" db:"goals_completed"`
 }
 
 type ActivityLeaderboardEntry struct {
 	UserID        string
 	Name          string
 	ActivityCount int
+}
+
+type WeeklyGoal struct {
+	UserID      string
+	TargetDays  int
+	Activity    string
+	StartAt     time.Time
+	EndAt       time.Time
+	CreatedAt   time.Time
+	CompletedAt *time.Time
+}
+
+type GoalActivity struct {
+	Date     time.Time
+	Activity string
 }
 
 // ReportCutoffOffset is the spare time allowed for late-night reporting.
@@ -48,6 +67,19 @@ func GetStartOfISOWeek(t time.Time) time.Time {
 	t = GetToday(t)
 	// ISO week starts on Monday. Go's Weekday() returns 0 for Sunday, 1 for Monday, etc.
 	// We want to shift back to the most recent Monday.
+	weekday := int(t.Weekday())
+	if weekday == 0 { // Sunday
+		weekday = 7
+	}
+	daysToSubtract := weekday - 1
+	return t.AddDate(0, 0, -daysToSubtract)
+}
+
+// GetStartOfISOWeekStrict returns the Monday of the ISO week containing t
+// without applying the daily report cutoff. Use this for weekly windows that
+// must roll over exactly at Monday 00:00.
+func GetStartOfISOWeekStrict(t time.Time) time.Time {
+	t = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 	weekday := int(t.Weekday())
 	if weekday == 0 { // Sunday
 		weekday = 7
@@ -80,6 +112,13 @@ type ReportRepository interface {
 	DeleteReport(ctx context.Context, userID string) error
 
 	GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error)
+
+	SetGoal(ctx context.Context, goal *WeeklyGoal) error
+	GetActiveGoal(ctx context.Context, userID string, now time.Time) (*WeeklyGoal, error)
+	DeleteActiveGoal(ctx context.Context, userID string, now time.Time) error
+	DeleteExpiredGoals(ctx context.Context, now time.Time) (int64, error)
+	GetGoalActivities(ctx context.Context, userID string, startDate, endDate time.Time) ([]GoalActivity, error)
+	RecordGoalActivity(ctx context.Context, userID string, activityDate time.Time, activityText string) (bool, error)
 
 	// Strava Integration
 	UpsertStravaAccount(ctx context.Context, account *StravaAccount) error

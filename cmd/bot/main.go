@@ -52,6 +52,7 @@ func main() {
 	resetSessionUC := usecase.NewResetSessionUsecase(repo)
 	motivationUC := usecase.NewGetMotivationUsecase()
 	helpUC := usecase.NewGetHelpUsecase()
+	goalUC := usecase.NewGoalUsecase(repo)
 
 	// Strava Integration
 	stravaClient := strava.NewClient(cfg)
@@ -253,7 +254,29 @@ func main() {
 		log.Fatalf("Invalid NOTIFY_LEADERBOARD_TIME %q: %v", cfg.NotifyLeaderboardTime, err)
 	}
 
+	goalCleanupSchedule, err := scheduler.ParseDaily("00:10", jakartaLoc)
+	if err != nil {
+		log.Fatalf("Invalid goal cleanup schedule: %v", err)
+	}
+
 	sched := scheduler.NewScheduler(appCtx)
+
+	sched.AddJob(&scheduler.Job{
+		Name:    "goal-cleanup",
+		Freq:    goalCleanupSchedule,
+		Recover: false,
+		Fn: func(ctx context.Context) error {
+			deleted, err := goalUC.CleanupExpired(ctx, time.Now().In(jakartaLoc))
+			if err != nil {
+				log.Printf("[SCHEDULER] Goal cleanup failed: %v", err)
+				return err
+			}
+			if deleted > 0 {
+				log.Printf("[SCHEDULER] Goal cleanup deleted %d expired goal(s)", deleted)
+			}
+			return nil
+		},
+	})
 
 	sched.AddJob(&scheduler.Job{
 		Name:    "morning-workout-checkpoint",

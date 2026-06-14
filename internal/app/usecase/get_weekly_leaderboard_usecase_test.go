@@ -88,7 +88,31 @@ func (r *weeklyLeaderboardRepoStub) GetDailyActivityCount(ctx context.Context, u
 	return 0, nil
 }
 
-func TestGetWeeklyLeaderboardUsecase_UsesSundayWeekRange(t *testing.T) {
+func (r *weeklyLeaderboardRepoStub) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
+	return nil
+}
+
+func (r *weeklyLeaderboardRepoStub) GetActiveGoal(ctx context.Context, userID string, now time.Time) (*domain.WeeklyGoal, error) {
+	return nil, nil
+}
+
+func (r *weeklyLeaderboardRepoStub) DeleteActiveGoal(ctx context.Context, userID string, now time.Time) error {
+	return nil
+}
+
+func (r *weeklyLeaderboardRepoStub) DeleteExpiredGoals(ctx context.Context, now time.Time) (int64, error) {
+	return 0, nil
+}
+
+func (r *weeklyLeaderboardRepoStub) GetGoalActivities(ctx context.Context, userID string, startDate, endDate time.Time) ([]domain.GoalActivity, error) {
+	return nil, nil
+}
+
+func (r *weeklyLeaderboardRepoStub) RecordGoalActivity(ctx context.Context, userID string, activityDate time.Time, activityText string) (bool, error) {
+	return false, nil
+}
+
+func TestGetWeeklyLeaderboardUsecase_UsesISOWeekRange(t *testing.T) {
 	repo := &weeklyLeaderboardRepoStub{
 		entries: []domain.ActivityLeaderboardEntry{
 			{Name: "Cici", ActivityCount: 2},
@@ -105,8 +129,8 @@ func TestGetWeeklyLeaderboardUsecase_UsesSundayWeekRange(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	expectedStart := time.Date(2026, time.April, 26, 0, 0, 0, 0, time.UTC)
-	expectedEnd := time.Date(2026, time.May, 3, 0, 0, 0, 0, time.UTC)
+	expectedStart := time.Date(2026, time.April, 27, 0, 0, 0, 0, time.UTC)
+	expectedEnd := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
 	if !repo.start.Equal(expectedStart) {
 		t.Fatalf("expected start %v, got %v", expectedStart, repo.start)
 	}
@@ -114,7 +138,7 @@ func TestGetWeeklyLeaderboardUsecase_UsesSundayWeekRange(t *testing.T) {
 		t.Fatalf("expected end %v, got %v", expectedEnd, repo.end)
 	}
 
-	if !contains(result, "Periode: 26-04-2026 s/d sebelum 03-05-2026") {
+	if !contains(result, "Periode: 27-04-2026 s/d sebelum 04-05-2026") {
 		t.Fatalf("expected weekly period in response, got %q", result)
 	}
 	if !contains(result, "1. Budi: 4 hari") {

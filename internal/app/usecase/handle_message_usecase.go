@@ -27,6 +27,7 @@ type HandleMessageUsecase struct {
 	motivationUC        *GetMotivationUsecase
 	helpUC              *GetHelpUsecase
 	jobUC               *JobUsecase
+	goalUC              *GoalUsecase
 }
 
 func NewHandleMessageUsecase(
@@ -56,6 +57,7 @@ func NewHandleMessageUsecase(
 		motivationUC:        motivationUC,
 		helpUC:              helpUC,
 		jobUC:               NewJobUsecase(leaderboardUC.repo),
+		goalUC:              NewGoalUsecase(leaderboardUC.repo),
 	}
 }
 
@@ -101,6 +103,11 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 
 	if strings.Contains(msg, "#jobs") {
 		return MessageResponse{Text: uc.jobUC.List()}, nil
+	}
+
+	if strings.Contains(msg, "#goal") {
+		text, err := uc.goalUC.Execute(ctx, userID, name, message)
+		return MessageResponse{Text: text}, err
 	}
 
 	if strings.Contains(msg, "#job") {

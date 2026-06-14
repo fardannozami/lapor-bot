@@ -103,6 +103,30 @@ func (m *mockRepo) GetDailyActivityCount(ctx context.Context, userID string, dat
 	return m.dailyCounts[key], nil
 }
 
+func (m *mockRepo) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
+	return nil
+}
+
+func (m *mockRepo) GetActiveGoal(ctx context.Context, userID string, now time.Time) (*domain.WeeklyGoal, error) {
+	return nil, nil
+}
+
+func (m *mockRepo) DeleteActiveGoal(ctx context.Context, userID string, now time.Time) error {
+	return nil
+}
+
+func (m *mockRepo) DeleteExpiredGoals(ctx context.Context, now time.Time) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockRepo) GetGoalActivities(ctx context.Context, userID string, startDate, endDate time.Time) ([]domain.GoalActivity, error) {
+	return nil, nil
+}
+
+func (m *mockRepo) RecordGoalActivity(ctx context.Context, userID string, activityDate time.Time, activityText string) (bool, error) {
+	return false, nil
+}
+
 // =============================================================================
 // STREAK LOGIC TESTS
 // =============================================================================

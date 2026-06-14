@@ -88,21 +88,46 @@ func (r *myStatsRepoStub) GetDailyActivityCount(ctx context.Context, userID stri
 	return 0, nil
 }
 
+func (r *myStatsRepoStub) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
+	return nil
+}
+
+func (r *myStatsRepoStub) GetActiveGoal(ctx context.Context, userID string, now time.Time) (*domain.WeeklyGoal, error) {
+	return nil, nil
+}
+
+func (r *myStatsRepoStub) DeleteActiveGoal(ctx context.Context, userID string, now time.Time) error {
+	return nil
+}
+
+func (r *myStatsRepoStub) DeleteExpiredGoals(ctx context.Context, now time.Time) (int64, error) {
+	return 0, nil
+}
+
+func (r *myStatsRepoStub) GetGoalActivities(ctx context.Context, userID string, startDate, endDate time.Time) ([]domain.GoalActivity, error) {
+	return nil, nil
+}
+
+func (r *myStatsRepoStub) RecordGoalActivity(ctx context.Context, userID string, activityDate time.Time, activityText string) (bool, error) {
+	return false, nil
+}
+
 func TestGetMyStatsUsecase_IncludesSeasonAndWeeklyCounts(t *testing.T) {
 	fixedNow := time.Date(2026, time.June, 10, 9, 0, 0, 0, time.UTC)
-	weekStart := time.Date(2026, time.June, 7, 0, 0, 0, 0, time.UTC)
-	weekEnd := time.Date(2026, time.June, 14, 0, 0, 0, 0, time.UTC)
+	weekStart := time.Date(2026, time.June, 8, 0, 0, 0, 0, time.UTC)
+	weekEnd := time.Date(2026, time.June, 15, 0, 0, 0, 0, time.UTC)
 	seasonStart := time.Date(2026, time.May, 1, 0, 0, 0, 0, time.UTC)
 	seasonEnd := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.FixedZone("WIB", 7*3600))
 
 	repo := &myStatsRepoStub{
 		report: &domain.Report{
-			UserID:        "user1",
-			Name:          "Gamer",
-			Streak:        10,
-			ActivityCount: 10,
-			MaxStreak:     12,
-			TotalPoints:   50,
+			UserID:         "user1",
+			Name:           "Gamer",
+			Streak:         10,
+			ActivityCount:  10,
+			MaxStreak:      12,
+			TotalPoints:    50,
+			GoalsCompleted: 2,
 		},
 		entries: map[string][]domain.ActivityLeaderboardEntry{
 			weekStart.Format(time.DateOnly) + "|" + weekEnd.Format(time.DateOnly): {
@@ -136,5 +161,8 @@ func TestGetMyStatsUsecase_IncludesSeasonAndWeeklyCounts(t *testing.T) {
 	}
 	if !contains(result, "📆 Hari minggu ini: 3") {
 		t.Fatalf("expected weekly count in response, got %q", result)
+	}
+	if !contains(result, "🎯 Goals tercapai: 2") {
+		t.Fatalf("expected goal count in response, got %q", result)
 	}
 }

@@ -25,7 +25,7 @@ const selectColumns = `user_id, name, COALESCE(job_class, ''), streak, activity_
 	COALESCE(comeback_streak, 0), COALESCE(inactive_days, 0), COALESCE(centurion_cycles, 0),
 	COALESCE(seasonal_points, 0), COALESCE(seasonal_activity_count, 0),
 	COALESCE(seasonal_max_streak, 0), COALESCE(seasonal_achievements, ''),
-	COALESCE(streak_freezes, 0)`
+	COALESCE(streak_freezes, 0), COALESCE(goals_completed, 0)`
 
 func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, error) {
 	var report domain.Report
@@ -36,7 +36,7 @@ func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, e
 		&report.ComebackStreak, &report.InactiveDays, &report.CenturionCycles,
 		&report.SeasonalPoints, &report.SeasonalActivityCount,
 		&report.SeasonalMaxStreak, &report.SeasonalAchievements,
-		&report.StreakFreezes,
+		&report.StreakFreezes, &report.GoalsCompleted,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -61,8 +61,8 @@ func (r *ReportRepository) GetReport(ctx context.Context, userID string) (*domai
 
 func upsertReport(ctx context.Context, execer execContexter, report *domain.Report) error {
 	query := `
-		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, level, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, level, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes, goals_completed)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			name = excluded.name,
 			job_class = excluded.job_class,
@@ -87,7 +87,7 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 		report.LastReportDate.Format(time.RFC3339), report.MaxStreak, report.TotalPoints,
 		report.Level, report.Achievements, report.ComebackStreak, report.InactiveDays, report.CenturionCycles,
 		report.SeasonalPoints, report.SeasonalActivityCount, report.SeasonalMaxStreak,
-		report.SeasonalAchievements, report.StreakFreezes,
+		report.SeasonalAchievements, report.StreakFreezes, report.GoalsCompleted,
 	)
 	return err
 }
@@ -231,6 +231,7 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 			activity_date TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			report_count INTEGER NOT NULL DEFAULT 1,
+			activity_text TEXT DEFAULT '',
 			PRIMARY KEY (user_id, activity_date),
 			FOREIGN KEY (user_id) REFERENCES user_reports(user_id) ON DELETE CASCADE
 		);
@@ -278,8 +279,62 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_max_streak INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_achievements TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN streak_freezes INTEGER DEFAULT 1")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN goals_completed INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN report_count INTEGER NOT NULL DEFAULT 1")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN activity_text TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE strava_accounts ADD COLUMN name TEXT")
+
+	goalQuery := `
+		CREATE TABLE IF NOT EXISTS weekly_goals (
+			user_id TEXT NOT NULL,
+			target_days INTEGER NOT NULL,
+			activity TEXT NOT NULL,
+			week_start TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			completed_at TEXT DEFAULT '',
+			PRIMARY KEY (user_id, week_start)
+		);
+	`
+	_, err = r.db.ExecContext(ctx, goalQuery)
+	if err != nil {
+		return err
+	}
+
+	rollingGoalQuery := `
+		CREATE TABLE IF NOT EXISTS goals (
+			user_id TEXT NOT NULL,
+			target_days INTEGER NOT NULL,
+			activity TEXT NOT NULL,
+			start_at TEXT NOT NULL,
+			end_at TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			completed_at TEXT DEFAULT '',
+			PRIMARY KEY (user_id, start_at)
+		);
+	`
+	_, err = r.db.ExecContext(ctx, rollingGoalQuery)
+	if err != nil {
+		return err
+	}
+
+	goalActivityQuery := `
+		CREATE TABLE IF NOT EXISTS goal_activity_logs (
+			user_id TEXT NOT NULL,
+			goal_start_at TEXT NOT NULL,
+			activity_date TEXT NOT NULL,
+			activity_text TEXT DEFAULT '',
+			created_at TEXT NOT NULL,
+			PRIMARY KEY (user_id, goal_start_at, activity_date)
+		);
+	`
+	_, err = r.db.ExecContext(ctx, goalActivityQuery)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_goals_end_at ON goals (end_at)`)
+	if err != nil {
+		return err
+	}
 
 	// Run data migrations
 	if err := r.MigrateDayToWeekStreaks(ctx); err != nil {
@@ -498,9 +553,19 @@ func (r *ReportRepository) GetUserActivityDates(ctx context.Context, userID stri
 }
 
 func (r *ReportRepository) DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error {
-	query := `DELETE FROM activity_logs WHERE user_id = ? AND activity_date = ?`
-	_, err := r.db.ExecContext(ctx, query, userID, activityDate.Format(time.DateOnly))
-	return err
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM activity_logs WHERE user_id = ? AND activity_date = ?`, userID, activityDate.Format(time.DateOnly)); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := reconcileGoalAfterActivityDelete(ctx, tx, userID, activityDate); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *ReportRepository) DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error) {
@@ -532,13 +597,95 @@ func (r *ReportRepository) DeleteLatestActivityLog(ctx context.Context, userID s
 			_ = tx.Rollback()
 			return 0, err
 		}
+		if err := reconcileGoalAfterActivityDelete(ctx, tx, userID, activityDate); err != nil {
+			_ = tx.Rollback()
+			return 0, err
+		}
 	}
 
 	return remaining, tx.Commit()
 }
 
+func reconcileGoalAfterActivityDelete(ctx context.Context, tx *sql.Tx, userID string, activityDate time.Time) error {
+	activityDateStr := activityDate.Format(time.DateOnly)
+	rows, err := tx.QueryContext(ctx, `
+		SELECT g.start_at, g.target_days, COALESCE(g.completed_at, '')
+		FROM goals g
+		JOIN goal_activity_logs gal ON gal.user_id = g.user_id AND gal.goal_start_at = g.start_at
+		WHERE g.user_id = ? AND gal.activity_date = ?
+	`, userID, activityDateStr)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type affectedGoal struct {
+		startAt     string
+		targetDays  int
+		completedAt string
+	}
+	var goals []affectedGoal
+	for rows.Next() {
+		var goal affectedGoal
+		if err := rows.Scan(&goal.startAt, &goal.targetDays, &goal.completedAt); err != nil {
+			return err
+		}
+		goals = append(goals, goal)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM goal_activity_logs WHERE user_id = ? AND activity_date = ?`, userID, activityDateStr); err != nil {
+		return err
+	}
+
+	for _, goal := range goals {
+		if goal.completedAt == "" {
+			continue
+		}
+		var activeDays int
+		if err := tx.QueryRowContext(ctx, `
+			SELECT COUNT(*)
+			FROM goal_activity_logs
+			WHERE user_id = ? AND goal_start_at = ?
+		`, userID, goal.startAt).Scan(&activeDays); err != nil {
+			return err
+		}
+		if activeDays >= goal.targetDays {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE goals
+			SET completed_at = ''
+			WHERE user_id = ? AND start_at = ?
+		`, userID, goal.startAt); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+		UPDATE user_reports
+		SET goals_completed = CASE
+			WHEN COALESCE(goals_completed, 0) > 0 THEN goals_completed - 1
+			ELSE 0
+		END
+		WHERE user_id = ?
+	`, userID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *ReportRepository) DeleteReport(ctx context.Context, userID string) error {
 	if _, err := r.db.ExecContext(ctx, `DELETE FROM activity_logs WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM weekly_goals WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM goal_activity_logs WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM goals WHERE user_id = ?`, userID); err != nil {
 		return err
 	}
 	_, err := r.db.ExecContext(ctx, `DELETE FROM user_reports WHERE user_id = ?`, userID)
@@ -556,6 +703,275 @@ func (r *ReportRepository) GetDailyActivityCount(ctx context.Context, userID str
 		return 0, err
 	}
 	return count, nil
+}
+
+func (r *ReportRepository) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
+	query := `
+		INSERT INTO goals (user_id, target_days, activity, start_at, end_at, created_at, completed_at)
+		SELECT ?, ?, ?, ?, ?, ?, ''
+		WHERE NOT EXISTS (
+			SELECT 1 FROM goals
+			WHERE user_id = ? AND start_at <= ? AND end_at > ?
+		)
+	`
+	startAt := goal.StartAt.UTC().Format(time.RFC3339)
+	endAt := goal.EndAt.UTC().Format(time.RFC3339)
+	createdAt := goal.CreatedAt.UTC().Format(time.RFC3339)
+	res, err := r.db.ExecContext(ctx, query,
+		goal.UserID,
+		goal.TargetDays,
+		goal.Activity,
+		startAt,
+		endAt,
+		createdAt,
+		goal.UserID,
+		startAt,
+		startAt,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return domain.ErrActiveGoalExists
+	}
+	return nil
+}
+
+func (r *ReportRepository) GetActiveGoal(ctx context.Context, userID string, now time.Time) (*domain.WeeklyGoal, error) {
+	query := `
+		SELECT user_id, target_days, activity, start_at, end_at, created_at, COALESCE(completed_at, '')
+		FROM goals
+		WHERE user_id = ? AND start_at <= ? AND end_at > ?
+		ORDER BY start_at DESC
+		LIMIT 1
+	`
+	nowStr := now.UTC().Format(time.RFC3339)
+	row := r.db.QueryRowContext(ctx, query, userID, nowStr, nowStr)
+	return scanGoal(row)
+}
+
+func scanGoal(scanner interface{ Scan(dest ...any) error }) (*domain.WeeklyGoal, error) {
+	var goal domain.WeeklyGoal
+	var startAtStr, endAtStr, createdAtStr, completedAtStr string
+	err := scanner.Scan(&goal.UserID, &goal.TargetDays, &goal.Activity, &startAtStr, &endAtStr, &createdAtStr, &completedAtStr)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	goal.StartAt, err = time.Parse(time.RFC3339, startAtStr)
+	if err != nil {
+		return nil, err
+	}
+	goal.EndAt, err = time.Parse(time.RFC3339, endAtStr)
+	if err != nil {
+		return nil, err
+	}
+	goal.CreatedAt, err = time.Parse(time.RFC3339, createdAtStr)
+	if err != nil {
+		return nil, err
+	}
+	if completedAtStr != "" {
+		completedAt, err := time.Parse(time.RFC3339, completedAtStr)
+		if err != nil {
+			return nil, err
+		}
+		goal.CompletedAt = &completedAt
+	}
+	return &goal, nil
+}
+
+func (r *ReportRepository) DeleteActiveGoal(ctx context.Context, userID string, now time.Time) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	nowStr := now.UTC().Format(time.RFC3339)
+	var startAt, completedAt string
+	err = tx.QueryRowContext(ctx, `
+		SELECT start_at, COALESCE(completed_at, '')
+		FROM goals
+		WHERE user_id = ? AND start_at <= ? AND end_at > ?
+		ORDER BY start_at DESC
+		LIMIT 1
+	`, userID, nowStr, nowStr).Scan(&startAt, &completedAt)
+	if err == sql.ErrNoRows {
+		return tx.Commit()
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM goal_activity_logs WHERE user_id = ? AND goal_start_at = ?`, userID, startAt); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM goals WHERE user_id = ? AND start_at = ?`, userID, startAt); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if completedAt != "" {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE user_reports
+			SET goals_completed = CASE
+				WHEN COALESCE(goals_completed, 0) > 0 THEN goals_completed - 1
+				ELSE 0
+			END
+			WHERE user_id = ?
+		`, userID); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (r *ReportRepository) DeleteExpiredGoals(ctx context.Context, now time.Time) (int64, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	nowStr := now.UTC().Format(time.RFC3339)
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM goal_activity_logs
+		WHERE (user_id, goal_start_at) IN (
+			SELECT user_id, start_at FROM goals WHERE end_at <= ?
+		)
+	`, nowStr); err != nil {
+		_ = tx.Rollback()
+		return 0, err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM goals WHERE end_at <= ?`, nowStr)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, err
+	}
+	deleted, err := res.RowsAffected()
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, err
+	}
+	return deleted, tx.Commit()
+}
+
+func (r *ReportRepository) GetGoalActivities(ctx context.Context, userID string, startAt, endAt time.Time) ([]domain.GoalActivity, error) {
+	query := `
+		SELECT activity_date, COALESCE(activity_text, '')
+		FROM goal_activity_logs
+		WHERE user_id = ? AND goal_start_at = ?
+		ORDER BY activity_date ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query, userID, startAt.UTC().Format(time.RFC3339))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	activities := []domain.GoalActivity{}
+	for rows.Next() {
+		var activity domain.GoalActivity
+		var dateStr string
+		if err := rows.Scan(&dateStr, &activity.Activity); err != nil {
+			return nil, err
+		}
+		activity.Date, err = time.Parse(time.DateOnly, dateStr)
+		if err != nil {
+			return nil, err
+		}
+		activities = append(activities, activity)
+	}
+	return activities, rows.Err()
+}
+
+func (r *ReportRepository) RecordGoalActivity(ctx context.Context, userID string, activityAt time.Time, activityText string) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+
+	activityAtUTC := activityAt.UTC()
+	activityAtStr := activityAtUTC.Format(time.RFC3339)
+	var goalStartAt, completedAt string
+	var targetDays int
+	err = tx.QueryRowContext(ctx, `
+		SELECT start_at, target_days, COALESCE(completed_at, '')
+		FROM goals
+		WHERE user_id = ? AND start_at <= ? AND end_at > ?
+		ORDER BY start_at DESC
+		LIMIT 1
+	`, userID, activityAtStr, activityAtStr).Scan(&goalStartAt, &targetDays, &completedAt)
+	if err == sql.ErrNoRows {
+		return false, tx.Commit()
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return false, err
+	}
+
+	activityDate := domain.GetToday(activityAtUTC)
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO goal_activity_logs (user_id, goal_start_at, activity_date, activity_text, created_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(user_id, goal_start_at, activity_date) DO UPDATE SET
+			activity_text = CASE WHEN COALESCE(activity_text, '') = '' THEN excluded.activity_text ELSE activity_text END
+	`, userID, goalStartAt, activityDate.Format(time.DateOnly), activityText, activityAtStr); err != nil {
+		_ = tx.Rollback()
+		return false, err
+	}
+
+	if completedAt != "" {
+		return false, tx.Commit()
+	}
+
+	var activeDays int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM goal_activity_logs
+		WHERE user_id = ? AND goal_start_at = ?
+	`, userID, goalStartAt).Scan(&activeDays); err != nil {
+		_ = tx.Rollback()
+		return false, err
+	}
+	if activeDays < targetDays {
+		return false, tx.Commit()
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := tx.ExecContext(ctx, `
+		UPDATE goals
+		SET completed_at = ?
+		WHERE user_id = ? AND start_at = ? AND COALESCE(completed_at, '') = ''
+	`, now, userID, goalStartAt)
+	if err != nil {
+		_ = tx.Rollback()
+		return false, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		_ = tx.Rollback()
+		return false, err
+	}
+	if affected == 0 {
+		return false, tx.Commit()
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE user_reports
+		SET goals_completed = COALESCE(goals_completed, 0) + 1
+		WHERE user_id = ?
+	`, userID); err != nil {
+		_ = tx.Rollback()
+		return false, err
+	}
+
+	return true, tx.Commit()
 }
 
 func (r *ReportRepository) GetStravaAccountByUserID(ctx context.Context, userID string) (*domain.StravaAccount, error) {
