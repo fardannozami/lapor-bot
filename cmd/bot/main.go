@@ -179,19 +179,17 @@ func main() {
 			}
 
 			err := dailyQuestUC.SendDailyQuests(ctx, time.Now().In(jakartaLoc), waService.GetClient(), sender, targetID)
-			response := "✅ Proses distribusi daily quest selesai dikirim ke seluruh user!"
 			if err != nil {
 				log.Printf("Failed to distribute daily quests: %v", err)
-				response = fmt.Sprintf("Gagal mendistribusikan daily quest: %v", err)
-			}
-
-			resp := &waE2E.Message{
-				Conversation: &response,
-			}
-			if sender != nil {
-				_ = sender.SendNormalPriority(ctx, evt.Info.Chat, resp)
-			} else {
-				_, _ = waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
+				response := fmt.Sprintf("Gagal mendistribusikan daily quest: %v", err)
+				resp := &waE2E.Message{
+					Conversation: &response,
+				}
+				if sender != nil {
+					_ = sender.SendNormalPriority(ctx, evt.Info.Chat, resp)
+				} else {
+					_, _ = waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
+				}
 			}
 			return
 		}
