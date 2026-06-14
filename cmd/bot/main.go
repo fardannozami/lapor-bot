@@ -89,10 +89,6 @@ func main() {
 			return
 		}
 
-		if evt.Info.IsFromMe {
-			return
-		}
-
 		senderJID := evt.Info.Sender
 		var userID string
 		if senderJID.Server == "lid" || senderJID.Server == types.DefaultUserServer && len(senderJID.User) > 15 {
@@ -191,6 +187,10 @@ func main() {
 					_, _ = waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
 				}
 			}
+			return
+		}
+
+		if evt.Info.IsFromMe {
 			return
 		}
 

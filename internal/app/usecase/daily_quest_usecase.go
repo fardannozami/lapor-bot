@@ -71,9 +71,14 @@ func (u *DailyQuestUsecase) SendDailyQuests(ctx context.Context, now time.Time, 
 	sb.WriteString(fmt.Sprintf("Tanggal: %s\n\n", dateStr))
 	sb.WriteString("Berikut adalah quest harian untuk para Hunter hari ini:\n\n")
 
-	var mentions []string
+	type questGroup struct {
+		jobDesc  string
+		tasksStr string
+		users    []*domain.Report
+	}
+
+	var groups []questGroup
 	hasQuests := false
-	anyUserWithoutJob := false
 
 	for _, r := range reports {
 		if r == nil {
@@ -88,26 +93,59 @@ func (u *DailyQuestUsecase) SendDailyQuests(ctx context.Context, now time.Time, 
 
 		hasQuests = true
 
-		sb.WriteString(fmt.Sprintf("👤 @%s\n", r.UserID))
-		mentions = append(mentions, r.UserID+"@s.whatsapp.net")
-
+		jobDesc := ""
 		if r.JobClass == "" {
-			sb.WriteString("Job: - (General Quest)\n")
-			anyUserWithoutJob = true
+			jobDesc = "Job: - (General Quest)"
 		} else {
-			sb.WriteString(fmt.Sprintf("Job: %s (Lv.%d)\n", domain.FormatJobClass(r.JobClass), r.Level))
+			jobDesc = fmt.Sprintf("Job: %s (Lv.%d)", domain.FormatJobClass(r.JobClass), r.Level)
 		}
 
-		sb.WriteString("📜 *Daftar Quest:*\n")
+		var tasksSB strings.Builder
 		for i, t := range tasks {
-			sb.WriteString(fmt.Sprintf("  %d. %s\n", i+1, domain.FormatQuestProgressTask(t)))
+			tasksSB.WriteString(fmt.Sprintf("  %d. %s\n", i+1, domain.FormatQuestProgressTask(t)))
+		}
+		tasksSB.WriteString(fmt.Sprintf("Progress: %s", formatQuestProgressBar(tasks)))
+		tasksStr := tasksSB.String()
+
+		found := false
+		for i, g := range groups {
+			if g.jobDesc == jobDesc && g.tasksStr == tasksStr {
+				groups[i].users = append(groups[i].users, r)
+				found = true
+				break
+			}
 		}
 
-		sb.WriteString(fmt.Sprintf("Progress: %s\n\n", formatQuestProgressBar(tasks)))
+		if !found {
+			groups = append(groups, questGroup{
+				jobDesc:  jobDesc,
+				tasksStr: tasksStr,
+				users:    []*domain.Report{r},
+			})
+		}
 	}
 
 	if !hasQuests {
 		return nil
+	}
+
+	var mentions []string
+	anyUserWithoutJob := false
+
+	for _, g := range groups {
+		var userTags []string
+		for _, r := range g.users {
+			userTags = append(userTags, "@"+r.UserID)
+			mentions = append(mentions, r.UserID+"@s.whatsapp.net")
+			if r.JobClass == "" {
+				anyUserWithoutJob = true
+			}
+		}
+
+		sb.WriteString(fmt.Sprintf("👤 %s\n", strings.Join(userTags, ", ")))
+		sb.WriteString(g.jobDesc + "\n")
+		sb.WriteString("📜 *Daftar Quest:*\n")
+		sb.WriteString(g.tasksStr + "\n\n")
 	}
 
 	sb.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━━━\n")

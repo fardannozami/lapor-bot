@@ -199,6 +199,14 @@ func TestSendDailyQuests(t *testing.T) {
 			TotalPoints:    10,
 			LastReportDate: now.AddDate(0, 0, -2),
 		},
+		{
+			UserID:         "628111222333",
+			Name:           "Charlie",
+			JobClass:       "fighter",
+			Level:          5,
+			TotalPoints:    200,
+			LastReportDate: now.AddDate(0, 0, -2),
+		},
 	}
 
 	repo := &mockQuestRepo{
@@ -233,8 +241,8 @@ func TestSendDailyQuests(t *testing.T) {
 	if !strings.Contains(text, "⚔️ *DAILY QUEST HARIAN HUNTER* ⚔️") {
 		t.Errorf("expected text to contain title, got: %s", text)
 	}
-	if !strings.Contains(text, "👤 @628123456789") {
-		t.Errorf("expected text to mention Alice, got: %s", text)
+	if !strings.Contains(text, "👤 @628123456789, @628111222333") {
+		t.Errorf("expected text to group Alice and Charlie, got: %s", text)
 	}
 	if !strings.Contains(text, "👤 @628987654321") {
 		t.Errorf("expected text to mention Bob, got: %s", text)
@@ -251,7 +259,7 @@ func TestSendDailyQuests(t *testing.T) {
 	if contextInfo == nil {
 		t.Fatalf("expected ContextInfo in ExtendedTextMessage to be set")
 	}
-	expectedMentions := []string{"628123456789@s.whatsapp.net", "628987654321@s.whatsapp.net"}
+	expectedMentions := []string{"628123456789@s.whatsapp.net", "628111222333@s.whatsapp.net", "628987654321@s.whatsapp.net"}
 	if len(contextInfo.MentionedJID) != len(expectedMentions) {
 		t.Errorf("expected %d mentions, got %d", len(expectedMentions), len(contextInfo.MentionedJID))
 	} else {

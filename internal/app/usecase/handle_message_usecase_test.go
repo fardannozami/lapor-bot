@@ -132,6 +132,14 @@ func (m *mockReportRepo) GetDailyActivityCount(ctx context.Context, userID strin
 	return 0, nil
 }
 
+func (m *mockReportRepo) SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error {
+	return nil
+}
+
+func (m *mockReportRepo) GetDailyQuest(ctx context.Context, userID, questDate string) (string, error) {
+	return "", nil
+}
+
 func (m *mockReportRepo) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
 	if m.goals == nil {
 		m.goals = make(map[string]*domain.WeeklyGoal)

@@ -67,5 +67,9 @@ func (uc *JobUsecase) Select(ctx context.Context, userID, name, jobID string) (s
 		return "", err
 	}
 
+	// Clear today's daily quest cache so it gets regenerated for the new job
+	todayStr := domain.GetToday(time.Now()).Format("2006-01-02")
+	_ = uc.repo.SaveDailyQuest(ctx, userID, todayStr, "")
+
 	return fmt.Sprintf("✅ Job dipilih: %s *%s*\n_%s_\n\nJob ini akan tampil di #mystats dan laporan #lapor berikutnya.", job.Icon, job.Name, job.Description), nil
 }
