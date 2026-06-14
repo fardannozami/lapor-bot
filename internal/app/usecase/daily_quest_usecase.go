@@ -102,10 +102,9 @@ func (u *DailyQuestUsecase) SendDailyQuests(ctx context.Context, now time.Time, 
 
 		var tasksSB strings.Builder
 		for i, t := range tasks {
-			tasksSB.WriteString(fmt.Sprintf("  %d. %s\n", i+1, domain.FormatQuestProgressTask(t)))
+			tasksSB.WriteString(fmt.Sprintf("  %d. %s\n", i+1, domain.FormatQuestTask(t)))
 		}
-		tasksSB.WriteString(fmt.Sprintf("Progress: %s", formatQuestProgressBar(tasks)))
-		tasksStr := tasksSB.String()
+		tasksStr := strings.TrimSuffix(tasksSB.String(), "\n")
 
 		found := false
 		for i, g := range groups {

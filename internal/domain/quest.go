@@ -262,3 +262,12 @@ func FormatQuestProgressTask(task QuestTask) string {
 	}
 	return fmt.Sprintf("%s: %d/%d %s (+%d pts)", task.Name, task.Progress, task.Target, task.Unit, task.RewardPoints)
 }
+
+// FormatQuestTask returns a descriptive string for a quest task without showing progress (showing only target).
+func FormatQuestTask(task QuestTask) string {
+	if task.Unit == "100m" {
+		targetKm := float64(task.Target) / 10.0
+		return fmt.Sprintf("%s: %.1f km (+%d pts)", task.Name, targetKm, task.RewardPoints)
+	}
+	return fmt.Sprintf("%s: %d %s (+%d pts)", task.Name, task.Target, task.Unit, task.RewardPoints)
+}
