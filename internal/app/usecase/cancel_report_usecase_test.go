@@ -103,6 +103,30 @@ func (r *cancelReportRepoStub) GetDailyActivityCount(ctx context.Context, userID
 	return r.dailyCount, nil
 }
 
+func (r *cancelReportRepoStub) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
+	return nil
+}
+
+func (r *cancelReportRepoStub) GetActiveGoal(ctx context.Context, userID string, now time.Time) (*domain.WeeklyGoal, error) {
+	return nil, nil
+}
+
+func (r *cancelReportRepoStub) DeleteActiveGoal(ctx context.Context, userID string, now time.Time) error {
+	return nil
+}
+
+func (r *cancelReportRepoStub) DeleteExpiredGoals(ctx context.Context, now time.Time) (int64, error) {
+	return 0, nil
+}
+
+func (r *cancelReportRepoStub) GetGoalActivities(ctx context.Context, userID string, startDate, endDate time.Time) ([]domain.GoalActivity, error) {
+	return nil, nil
+}
+
+func (r *cancelReportRepoStub) RecordGoalActivity(ctx context.Context, userID string, activityDate time.Time, activityText string) (bool, error) {
+	return false, nil
+}
+
 func TestCancelReport_NoReport(t *testing.T) {
 	repo := &cancelReportRepoStub{report: nil}
 	uc := NewCancelReportUsecase(repo)

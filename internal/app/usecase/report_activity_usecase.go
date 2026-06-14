@@ -208,6 +208,10 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	if err := uc.repo.UpsertReportWithActivity(ctx, report, today); err != nil {
 		return "", err
 	}
+	goalCompleted, err := NewGoalUsecase(uc.repo).RecordActivity(ctx, userID, now, goalActivityText(workout))
+	if err != nil {
+		return "", err
+	}
 
 	isComeback := isFullReport && report.InactiveDays > 3 && report.Streak == 1
 	var response string
@@ -279,6 +283,10 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 
 	if newRecord {
 		response += fmt.Sprintf("\n\n🏆 New Personal Best Streak: %d minggu!", report.MaxStreak)
+	}
+
+	if goalCompleted {
+		response += "\n\n🎯 *Goal minggu ini tercapai!* Konsistensi harianmu sudah sesuai target. Mantap, champ! 🏆"
 	}
 
 	if leveledUp {
@@ -474,6 +482,10 @@ func (uc *ReportActivityUsecase) ExecuteYesterday(ctx context.Context, userID, n
 	if err := uc.repo.UpsertReportWithActivity(ctx, report, yesterday); err != nil {
 		return "", err
 	}
+	goalCompleted, err := NewGoalUsecase(uc.repo).RecordActivity(ctx, userID, yesterday, goalActivityText(workout))
+	if err != nil {
+		return "", err
+	}
 
 	isComeback := report.InactiveDays > 3 && report.Streak == 1
 	var response string
@@ -538,6 +550,10 @@ func (uc *ReportActivityUsecase) ExecuteYesterday(ctx context.Context, userID, n
 
 	if newRecord {
 		response += fmt.Sprintf("\n\n🏆 New Personal Best Streak: %d minggu!", report.MaxStreak)
+	}
+
+	if goalCompleted {
+		response += "\n\n🎯 *Goal minggu ini tercapai!* Konsistensi harianmu sudah sesuai target. Mantap, champ! 🏆"
 	}
 
 	if leveledUp {

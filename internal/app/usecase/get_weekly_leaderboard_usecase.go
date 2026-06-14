@@ -24,7 +24,7 @@ func NewGetWeeklyLeaderboardUsecase(repo domain.ReportRepository) *GetWeeklyLead
 
 func (uc *GetWeeklyLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	now := uc.now()
-	weekStart := domain.GetStartOfSundayWeek(now)
+	weekStart := domain.GetStartOfISOWeekStrict(now)
 	weekEnd := weekStart.AddDate(0, 0, 7)
 
 	entries, err := uc.repo.GetActivityCountsByDateRange(ctx, weekStart, weekEnd)

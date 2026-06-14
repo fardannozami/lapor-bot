@@ -33,3 +33,36 @@ func TestGetToday(t *testing.T) {
 		t.Errorf("For 23:59, expected %v, got %v", expected3, got3)
 	}
 }
+
+func TestGetStartOfISOWeekStrict_UsesMondayMidnightBoundary(t *testing.T) {
+	tests := []struct {
+		name string
+		now  time.Time
+		want time.Time
+	}{
+		{
+			name: "Monday midnight starts new week",
+			now:  time.Date(2026, time.June, 15, 0, 0, 0, 0, time.UTC),
+			want: time.Date(2026, time.June, 15, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "Monday within report cutoff still starts new week",
+			now:  time.Date(2026, time.June, 15, 0, 29, 0, 0, time.UTC),
+			want: time.Date(2026, time.June, 15, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "Sunday belongs to previous Monday",
+			now:  time.Date(2026, time.June, 14, 23, 59, 0, 0, time.UTC),
+			want: time.Date(2026, time.June, 8, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetStartOfISOWeekStrict(tt.now)
+			if !got.Equal(tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, got)
+			}
+		})
+	}
+}
