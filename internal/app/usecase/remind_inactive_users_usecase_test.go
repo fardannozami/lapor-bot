@@ -106,7 +106,12 @@ func TestBuildReminderMessage(t *testing.T) {
 		}
 	}
 
-	msg, mentions := BuildReminderMessage(users, weeklyGroups, hallOfFame, comebackCounts)
+	activeToday := []*domain.Report{
+		{UserID: "628111111111", Name: "Active One", LastReportDate: now},
+		{UserID: "628222222222", Name: "Active Two", LastReportDate: now},
+	}
+
+	msg, mentions := BuildReminderMessage(users, weeklyGroups, hallOfFame, comebackCounts, activeToday)
 
 	// Print the actual message so you can see it
 	fmt.Println("=== GENERATED MESSAGE ===")
@@ -132,5 +137,22 @@ func TestBuildReminderMessage(t *testing.T) {
 	}
 	if len(hallOfFame) == 0 {
 		t.Error("expected hall of fame to have users")
+	}
+	if !strings.Contains(msg, "Apresiasi buat yang sudah olahraga hari ini") {
+		t.Error("expected reminder to appreciate users who already exercised today")
+	}
+	if !strings.Contains(msg, "Ada *2 orang* yang sudah bergerak") {
+		t.Error("expected reminder to appreciate active users collectively")
+	}
+	for _, active := range activeToday {
+		if strings.Contains(msg, active.Name) || strings.Contains(msg, active.UserID) {
+			t.Errorf("active user %s should be appreciated collectively without name or ID", active.UserID)
+		}
+		mentionedJID := active.UserID + "@s.whatsapp.net"
+		for _, mention := range mentions {
+			if mention == mentionedJID {
+				t.Errorf("active user %s should not be mentioned", active.UserID)
+			}
+		}
 	}
 }

@@ -18,6 +18,8 @@ import (
 	"github.com/fardannozami/whatsapp-gateway/internal/infra/repository"
 	"github.com/fardannozami/whatsapp-gateway/internal/infra/strava"
 	"github.com/fardannozami/whatsapp-gateway/internal/infra/wa"
+	"github.com/fardannozami/whatsapp-gateway/internal/queue"
+	"github.com/fardannozami/whatsapp-gateway/internal/scheduler"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -42,6 +44,7 @@ func main() {
 	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	remindInactiveUC := usecase.NewRemindInactiveUsersUsecase(repo)
+	morningCheckpointUC := usecase.NewMorningWorkoutCheckpointUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	cancelUC := usecase.NewCancelReportUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
@@ -62,36 +65,36 @@ func main() {
 	// 5. WhatsApp Service
 	waService := wa.NewService(cfg.SQLitePath, logger)
 
+	// Shared context for graceful shutdown of scheduler and queue
+	appCtx, appCancel := context.WithCancel(context.Background())
+	defer appCancel()
+
+	// Declare sender early so the message handler closure can capture it.
+	// It will be initialized after the WhatsApp client connects.
+	var sender *queue.MessageSender
+
 	// 6. Register Message Handler
 	waService.SetMessageHandler(func(ctx context.Context, client *whatsmeow.Client, evt *events.Message) {
-		// Log all incoming messages with their Chat ID (useful for getting groupID)
 		fmt.Printf("[DEBUG] Incoming message from Chat ID: %s\n", evt.Info.Chat.String())
 
-		// Only handle messages from groups or specific sources if needed.
-		// For now, we filter by GroupID if configured.
 		if cfg.GroupID != "" && evt.Info.Chat.String() != cfg.GroupID {
 			return
 		}
 
-		// Ignore messages from self
 		if evt.Info.IsFromMe {
 			return
 		}
 
-		// Get sender info - resolve LID to phone number for consistent user tracking
 		senderJID := evt.Info.Sender
 		var userID string
 		if senderJID.Server == "lid" || senderJID.Server == types.DefaultUserServer && len(senderJID.User) > 15 {
-			// Looks like a LID, try to resolve to phone number
 			userID = repo.ResolveLIDToPhone(ctx, senderJID.User)
 		} else {
-			// Already a phone number
 			userID = senderJID.User
 		}
 
 		pushName := senderDisplayName(ctx, client, senderJID, evt.Info.SenderAlt, evt.Info.PushName)
 
-		// Get message content
 		msg := ""
 		if evt.Message.Conversation != nil {
 			msg = *evt.Message.Conversation
@@ -111,7 +114,6 @@ func main() {
 
 		fmt.Printf("Message from %s (%s): %s\n", pushName, userID, msg)
 
-		// Special handling for check_inactive command
 		if strings.HasPrefix(msg, "!check_inactive") {
 			log.Printf("[DEBUG] Received !check_inactive command from %s", evt.Info.Chat.String())
 
@@ -127,19 +129,18 @@ func main() {
 				response = fmt.Sprintf("Gagal menjalankan pengecekan: %v", err)
 			}
 
-			// Send the status response back to the user
 			log.Printf("[DEBUG] Sending response for !check_inactive: %s", response)
 			resp := &waE2E.Message{
 				Conversation: &response,
 			}
-			_, err = waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
-			if err != nil {
-				log.Printf("Failed to send status response: %v", err)
+			if sender != nil {
+				_ = sender.SendNormalPriority(ctx, evt.Info.Chat, resp)
+			} else {
+				_, _ = waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
 			}
 			return
 		}
 
-		// Execute Use Case
 		response, err := handleMessageUC.Execute(ctx, userID, pushName, msg)
 		if err != nil {
 			log.Printf("Error handling message: %v", err)
@@ -147,21 +148,17 @@ func main() {
 		}
 
 		if response.Text != "" {
-			// Determine response target
 			targetChat := evt.Info.Chat
 			if response.IsPrivate {
 				targetChat = evt.Info.Sender
 			}
 
-			// Apply reply delay to appear more human-like
 			delayMs := cfg.ReplyDelayMinMs
 			if cfg.ReplyDelayMaxMs > cfg.ReplyDelayMinMs {
-				// Random delay between min and max
 				delayMs = cfg.ReplyDelayMinMs + rand.Intn(cfg.ReplyDelayMaxMs-cfg.ReplyDelayMinMs+1)
 			}
 
 			if delayMs > 0 {
-				// Show typing indicator if enabled
 				if cfg.ShowTyping {
 					_ = waService.GetClient().SendChatPresence(ctx, targetChat, types.ChatPresenceComposing, types.ChatPresenceMediaText)
 				}
@@ -169,20 +166,20 @@ func main() {
 				log.Printf("Delaying reply by %dms", delayMs)
 				time.Sleep(time.Duration(delayMs) * time.Millisecond)
 
-				// Clear typing indicator
 				if cfg.ShowTyping {
 					_ = waService.GetClient().SendChatPresence(ctx, targetChat, types.ChatPresencePaused, types.ChatPresenceMediaText)
 				}
 			}
 
-			// Send response
 			resp := &waE2E.Message{
 				Conversation: &response.Text,
 			}
 			targetChat.Device = 0
-			_, err := waService.GetClient().SendMessage(ctx, targetChat, resp)
-			if err != nil {
-				log.Printf("Failed to send response: %v", err)
+
+			if sender != nil {
+				_ = sender.SendNormalPriority(ctx, targetChat, resp)
+			} else {
+				_, _ = waService.GetClient().SendMessage(ctx, targetChat, resp)
 			}
 		}
 	})
@@ -195,8 +192,6 @@ func main() {
 	// 8. Connect / Login Logic
 	if !waService.IsLoggedIn() {
 		if cfg.BotPhone != "" {
-			// Pair Code Mode
-			// Must connect first to pair
 			if err := waService.Connect(); err != nil {
 				log.Fatalf("Failed to connect for pairing: %v", err)
 			}
@@ -212,13 +207,10 @@ func main() {
 				log.Println("Please verify this code on your WhatsApp (Linked Devices > Link with phone number)")
 			}
 		} else {
-			// QR Code Mode
 			log.Println("Not logged in. BOT_PHONE not set. Printing QR...")
-			// PrintQR handles GetQRChannel AND Connect() internally to ensure no race condition
 			waService.PrintQR()
 		}
 	} else {
-		// Already logged in, just connect
 		if err := waService.Connect(); err != nil {
 			log.Fatalf("Failed to connect: %v", err)
 		}
@@ -227,8 +219,12 @@ func main() {
 
 	log.Println("Bot is running... Press Ctrl+C to exit.")
 
-	// Schedule seasonal reset every 4 months at 00:00 WIB.
-	resetCtx, resetCancel := context.WithCancel(context.Background())
+	// 9. Start message sender (serializes all SendMessage calls)
+	sender = queue.NewMessageSender(waService.GetClient(), appCtx)
+	sender.Start()
+
+	// 10. Schedule seasonal reset every 4 months at 00:00 WIB.
+	resetCtx, resetCancel := context.WithCancel(appCtx)
 	defer resetCancel()
 	usecase.ScheduleSessionReset(resetCtx, resetSessionUC, func() *whatsmeow.Client {
 		return waService.GetClient()
@@ -236,83 +232,106 @@ func main() {
 		return waService.IsLoggedIn() && waService.GetClient().IsConnected()
 	}, cfg.GroupID)
 
-	// Background ticker for inactivity check (every day at 12:00 WIB)
-	go func() {
-		// Ensure logic runs in Asia/Jakarta
-		loc, _ := time.LoadLocation("Asia/Jakarta")
+	// 11. Daily scheduled jobs via the scheduler module
+	jakartaLoc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		log.Fatalf("Failed to load Asia/Jakarta timezone: %v", err)
+	}
 
-		for {
-			now := time.Now().In(loc)
-			nextRun := time.Date(now.Year(), now.Month(), now.Day(), 15, 9, 0, 0, loc)
+	morningSchedule, err := scheduler.ParseDaily(cfg.NotifyMorningTime, jakartaLoc)
+	if err != nil {
+		log.Fatalf("Invalid NOTIFY_MORNING_TIME %q: %v", cfg.NotifyMorningTime, err)
+	}
 
-			if now.After(nextRun) {
-				nextRun = nextRun.Add(24 * time.Hour)
+	inactiveSchedule, err := scheduler.ParseDaily(cfg.NotifyInactiveTime, jakartaLoc)
+	if err != nil {
+		log.Fatalf("Invalid NOTIFY_INACTIVE_TIME %q: %v", cfg.NotifyInactiveTime, err)
+	}
+
+	leaderboardSchedule, err := scheduler.ParseDaily(cfg.NotifyLeaderboardTime, jakartaLoc)
+	if err != nil {
+		log.Fatalf("Invalid NOTIFY_LEADERBOARD_TIME %q: %v", cfg.NotifyLeaderboardTime, err)
+	}
+
+	sched := scheduler.NewScheduler(appCtx)
+
+	sched.AddJob(&scheduler.Job{
+		Name:    "morning-workout-checkpoint",
+		Freq:    morningSchedule,
+		Recover: false,
+		Fn: func(ctx context.Context) error {
+			if cfg.GroupID == "" || !waService.IsLoggedIn() || !waService.GetClient().IsConnected() {
+				return fmt.Errorf("not connected or no group configured")
 			}
 
-			delay := time.Until(nextRun)
-			log.Printf("Next scheduled inactivity check at: %v (in %v)", nextRun, delay)
-
-			select {
-			case <-time.After(delay):
-				if cfg.GroupID != "" && waService.IsLoggedIn() && waService.GetClient().IsConnected() {
-					log.Println("Running scheduled inactivity check...")
-					_, err := remindInactiveUC.Execute(context.Background(), waService.GetClient(), cfg.GroupID)
-					if err != nil {
-						log.Printf("Scheduled inactivity check failed: %v", err)
-					}
-				}
-			case <-context.Background().Done():
-				return
-			}
-		}
-	}()
-
-	// Background ticker for daily leaderboard (every day at 23:58 WIB)
-	go func() {
-		loc, _ := time.LoadLocation("Asia/Jakarta")
-		for {
-			now := time.Now().In(loc)
-			nextRun := time.Date(now.Year(), now.Month(), now.Day(), 23, 58, 0, 0, loc)
-
-			if now.After(nextRun) {
-				nextRun = nextRun.Add(24 * time.Hour)
+			log.Println("[SCHEDULER] Running morning workout checkpoint...")
+			response, err := morningCheckpointUC.Execute(ctx, time.Now().In(jakartaLoc))
+			if err != nil {
+				log.Printf("[SCHEDULER] Morning workout checkpoint failed: %v", err)
+				return err
 			}
 
-			delay := time.Until(nextRun)
-			log.Printf("Next scheduled leaderboard at: %v (in %v)", nextRun, delay)
-
-			select {
-			case <-time.After(delay):
-				if cfg.GroupID != "" && waService.IsLoggedIn() && waService.GetClient().IsConnected() {
-					log.Println("Running scheduled leaderboard...")
-					response, err := leaderboardUC.Execute(context.Background())
-					if err != nil {
-						log.Printf("Scheduled leaderboard failed: %v", err)
-						continue
-					}
-
-					// Append random motivation + health pillar reminders
-					// (olahraga, makanan, istirahat, kelola stres)
-					response += usecase.BuildWellnessReminder()
-
-					targetJID, _ := types.ParseJID(cfg.GroupID)
-					msg := &waE2E.Message{
-						Conversation: &response,
-					}
-					_, err = waService.GetClient().SendMessage(context.Background(), targetJID, msg)
-					if err != nil {
-						log.Printf("Failed to send scheduled leaderboard: %v", err)
-					}
-				}
-			case <-context.Background().Done():
-				return
+			targetJID, err := types.ParseJID(cfg.GroupID)
+			if err != nil {
+				return fmt.Errorf("invalid GroupID: %w", err)
 			}
-		}
-	}()
+			msg := &waE2E.Message{
+				Conversation: &response,
+			}
+			return sender.SendHighPriority(ctx, targetJID, msg)
+		},
+	})
+
+	sched.AddJob(&scheduler.Job{
+		Name:    "inactivity-check",
+		Freq:    inactiveSchedule,
+		Recover: false,
+		Fn: func(ctx context.Context) error {
+			if cfg.GroupID == "" || !waService.IsLoggedIn() || !waService.GetClient().IsConnected() {
+				return fmt.Errorf("not connected or no group configured")
+			}
+			log.Println("[SCHEDULER] Running inactivity check...")
+			_, err := remindInactiveUC.ExecuteAt(ctx, waService.GetClient(), cfg.GroupID, time.Now().In(jakartaLoc))
+			if err != nil {
+				log.Printf("[SCHEDULER] Inactivity check failed: %v", err)
+			}
+			return err
+		},
+	})
+
+	sched.AddJob(&scheduler.Job{
+		Name:    "leaderboard",
+		Freq:    leaderboardSchedule,
+		Recover: false,
+		Fn: func(ctx context.Context) error {
+			if cfg.GroupID == "" || !waService.IsLoggedIn() || !waService.GetClient().IsConnected() {
+				return fmt.Errorf("not connected or no group configured")
+			}
+			log.Println("[SCHEDULER] Running daily leaderboard...")
+			response, err := leaderboardUC.Execute(ctx)
+			if err != nil {
+				log.Printf("[SCHEDULER] Leaderboard failed: %v", err)
+				return err
+			}
+
+			response += usecase.BuildWellnessReminder()
+
+			targetJID, err := types.ParseJID(cfg.GroupID)
+			if err != nil {
+				return fmt.Errorf("invalid GroupID: %w", err)
+			}
+			msg := &waE2E.Message{
+				Conversation: &response,
+			}
+			return sender.SendHighPriority(ctx, targetJID, msg)
+		},
+	})
+
+	sched.Start()
 
 	log.Printf("Starting HTTP server on port %s", cfg.Port)
 
-	// 8. HTTP server (Healthcheck + Strava)
+	// 12. HTTP server (Healthcheck + Strava)
 	httpServer := botHTTP.NewServer(linkStravaUC, processStravaUC, waService.GetClient(), cfg)
 	mux := http.NewServeMux()
 	httpServer.RegisterHandlers(mux)
@@ -328,18 +347,27 @@ func main() {
 		}
 	}()
 
-	// 9. Wait for OS Signal
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	sig := <-c
+	// 13. Wait for OS signal then graceful shutdown
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	sig := <-sigCh
+
 	log.Printf("Received signal: %v. Shutting down...", sig)
+
+	// 1. Cancel all scheduler goroutines
+	appCancel()
+
+	// 2. Drain pending notifications with timeout
+	sender.Shutdown(5 * time.Second)
+
+	// 3. Disconnect WhatsApp
 	waService.Disconnect()
 
-	// Shutdown healthcheck server
+	// 4. Shutdown HTTP server
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("Healthcheck server shutdown error: %v", err)
+		log.Printf("HTTP server shutdown error: %v", err)
 	}
 
 	os.Exit(0)

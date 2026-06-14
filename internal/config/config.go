@@ -9,17 +9,20 @@ import (
 )
 
 type Config struct {
-	Port            string
-	SQLitePath      string
-	GroupID         string
-	BotPhone        string
-	ReplyDelayMinMs int  // Minimum delay before reply (milliseconds)
-	ReplyDelayMaxMs int  // Maximum delay before reply (milliseconds), 0 = use min as fixed
-	ShowTyping      bool // Show typing indicator during delay
-	StravaClientID  string
-	StravaClientSecret string
-	StravaVerifyToken string
-	AppBaseURL      string
+	Port                  string
+	SQLitePath            string
+	GroupID               string
+	BotPhone              string
+	ReplyDelayMinMs       int    // Minimum delay before reply (milliseconds)
+	ReplyDelayMaxMs       int    // Maximum delay before reply (milliseconds), 0 = use min as fixed
+	ShowTyping            bool   // Show typing indicator during delay
+	NotifyMorningTime     string // "HH:MM" WIB, default "09:09"
+	NotifyInactiveTime    string // "HH:MM" WIB, default "15:15"
+	NotifyLeaderboardTime string // "HH:MM" WIB, default "23:58"
+	StravaClientID        string
+	StravaClientSecret    string
+	StravaVerifyToken     string
+	AppBaseURL            string
 }
 
 func Load() Config {
@@ -40,17 +43,20 @@ func Load() Config {
 	appBaseURL := getenv("APP_BASE_URL", "http://localhost:8080")
 
 	return Config{
-		Port:            port,
-		SQLitePath:      sqlitePath,
-		GroupID:         groupID,
-		BotPhone:        botPhone,
-		ReplyDelayMinMs: replyDelayMinMs,
-		ReplyDelayMaxMs: replyDelayMaxMs,
-		ShowTyping:      showTyping,
-		StravaClientID:  stravaClientID,
-		StravaClientSecret: stravaClientSecret,
-		StravaVerifyToken: stravaVerifyToken,
-		AppBaseURL:      appBaseURL,
+		Port:                  port,
+		SQLitePath:            sqlitePath,
+		GroupID:               groupID,
+		BotPhone:              botPhone,
+		ReplyDelayMinMs:       replyDelayMinMs,
+		ReplyDelayMaxMs:       replyDelayMaxMs,
+		ShowTyping:            showTyping,
+		NotifyMorningTime:     getenv("NOTIFY_MORNING_TIME", "09:09"),
+		NotifyInactiveTime:    getenv("NOTIFY_INACTIVE_TIME", "15:15"),
+		NotifyLeaderboardTime: getenv("NOTIFY_LEADERBOARD_TIME", "23:58"),
+		StravaClientID:        stravaClientID,
+		StravaClientSecret:    stravaClientSecret,
+		StravaVerifyToken:     stravaVerifyToken,
+		AppBaseURL:            appBaseURL,
 	}
 }
 
