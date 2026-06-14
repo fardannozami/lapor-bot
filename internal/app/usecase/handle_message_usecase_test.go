@@ -46,6 +46,7 @@ func (m *mockLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 
 // mockReportRepo implements domain.ReportRepository for testing
 type mockReportRepo struct {
+	domain.ReportRepository
 	reports        map[string]*domain.Report
 	activityCounts []domain.ActivityLeaderboardEntry
 	goals          map[string]*domain.WeeklyGoal
@@ -498,6 +499,12 @@ func TestHandleMessage_JobCommands(t *testing.T) {
 	}
 	if !containsSubstring(msg.Text, "Daftar Hunter Jobs") || !containsSubstring(msg.Text, "#job ranger") {
 		t.Fatalf("#jobs response should include job list and selection example, got %q", msg.Text)
+	}
+
+	repo.reports["user1"] = &domain.Report{
+		UserID:      "user1",
+		Name:        "Hunter",
+		TotalPoints: 100,
 	}
 
 	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "#job ranger")

@@ -59,6 +59,7 @@ func main() {
 	helpUC := usecase.NewGetHelpUsecase()
 	goalUC := usecase.NewGoalUsecase(repo)
 	weeklyRanksAnnouncementUC := usecase.NewWeeklyHunterRanksAnnouncementUsecase(repo)
+	dailyQuestUC := usecase.NewDailyQuestUsecase(repo)
 
 	// Strava Integration
 	stravaClient := strava.NewClient(cfg)
@@ -158,6 +159,27 @@ func main() {
 			}
 
 			log.Printf("[DEBUG] Sending response for !check_weekly_ranks: %s", response)
+			resp := &waE2E.Message{
+				Conversation: &response,
+			}
+			if sender != nil {
+				_ = sender.SendNormalPriority(ctx, evt.Info.Chat, resp)
+			} else {
+				_, _ = waService.GetClient().SendMessage(ctx, evt.Info.Chat, resp)
+			}
+			return
+		}
+
+		if strings.HasPrefix(msg, "!check_daily_quest") {
+			log.Printf("[DEBUG] Received !check_daily_quest command from %s", evt.Info.Chat.String())
+
+			err := dailyQuestUC.SendDailyQuests(ctx, time.Now().In(jakartaLoc), waService.GetClient(), sender)
+			response := "✅ Proses distribusi daily quest selesai dikirim ke seluruh user!"
+			if err != nil {
+				log.Printf("Failed to distribute daily quests: %v", err)
+				response = fmt.Sprintf("Gagal mendistribusikan daily quest: %v", err)
+			}
+
 			resp := &waE2E.Message{
 				Conversation: &response,
 			}
@@ -282,6 +304,11 @@ func main() {
 		log.Fatalf("Invalid goal cleanup schedule: %v", err)
 	}
 
+	dailyQuestSchedule, err := scheduler.ParseDaily("04:00", jakartaLoc)
+	if err != nil {
+		log.Fatalf("Invalid daily quest schedule: %v", err)
+	}
+
 	sched := scheduler.NewScheduler(appCtx)
 
 	sched.AddJob(&scheduler.Job{
@@ -396,6 +423,19 @@ func main() {
 				Conversation: &response,
 			}
 			return sender.SendHighPriority(ctx, targetJID, msg)
+		},
+	})
+
+	sched.AddJob(&scheduler.Job{
+		Name:    "daily-quest-sender",
+		Freq:    dailyQuestSchedule,
+		Recover: false,
+		Fn: func(ctx context.Context) error {
+			if !waService.IsLoggedIn() || !waService.GetClient().IsConnected() {
+				return fmt.Errorf("not connected to WhatsApp")
+			}
+			log.Println("[SCHEDULER] Distributing daily quests...")
+			return dailyQuestUC.SendDailyQuests(ctx, time.Now().In(jakartaLoc), waService.GetClient(), sender)
 		},
 	})
 

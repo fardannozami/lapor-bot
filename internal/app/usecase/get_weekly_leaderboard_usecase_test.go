@@ -9,6 +9,7 @@ import (
 )
 
 type weeklyLeaderboardRepoStub struct {
+	domain.ReportRepository
 	entries []domain.ActivityLeaderboardEntry
 	start   time.Time
 	end     time.Time

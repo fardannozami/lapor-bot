@@ -44,6 +44,15 @@ func (uc *JobUsecase) Select(ctx context.Context, userID, name, jobID string) (s
 		return "", err
 	}
 
+	const MinPointsToSelectJob = 50
+	points := 0
+	if report != nil {
+		points = report.TotalPoints
+	}
+	if points < MinPointsToSelectJob {
+		return fmt.Sprintf("🔒 *Pilihan Job Belum Terbuka!*\n\nKamu harus memiliki minimal %d poin (level up ke Fighter/Tier 2) untuk memilih job. Poinmu saat ini: %d.\nKumpulkan poin dengan melapor latihan menggunakan `#lapor`! 💪", MinPointsToSelectJob, points), nil
+	}
+
 	if report == nil {
 		report = &domain.Report{
 			UserID:         userID,

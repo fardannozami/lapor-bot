@@ -124,4 +124,8 @@ type ReportRepository interface {
 	UpsertStravaAccount(ctx context.Context, account *StravaAccount) error
 	GetStravaAccountByAthleteID(ctx context.Context, athleteID int64) (*StravaAccount, error)
 	GetStravaAccountByUserID(ctx context.Context, userID string) (*StravaAccount, error)
+
+	// Daily Quests
+	SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error
+	GetDailyQuest(ctx context.Context, userID, questDate string) (tasksJSON string, err error)
 }

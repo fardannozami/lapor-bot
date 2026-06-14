@@ -9,6 +9,7 @@ import (
 )
 
 type myStatsRepoStub struct {
+	domain.ReportRepository
 	report  *domain.Report
 	entries map[string][]domain.ActivityLeaderboardEntry
 	calls   [][2]time.Time

@@ -347,6 +347,19 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 		return err
 	}
 
+	dailyQuestTableQuery := `
+		CREATE TABLE IF NOT EXISTS daily_quests (
+			user_id TEXT NOT NULL,
+			quest_date TEXT NOT NULL,
+			tasks_json TEXT NOT NULL,
+			PRIMARY KEY (user_id, quest_date)
+		);
+	`
+	_, err = r.db.ExecContext(ctx, dailyQuestTableQuery)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -994,4 +1007,25 @@ func (r *ReportRepository) GetStravaAccountByUserID(ctx context.Context, userID 
 	}
 
 	return &account, nil
+}
+
+func (r *ReportRepository) SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error {
+	query := `
+		INSERT INTO daily_quests (user_id, quest_date, tasks_json)
+		VALUES (?, ?, ?)
+		ON CONFLICT(user_id, quest_date) DO UPDATE SET
+			tasks_json = excluded.tasks_json
+	`
+	_, err := r.db.ExecContext(ctx, query, userID, questDate, tasksJSON)
+	return err
+}
+
+func (r *ReportRepository) GetDailyQuest(ctx context.Context, userID, questDate string) (string, error) {
+	query := `SELECT tasks_json FROM daily_quests WHERE user_id = ? AND quest_date = ?`
+	var tasksJSON string
+	err := r.db.QueryRowContext(ctx, query, userID, questDate).Scan(&tasksJSON)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return tasksJSON, err
 }

@@ -10,6 +10,7 @@ import (
 )
 
 type mockRepo struct {
+	domain.ReportRepository
 	reports        map[string]*domain.Report
 	activityCounts []domain.ActivityLeaderboardEntry
 	dailyCounts    map[string]int

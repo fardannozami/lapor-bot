@@ -9,6 +9,7 @@ import (
 )
 
 type cancelReportRepoStub struct {
+	domain.ReportRepository
 	report         *domain.Report
 	dates          []time.Time
 	deletedLog     bool
