@@ -19,8 +19,8 @@ func TestGenerateDailyQuest(t *testing.T) {
 
 	// 2. High level general quest tests
 	tasksGeneralLv20 := GenerateDailyQuest("", 20, now)
-	if tasksGeneralLv20[0].RewardPoints != 6 {
-		t.Errorf("expected reward points to be 6 for general level 20 (base 2 + 20/5 = 6), got %d", tasksGeneralLv20[0].RewardPoints)
+	if tasksGeneralLv20[0].RewardPoints != 2 {
+		t.Errorf("expected reward points to be 2 for general level 20, got %d", tasksGeneralLv20[0].RewardPoints)
 	}
 
 	// 3. Job quest tests

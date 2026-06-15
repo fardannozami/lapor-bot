@@ -186,6 +186,8 @@ func GenerateDailyQuest(jobClass string, level int, date time.Time) []QuestTask 
 		tasks = templates[hashValue%len(templates)]
 
 	default: // general / no job
+		level = 1
+		reward = 2
 		templates := [][]QuestTask{
 			{
 				{ID: "jalan", Name: "Jalan Kaki Santai", Target: scale(15, 1), Unit: "menit", RewardPoints: reward},
