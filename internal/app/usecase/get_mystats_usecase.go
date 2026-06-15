@@ -82,6 +82,7 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 	sb.WriteString(fmt.Sprintf("🗓️ Hari season: %d\n", seasonCount))
 	sb.WriteString(fmt.Sprintf("📆 Hari minggu ini: %d\n\n", weeklyCount))
 	sb.WriteString(fmt.Sprintf("🎯 Goals tercapai: %d\n\n", report.GoalsCompleted))
+	sb.WriteString(fmt.Sprintf("✨ Side quest selesai: %d lifetime • %d season\n\n", report.TotalSideQuests, report.SeasonalSideQuests))
 
 	sb.WriteString(fmt.Sprintf("🔥 Streak saat ini: %d minggu\n", report.Streak))
 	sb.WriteString(fmt.Sprintf("🏆 Streak tertinggi: %d minggu\n", report.MaxStreak))

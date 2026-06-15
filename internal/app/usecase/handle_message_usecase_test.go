@@ -614,7 +614,7 @@ func TestHandleMessage_LaporDoesNotUpdateName(t *testing.T) {
 	}
 }
 
-func TestHandleMessage_LaporQuestCommand(t *testing.T) {
+func TestHandleMessage_MySideQuestCommand(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
@@ -630,29 +630,18 @@ func TestHandleMessage_LaporQuestCommand(t *testing.T) {
 	repo.reports["user123"] = &domain.Report{
 		UserID:      "user123",
 		Name:        "TestUser",
+		JobClass:    "fighter",
 		TotalPoints: 10,
 		Level:       1,
 	}
 
-	// 2. Test #lapor-quest command to view quests
-	msg, err := handleUC.Execute(ctx, "user123", "TestUser", "#lapor-quest")
+	msg, err := handleUC.Execute(ctx, "user123", "TestUser", "#mysidequest")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// Should route to daily quest view and return daily quest checklist
-	expected := "Quest Harian - TestUser"
-	if !containsSubstring(msg.Text, expected) {
-		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg.Text)
-	}
-
-	// 3. Test #laporquest (without dash) to view quests
-	msg, err = handleUC.Execute(ctx, "user123", "TestUser", "#laporquest")
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	expected := "Side Quest Hari Ini - TestUser"
 	if !containsSubstring(msg.Text, expected) {
 		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg.Text)
 	}
 }
-

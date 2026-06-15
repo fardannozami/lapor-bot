@@ -45,25 +45,23 @@ var morningWorkoutMotivations = []string{
 func BuildMorningWorkoutCheckpointMessage(activeToday, pendingToday []*domain.Report) string {
 	var sb strings.Builder
 
-	sb.WriteString("🌤️ *09:09 Workout Checkpoint*\n\n")
+	sb.WriteString("🌤️ *Selamat pagi! 09:09 Workout Checkpoint*\n\n")
 	sb.WriteString(morningWorkoutMotivations[rand.Intn(len(morningWorkoutMotivations))])
 	sb.WriteString("\n\n")
 
 	if len(activeToday) > 0 {
-		sb.WriteString(fmt.Sprintf("👏 *Sudah olahraga pagi ini (%d):*\n", len(activeToday)))
-		sb.WriteString(formatReportNames(activeToday))
-		sb.WriteString("\nKeren! Kalian sudah buka jalan dan jadi pemantik semangat buat grup. Respect! 🔥\n\n")
+		sb.WriteString(fmt.Sprintf("👏 Sebelum jam ini sudah ada %d laporan olahraga. Keren—terima kasih sudah jadi pemantik energi pagi buat grup! 🔥\n\n", len(activeToday)))
 	} else {
-		sb.WriteString("Belum ada yang laporan olahraga pagi ini. Siapa yang mau jadi pembuka dan nyalain semangat grup? 💪\n\n")
+		sb.WriteString("Belum ada laporan olahraga pagi ini. Tidak apa-apa—mulai dari 10 menit gerak ringan juga sudah menang dari nol. 💪\n\n")
 	}
 
 	if len(pendingToday) > 0 {
-		sb.WriteString(fmt.Sprintf("⏳ *Belum lapor hari ini (%d):*\n", len(pendingToday)))
-		sb.WriteString(formatReportNames(pendingToday))
-		sb.WriteString("\n\nMasih pagi — ambil 10–30 menit buat jalan kaki, stretching, bodyweight workout, atau olahraga favoritmu. Satu gerakan kecil hari ini tetap menang dari nol. 🚀")
+		sb.WriteString("Masih pagi — ambil 10–30 menit buat jalan kaki, stretching, bodyweight workout, atau olahraga favoritmu. Setelah itu lapor di grup dengan `#lapor`. 🚀")
 	} else {
 		sb.WriteString("Mantap, semua sudah lapor hari ini. Grup sehat full power! 🏆")
 	}
+
+	sb.WriteString("\n\n✨ Kalau sudah punya job, cek bonus gerak harian dengan `#mysidequest`.")
 
 	return sb.String()
 }

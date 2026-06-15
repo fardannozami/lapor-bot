@@ -60,8 +60,6 @@ type inactiveUserInfo struct {
 	daysInactive int
 }
 
-
-
 func (u *RemindInactiveUsersUsecase) Execute(ctx context.Context, client *whatsmeow.Client, groupID string) (string, error) {
 	return u.ExecuteAt(ctx, client, groupID, time.Now())
 }
@@ -194,6 +192,7 @@ func BuildReminderMessage(
 
 	// Append health pillar reminders (olahraga, makanan, istirahat, kelola stres)
 	sb.WriteString(BuildWellnessReminder())
+	sb.WriteString("\n\n✨ Sudah punya job? Cek side quest hari ini dengan `#mysidequest` untuk bonus gerak ringan sebelum hari selesai.")
 
 	mentions = deduplicateMentions(mentions)
 	return sb.String(), mentions

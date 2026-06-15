@@ -32,6 +32,7 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 	// database, but the visible badge race resets every season.
 	stats := make(map[string]int)
 	goalTotal := 0
+	sideQuestTotal := 0
 	for _, r := range reports {
 		if r.SeasonalAchievements != "" {
 			ids := strings.Split(r.SeasonalAchievements, ",")
@@ -40,6 +41,7 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 			}
 		}
 		goalTotal += r.GoalsCompleted
+		sideQuestTotal += r.SeasonalSideQuests
 	}
 
 	seasonNumber, _ := GetCurrentSessionInfo(time.Now())
@@ -80,6 +82,11 @@ func (uc *GetAchievementsUsecase) Execute(ctx context.Context) (string, error) {
 	sb.WriteString(fmt.Sprintf("🏆 Total goal tercapai grup: %d\n", goalTotal))
 	sb.WriteString("   Syarat: set #goal, lalu penuhi target hari aktif dalam 7 hari sejak goal dibuat. Laporan dobel di hari yang sama tetap dihitung 1.\n")
 	sb.WriteString("   _Goal adalah quest mingguan: kecil, jelas, dan selesai lewat aksi harian._\n\n")
+
+	sb.WriteString("✨ *Side Quest Harian*\n")
+	sb.WriteString(fmt.Sprintf("🏹 Total side quest selesai season ini: %d\n", sideQuestTotal))
+	sb.WriteString("   Syarat: sudah memilih job, cek `#mysidequest`, lalu lapor dengan `#lapor sidequest <kegiatan> <jumlah>`.\n")
+	sb.WriteString("   Reward side quest hanya ½ XP, tapi tetap dihitung ke streak, stats, leaderboard, dan goal.\n\n")
 
 	sb.WriteString("⚔️ Level numerik naik dari total EXP lifetime. Semakin tinggi level, semakin banyak EXP yang dibutuhkan.")
 

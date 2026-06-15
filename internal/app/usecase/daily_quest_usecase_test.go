@@ -109,7 +109,7 @@ func TestDailyQuestViewAndComplete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected view quest error: %v", err)
 	}
-	if !strings.Contains(viewMsg, "Quest Harian - Alice") {
+	if !strings.Contains(viewMsg, "Side Quest Hari Ini - Alice") {
 		t.Errorf("expected view message to contain Alice, got %q", viewMsg)
 	}
 
@@ -122,48 +122,35 @@ func TestDailyQuestViewAndComplete(t *testing.T) {
 	if err := json.Unmarshal([]byte(qJSON), &tasks); err != nil {
 		t.Fatalf("failed to parse stored quest tasks: %v", err)
 	}
-	if len(tasks) != 3 {
-		t.Fatalf("expected 3 generated tasks, got %d", len(tasks))
+	if len(tasks) != 4 {
+		t.Fatalf("expected 4 generated tasks, got %d", len(tasks))
 	}
 
-	// First task is Push-up (Target: 10 + 5 = 15 x)
 	t.Logf("Generated tasks: %+v", tasks)
 
-	// 2. Report progress for Push-up
-	progressMsg, err := questUC.UpdateProgress(context.Background(), "user1", "Alice", []string{"pushup 5"}, reportUC, now)
+	// 2. Report below target should be rejected.
+	progressMsg, err := questUC.UpdateProgress(context.Background(), "user1", "Alice", []string{"jalan 3999"}, reportUC, now)
 	if err != nil {
 		t.Fatalf("unexpected update progress error: %v", err)
 	}
-
-	// Verify progress was updated
-	if !strings.Contains(progressMsg, "Push-up: 5/") {
-		t.Errorf("expected progress message to show updated reps, got %q", progressMsg)
+	if !strings.Contains(progressMsg, "Side quest belum diterima") {
+		t.Errorf("expected below-target side quest to be rejected, got %q", progressMsg)
 	}
 
-	// Verify auto-#lapor was triggered (as they hadn't reported yet today)
-	if !strings.Contains(progressMsg, "AUTO #LAPOR DETECTED") {
-		t.Errorf("expected response to show auto-#lapor trigger, got %q", progressMsg)
-	}
-
-	// Verify streak increased (last report date updated)
-	if repo.upsertedReport.LastReportDate.Sub(now) > time.Second {
-		t.Errorf("expected last report date to be now, got %v", repo.upsertedReport.LastReportDate)
-	}
-
-	// 3. Complete pushup task
-	compMsg, err := questUC.UpdateProgress(context.Background(), "user1", "Alice", []string{"pushup 15"}, reportUC, now)
+	// 3. Complete walking side quest.
+	compMsg, err := questUC.UpdateProgress(context.Background(), "user1", "Alice", []string{"jalan 4000"}, reportUC, now)
 	if err != nil {
 		t.Fatalf("unexpected complete task error: %v", err)
 	}
 
-	// Verify points awarded
-	if !strings.Contains(compMsg, "QUEST BERHASIL DISELESAIKAN") {
+	if !strings.Contains(compMsg, "SIDE QUEST BERHASIL DISELESAIKAN") {
 		t.Errorf("expected success notification, got %q", compMsg)
 	}
-
-	// Pushup reward is 3 + 5/5 = 4 points
-	if repo.upsertedReport.TotalPoints <= 200 {
-		t.Errorf("expected points to increase, got %d", repo.upsertedReport.TotalPoints)
+	if repo.upsertedReport.TotalSideQuests != 1 || repo.upsertedReport.SeasonalSideQuests != 1 {
+		t.Errorf("expected side quest counters to increase, got lifetime=%d season=%d", repo.upsertedReport.TotalSideQuests, repo.upsertedReport.SeasonalSideQuests)
+	}
+	if repo.upsertedReport.TotalPoints != 205 {
+		t.Errorf("expected side quest to add 5 points, got %d", repo.upsertedReport.TotalPoints)
 	}
 }
 
@@ -233,40 +220,21 @@ func TestSendDailyQuests(t *testing.T) {
 		t.Errorf("expected JID %s, got %s", groupJID.String(), fakeClient.sentJID.String())
 	}
 
-	if fakeClient.sentMsg == nil || fakeClient.sentMsg.ExtendedTextMessage == nil || fakeClient.sentMsg.ExtendedTextMessage.Text == nil {
-		t.Fatalf("sent message does not contain ExtendedTextMessage text")
+	if fakeClient.sentMsg == nil || fakeClient.sentMsg.Conversation == nil {
+		t.Fatalf("sent message does not contain conversation text")
 	}
 
-	text := *fakeClient.sentMsg.ExtendedTextMessage.Text
-	if !strings.Contains(text, "⚔️ *DAILY QUEST HARIAN HUNTER* ⚔️") {
+	text := *fakeClient.sentMsg.Conversation
+	if !strings.Contains(text, "Selamat pagi, Hunters") {
 		t.Errorf("expected text to contain title, got: %s", text)
 	}
-	if !strings.Contains(text, "👤 @628123456789, @628111222333") {
-		t.Errorf("expected text to group Alice and Charlie, got: %s", text)
+	if !strings.Contains(text, "#mysidequest") {
+		t.Errorf("expected text to prompt #mysidequest, got: %s", text)
 	}
-	if !strings.Contains(text, "👤 @628987654321") {
-		t.Errorf("expected text to mention Bob, got: %s", text)
+	if strings.Contains(text, "@") || strings.Contains(text, "Alice") || strings.Contains(text, "Bob") || strings.Contains(text, "Charlie") {
+		t.Errorf("daily side quest prompt should not mention or name users, got: %s", text)
 	}
-	if !strings.Contains(text, "Job: Fighter ⚔️ (Lv.5)") {
-		t.Errorf("expected text to show Alice job and level, got: %s", text)
-	}
-	if !strings.Contains(text, "Job: - (General Quest)") {
-		t.Errorf("expected text to show Bob general quest, got: %s", text)
-	}
-
-	// Verify mentions are populated correctly in ContextInfo
-	contextInfo := fakeClient.sentMsg.ExtendedTextMessage.ContextInfo
-	if contextInfo == nil {
-		t.Fatalf("expected ContextInfo in ExtendedTextMessage to be set")
-	}
-	expectedMentions := []string{"628123456789@s.whatsapp.net", "628111222333@s.whatsapp.net", "628987654321@s.whatsapp.net"}
-	if len(contextInfo.MentionedJID) != len(expectedMentions) {
-		t.Errorf("expected %d mentions, got %d", len(expectedMentions), len(contextInfo.MentionedJID))
-	} else {
-		for i, m := range contextInfo.MentionedJID {
-			if m != expectedMentions[i] {
-				t.Errorf("expected mention %q at index %d, got %q", expectedMentions[i], i, m)
-			}
-		}
+	if !strings.Contains(text, "2 hunter") {
+		t.Errorf("expected only users with job to be counted, got: %s", text)
 	}
 }
