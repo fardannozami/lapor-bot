@@ -34,14 +34,16 @@ func TestBuildMorningWorkoutCheckpointMessage(t *testing.T) {
 
 	for _, want := range []string{
 		"09:09 Workout Checkpoint",
-		"Sudah olahraga pagi ini",
-		"Active One",
-		"Belum lapor hari ini",
-		"Pending Two",
+		"sudah ada 1 laporan olahraga",
+		"#lapor",
+		"#mysidequest",
 	} {
 		if !strings.Contains(msg, want) {
 			t.Fatalf("expected message to contain %q, got %q", want, msg)
 		}
+	}
+	if strings.Contains(msg, "Active One") || strings.Contains(msg, "Pending Two") {
+		t.Fatalf("morning checkpoint should not name users, got %q", msg)
 	}
 	if strings.Contains(msg, "@") {
 		t.Fatalf("morning checkpoint should use plain names without mentions, got %q", msg)

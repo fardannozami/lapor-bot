@@ -8,46 +8,31 @@ import (
 func TestGenerateDailyQuest(t *testing.T) {
 	now := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 
-	// 1. General quest tests (no job)
+	// 1. No job means no side quest.
 	tasksGeneral := GenerateDailyQuest("", 0, now)
-	if len(tasksGeneral) != 3 {
-		t.Fatalf("expected 3 tasks, got %d", len(tasksGeneral))
-	}
-	if tasksGeneral[0].RewardPoints != 2 {
-		t.Errorf("expected reward points to be 2 for general level 0, got %d", tasksGeneral[0].RewardPoints)
+	if len(tasksGeneral) != 0 {
+		t.Fatalf("expected no tasks without job, got %d", len(tasksGeneral))
 	}
 
-	// 2. High level general quest tests
-	tasksGeneralLv20 := GenerateDailyQuest("", 20, now)
-	if tasksGeneralLv20[0].RewardPoints != 2 {
-		t.Errorf("expected reward points to be 2 for general level 20, got %d", tasksGeneralLv20[0].RewardPoints)
-	}
-
-	// 3. Job quest tests
+	// 2. Job quest tests
 	tasksFighter := GenerateDailyQuest("fighter", 0, now)
-	if len(tasksFighter) != 3 {
-		t.Fatalf("expected 3 tasks, got %d", len(tasksFighter))
+	if len(tasksFighter) != 4 {
+		t.Fatalf("expected 4 tasks, got %d", len(tasksFighter))
 	}
-	if tasksFighter[0].RewardPoints != 3 {
-		t.Errorf("expected reward points to be 3 for fighter level 0, got %d", tasksFighter[0].RewardPoints)
+	if tasksFighter[0].ID != "jalan" || tasksFighter[0].Target != 4000 || tasksFighter[0].Difficulty != "easy" {
+		t.Errorf("expected easy walk target, got %+v", tasksFighter[0])
+	}
+	if tasksFighter[1].ID != "sepeda" || tasksFighter[1].Target != 50 || tasksFighter[1].Difficulty != "easy" {
+		t.Errorf("expected easy bike target, got %+v", tasksFighter[1])
 	}
 
-	// 4. Verification of Ranger scaling and target conversion
-	tasksRanger := GenerateDailyQuest("ranger", 10, now)
-	foundLari := false
-	for _, task := range tasksRanger {
-		if task.ID == "lari" {
-			foundLari = true
-			expectedTarget := 30 + (10 * 2) // base 30 + 10 * 2 = 50 (50 * 100m = 5.0 km)
-			if task.Target != expectedTarget {
-				t.Errorf("expected target for lari ranger to be %d, got %d", expectedTarget, task.Target)
-			}
-		}
+	// 3. Medium/hard scale gently with level.
+	tasksLv20 := GenerateDailyQuest("fighter", 20, now)
+	if tasksLv20[2].Target <= tasksFighter[2].Target {
+		t.Errorf("expected medium target to scale up, got lv0=%d lv20=%d", tasksFighter[2].Target, tasksLv20[2].Target)
 	}
-	if !foundLari {
-		// Note: the template chosen is dependent on hashValue, so "lari" might not be in the current day's selected template. Let's force check a date or just check if any ranger templates scale.
-		// For June 15, 2026, "ranger" + "2026-06-15" hash will deterministicly select a template. Let's print to see what templates are generated.
-		t.Logf("Generated Ranger tasks: %+v", tasksRanger)
+	if tasksLv20[3].Target <= tasksFighter[3].Target {
+		t.Errorf("expected hard target to scale up, got lv0=%d lv20=%d", tasksFighter[3].Target, tasksLv20[3].Target)
 	}
 }
 

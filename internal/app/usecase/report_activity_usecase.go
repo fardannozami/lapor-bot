@@ -18,6 +18,12 @@ type ReportActivityUsecase struct {
 	locks sync.Map
 }
 
+type reportActivityOptions struct {
+	sideQuestCount int
+	activityText   string
+	now            time.Time
+}
+
 func NewReportActivityUsecase(repo domain.ReportRepository) *ReportActivityUsecase {
 	return &ReportActivityUsecase{repo: repo}
 }
@@ -28,6 +34,21 @@ func (uc *ReportActivityUsecase) userLock(userID string) *sync.Mutex {
 }
 
 func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name string, workout *domain.HevyWorkout) (string, error) {
+	return uc.execute(ctx, userID, name, workout, reportActivityOptions{})
+}
+
+func (uc *ReportActivityUsecase) ExecuteSideQuest(ctx context.Context, userID, name, activityText string, completedCount int, now time.Time) (string, error) {
+	if completedCount < 1 {
+		completedCount = 1
+	}
+	return uc.execute(ctx, userID, name, nil, reportActivityOptions{
+		sideQuestCount: completedCount,
+		activityText:   activityText,
+		now:            now,
+	})
+}
+
+func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name string, workout *domain.HevyWorkout, opts reportActivityOptions) (string, error) {
 	lock := uc.userLock(userID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -37,8 +58,12 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		return "", err
 	}
 
-	now := time.Now()
+	now := opts.now
+	if now.IsZero() {
+		now = time.Now()
+	}
 	today := domain.GetToday(now)
+	isSideQuest := opts.sideQuestCount > 0
 
 	var dailyCount int
 	if report != nil && domain.GetToday(report.LastReportDate).Equal(today) {
@@ -161,8 +186,15 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 			seasonalFirstBonus = 5
 		}
 	}
+	if isSideQuest {
+		basePoints = 5
+		streakBonus = 0
+		seasonalFirstBonus = 0
+		report.TotalSideQuests += opts.sideQuestCount
+		report.SeasonalSideQuests += opts.sideQuestCount
+	}
 	reportPoints := basePoints + streakBonus + seasonalFirstBonus
-	if isRepeatReport {
+	if isRepeatReport && !isSideQuest {
 		reportPoints = reportPoints / 2
 	}
 	report.TotalPoints += reportPoints
@@ -172,7 +204,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	var comebackAchievements []domain.ComebackAchievement
 	pointsGained := 0
 
-	if isFullReport {
+	if isFullReport && !isSideQuest {
 		newAchievements = domain.CheckNewSeasonAchievements(report)
 		for _, ach := range newAchievements {
 			report.SeasonalAchievements = domain.AddAchievement(report.SeasonalAchievements, ach.ID)
@@ -193,7 +225,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	}
 
 	freezeAwarded := false
-	if isFullReport {
+	if isFullReport && !isSideQuest {
 		for _, ach := range newAchievements {
 			if ach.ID == "streak_4" && report.StreakFreezes < 2 {
 				report.StreakFreezes++
@@ -208,7 +240,7 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	if err := uc.repo.UpsertReportWithActivity(ctx, report, today); err != nil {
 		return "", err
 	}
-	goalCompleted, err := NewGoalUsecase(uc.repo).RecordActivity(ctx, userID, now, goalActivityText(workout))
+	goalCompleted, err := NewGoalUsecase(uc.repo).RecordActivity(ctx, userID, now, goalActivityTextWithFallback(workout, opts.activityText))
 	if err != nil {
 		return "", err
 	}
@@ -245,11 +277,16 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 		if seasonalFirstBonus > 0 {
 			expBreakdown += " (first season report +5)"
 		}
-		if isRepeatReport {
+		if isSideQuest {
+			expBreakdown += " (side quest, ½ XP)"
+		} else if isRepeatReport {
 			expBreakdown += " (repeat report, ½ XP)"
 		}
 
-		if isRepeatReport {
+		if isSideQuest {
+			response = fmt.Sprintf("Side quest diterima, %s%s menyelesaikan %d side quest. Tetap dihitung untuk streak, stats, leaderboard, dan goal. 🔥\n%s",
+				cyclePrefix, name, opts.sideQuestCount, expBreakdown)
+		} else if isRepeatReport {
 			response = fmt.Sprintf("Laporan diterima (laporan ke-%d hari ini), %s%s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)\n%s",
 				dailyCount+1, cyclePrefix, name, report.ActivityCount, report.Streak, expBreakdown)
 		} else {

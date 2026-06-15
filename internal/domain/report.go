@@ -28,6 +28,8 @@ type Report struct {
 	SeasonalAchievements  string    `json:"seasonal_achievements" db:"seasonal_achievements"`
 	StreakFreezes         int       `json:"streak_freezes" db:"streak_freezes"`
 	GoalsCompleted        int       `json:"goals_completed" db:"goals_completed"`
+	TotalSideQuests       int       `json:"total_side_quests" db:"total_side_quests"`
+	SeasonalSideQuests    int       `json:"seasonal_side_quests" db:"seasonal_side_quests"`
 }
 
 type ActivityLeaderboardEntry struct {

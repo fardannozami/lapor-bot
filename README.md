@@ -85,6 +85,8 @@ Bot hanya merespon perintah berikut di dalam grup yang telah dikonfigurasi (`GRO
 | Perintah | Fungsi |
 | --- | --- |
 | `#lapor` | Merekam aktivitas harian user. Menambah streak jika laporan hari ini/kemarin. |
+| `#mysidequest` | Menampilkan side quest harian untuk user yang sudah memilih job. |
+| `#lapor sidequest [kegiatan] [jumlah]` | Melaporkan side quest. Reward ½ XP, tetap dihitung ke streak, stats, leaderboard, dan goal. |
 | `#cancel` | Membatalkan laporan hari ini. Hanya bisa digunakan di hari yang sama. |
 | `#leaderboard` | Menampilkan klasemen streak, daftar yang "Keep Streak" 🔥 dan "Lose Streak" 💔. |
 | `#leaderboard-weekly` | Menampilkan klasemen total hari aktif minggu ini. |
@@ -103,6 +105,7 @@ Bot hanya merespon perintah berikut di dalam grup yang telah dikonfigurasi (`GRO
 ### Fitur Gamifikasi 🏅
 - **Season Ranks (`#ranks`)**: Rank ala hunter dihitung dari seasonal points dan reset setiap season.
 - **Hunter Jobs (`#jobs`, `#job [id]`)**: Pilih job profile seperti fighter, tanker, assassin, mage, ranger, healer, atau necromancer. Job tampil di `#mystats` dan laporan harian.
+- **Side Quest (`#mysidequest`)**: Bonus gerak harian easy/medium/hard untuk user yang sudah punya job. Lapor dengan `#lapor sidequest jalan 4000` atau `#lapor sidequest sepeda 5 km`.
 - **Season Badges**: Badge reset setiap season supaya semua member mulai berburu dari awal.
 - **Lifetime Level & EXP**: Total poin dan level numerik (`Lv.0+`) tetap tersimpan lintas season. EXP naik level memakai kurva `5×level² + 50×level + 100` agar makin tinggi level makin lama naiknya.
 - **Milestone Notification**: Dapat notifikasi khusus saat mencapai streak tertenu (7, 14, 30 hari, dst).

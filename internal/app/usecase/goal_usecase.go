@@ -169,8 +169,7 @@ func formatGoalStatus(goal *domain.WeeklyGoal, activities []domain.GoalActivity,
 	}
 
 	if now.Before(goal.EndAt) {
-		remainingDuration := goal.EndAt.Sub(now).Round(time.Minute)
-		sb.WriteString(fmt.Sprintf("\n⏳ Sisa waktu: %s", remainingDuration))
+		sb.WriteString(fmt.Sprintf("\n⏳ Sisa waktu: %s", formatGoalRemaining(goal.EndAt.Sub(now))))
 	}
 
 	return sb.String()
@@ -195,12 +194,43 @@ func formatGoalTime(t time.Time) string {
 	return fmt.Sprintf("%02d %s %d %02d:%02d", t.Day(), indonesianMonths[int(t.Month())], t.Year(), t.Hour(), t.Minute())
 }
 
+func formatGoalRemaining(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	d = d.Round(time.Minute)
+	days := int(d / (24 * time.Hour))
+	d -= time.Duration(days) * 24 * time.Hour
+	hours := int(d / time.Hour)
+	d -= time.Duration(hours) * time.Hour
+	minutes := int(d / time.Minute)
+
+	parts := make([]string, 0, 3)
+	if days > 0 {
+		parts = append(parts, fmt.Sprintf("%d hari", days))
+	}
+	if hours > 0 {
+		parts = append(parts, fmt.Sprintf("%d jam", hours))
+	}
+	if minutes > 0 || len(parts) == 0 {
+		parts = append(parts, fmt.Sprintf("%d menit", minutes))
+	}
+	return strings.Join(parts, " ")
+}
+
 func goalReportDate(t time.Time) time.Time {
 	return domain.GetToday(t.UTC())
 }
 
 func goalActivityText(workout *domain.HevyWorkout) string {
+	return goalActivityTextWithFallback(workout, "")
+}
+
+func goalActivityTextWithFallback(workout *domain.HevyWorkout, fallback string) string {
 	if workout == nil || strings.TrimSpace(workout.Title) == "" {
+		if text := strings.TrimSpace(fallback); text != "" {
+			return text
+		}
 		return "Olahraga"
 	}
 	return strings.TrimSpace(workout.Title)

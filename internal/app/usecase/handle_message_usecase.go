@@ -83,42 +83,21 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{Text: text}, err
 	}
 
-	if strings.Contains(msg, "#lapor-quest") || strings.Contains(msg, "#laporquest") {
-		lines := strings.Split(message, "\n")
-		var argLines []string
-
-		if len(lines) == 1 {
-			cmdIdx := strings.Index(msg, "#lapor-quest")
-			cmdLen := len("#lapor-quest")
-			if cmdIdx == -1 {
-				cmdIdx = strings.Index(msg, "#laporquest")
-				cmdLen = len("#laporquest")
-			}
-			var arg string
-			if cmdIdx != -1 {
-				arg = strings.TrimSpace(message[cmdIdx+cmdLen:])
-			}
-			if arg != "" {
-				argLines = append(argLines, arg)
-			}
-		} else {
-			for _, line := range lines[1:] {
-				if strings.TrimSpace(line) != "" {
-					argLines = append(argLines, line)
-				}
-			}
-		}
-
-		if len(argLines) > 0 {
-			text, err := uc.dailyQuestUC.UpdateProgress(ctx, userID, name, argLines, uc.reportUC, time.Now())
-			return MessageResponse{Text: text}, err
-		}
-
+	if strings.Contains(msg, "#mysidequest") {
 		text, err := uc.dailyQuestUC.ViewQuest(ctx, userID, name, time.Now())
 		return MessageResponse{Text: text}, err
 	}
 
-	if strings.Contains(msg, "#lapor") {
+	if arg, ok := extractSideQuestReport(message); ok {
+		if arg == "" {
+			text, err := uc.dailyQuestUC.ViewQuest(ctx, userID, name, time.Now())
+			return MessageResponse{Text: text}, err
+		}
+		text, err := uc.dailyQuestUC.UpdateProgress(ctx, userID, name, []string{arg}, uc.reportUC, time.Now())
+		return MessageResponse{Text: text}, err
+	}
+
+	if containsCommand(msg, "#lapor") {
 		workout := domain.ParseHevy(message)
 		text, err := uc.reportUC.Execute(ctx, userID, name, workout)
 		return MessageResponse{Text: text}, err
@@ -212,4 +191,25 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 	}
 
 	return MessageResponse{}, nil
+}
+
+func extractSideQuestReport(message string) (string, bool) {
+	lower := strings.ToLower(message)
+	for _, command := range []string{"#lapor sidequest", "#lapor-sidequest"} {
+		idx := strings.Index(lower, command)
+		if idx == -1 {
+			continue
+		}
+		return strings.TrimSpace(message[idx+len(command):]), true
+	}
+	return "", false
+}
+
+func containsCommand(message, command string) bool {
+	idx := strings.Index(message, command)
+	if idx == -1 {
+		return false
+	}
+	end := idx + len(command)
+	return end == len(message) || message[end] == ' ' || message[end] == '\n' || message[end] == '\t'
 }
