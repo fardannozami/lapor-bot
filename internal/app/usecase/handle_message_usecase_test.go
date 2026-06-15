@@ -613,3 +613,46 @@ func TestHandleMessage_LaporDoesNotUpdateName(t *testing.T) {
 		t.Errorf("Expected name to remain 'ManualName', but got '%s'", r.Name)
 	}
 }
+
+func TestHandleMessage_LaporQuestCommand(t *testing.T) {
+	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
+	reportUC := usecase.NewReportActivityUsecase(repo)
+	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	updateNameUC := usecase.NewUpdateNameUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase())
+
+	ctx := context.Background()
+
+	// 1. Setup user in repo
+	repo.reports["user123"] = &domain.Report{
+		UserID:      "user123",
+		Name:        "TestUser",
+		TotalPoints: 10,
+		Level:       1,
+	}
+
+	// 2. Test #lapor-quest command to view quests
+	msg, err := handleUC.Execute(ctx, "user123", "TestUser", "#lapor-quest")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Should route to daily quest view and return daily quest checklist
+	expected := "Quest Harian - TestUser"
+	if !containsSubstring(msg.Text, expected) {
+		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg.Text)
+	}
+
+	// 3. Test #laporquest (without dash) to view quests
+	msg, err = handleUC.Execute(ctx, "user123", "TestUser", "#laporquest")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if !containsSubstring(msg.Text, expected) {
+		t.Errorf("Expected message to contain '%s', got '%s'", expected, msg.Text)
+	}
+}
+

@@ -83,31 +83,6 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{Text: text}, err
 	}
 
-	if strings.Contains(msg, "#lapor") {
-		workout := domain.ParseHevy(message)
-		text, err := uc.reportUC.Execute(ctx, userID, name, workout)
-		return MessageResponse{Text: text}, err
-	}
-
-	if strings.Contains(msg, "#cancel-all") {
-		text, err := uc.cancelUC.ExecuteAll(ctx, userID, name)
-		return MessageResponse{Text: text}, err
-	}
-
-	if strings.Contains(msg, "#cancel") {
-		text, err := uc.cancelUC.Execute(ctx, userID, name)
-		return MessageResponse{Text: text}, err
-	}
-
-	if strings.Contains(msg, "#motivasi") {
-		text := uc.motivationUC.Execute()
-		return MessageResponse{Text: text}, nil
-	}
-
-	if strings.Contains(msg, "#jobs") {
-		return MessageResponse{Text: uc.jobUC.List()}, nil
-	}
-
 	if strings.Contains(msg, "#lapor-quest") || strings.Contains(msg, "#laporquest") {
 		lines := strings.Split(message, "\n")
 		var argLines []string
@@ -141,6 +116,31 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 
 		text, err := uc.dailyQuestUC.ViewQuest(ctx, userID, name, time.Now())
 		return MessageResponse{Text: text}, err
+	}
+
+	if strings.Contains(msg, "#lapor") {
+		workout := domain.ParseHevy(message)
+		text, err := uc.reportUC.Execute(ctx, userID, name, workout)
+		return MessageResponse{Text: text}, err
+	}
+
+	if strings.Contains(msg, "#cancel-all") {
+		text, err := uc.cancelUC.ExecuteAll(ctx, userID, name)
+		return MessageResponse{Text: text}, err
+	}
+
+	if strings.Contains(msg, "#cancel") {
+		text, err := uc.cancelUC.Execute(ctx, userID, name)
+		return MessageResponse{Text: text}, err
+	}
+
+	if strings.Contains(msg, "#motivasi") {
+		text := uc.motivationUC.Execute()
+		return MessageResponse{Text: text}, nil
+	}
+
+	if strings.Contains(msg, "#jobs") {
+		return MessageResponse{Text: uc.jobUC.List()}, nil
 	}
 
 	if strings.Contains(msg, "#goal") {
