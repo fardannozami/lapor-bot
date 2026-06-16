@@ -87,7 +87,7 @@ func (u *DailyQuestUsecase) SendDailyQuests(ctx context.Context, now time.Time, 
 	}
 
 	dateStr := domain.GetToday(now).Format("02 Jan 2006")
-	msgText := fmt.Sprintf("🌅 *Selamat pagi, Hunters!*\n\nSide quest hari ini sudah terbuka untuk %d hunter yang sudah memilih job. Buka `#mysidequest` untuk lihat pilihan easy, medium, dan hard hari ini.\n\nPilih yang ringan dulu juga boleh—jalan 4.000 langkah, sepeda 5 km, atau gerakan singkat di rumah/kantor. Side quest cuma bonus ½ XP; misi utama tetap konsisten olahraga dan lapor di grup. ✨\n\n📅 %s\n📝 Lapor side quest: `#lapor sidequest <kegiatan> <jumlah>`", eligibleCount, dateStr)
+	msgText := fmt.Sprintf("🌅 *Selamat pagi, Hunters!*\n\nSide quest hari ini sudah terbuka untuk %d hunter yang sudah memilih job. Buka `#mysidequest` untuk lihat pilihan easy, medium, dan hard hari ini.\n\nPilih yang ringan dulu juga boleh—minimal jalan kaki 4.000 langkah atau sepeda 5 km, atau gerakan singkat di rumah/kantor. Side quest cuma bonus kecil; misi utama tetap konsisten olahraga dan lapor di grup. ✨\n\n📅 %s\n📝 Lapor side quest: `#lapor sidequest <kegiatan> <jumlah>`", eligibleCount, dateStr)
 
 	targetJID, err := types.ParseJID(groupID)
 	if err != nil {
@@ -128,7 +128,7 @@ func (u *DailyQuestUsecase) ViewQuest(ctx context.Context, userID, name string, 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("📜 *Side Quest Hari Ini - %s* 🏹\n", report.Name))
 	sb.WriteString(fmt.Sprintf("Job: %s (Lv.%d)\n", domain.FormatJobClass(report.JobClass), report.Level))
-	sb.WriteString("Reward: ½ XP per side quest yang valid. #lapor utama tetap prioritas.\n\n")
+	sb.WriteString("Reward: XP bonus per side quest yang valid (easy/medium/hard). #lapor utama tetap prioritas.\n\n")
 
 	completed := 0
 	for i, t := range tasks {
@@ -140,13 +140,19 @@ func (u *DailyQuestUsecase) ViewQuest(ctx context.Context, userID, name string, 
 		sb.WriteString(fmt.Sprintf("%s %d. %s\n", status, i+1, domain.FormatQuestProgressTask(t)))
 	}
 
-	sb.WriteString(fmt.Sprintf("\nProgress hari ini: %s (%d/%d selesai)\n", formatQuestProgressBar(tasks), completed, len(tasks)))
+	sb.WriteString(fmt.Sprintf("\nProgress hari ini: %s\n", formatQuestProgressBar(tasks)))
 	sb.WriteString(fmt.Sprintf("Total side quest selesai: %d lifetime • %d season\n\n", report.TotalSideQuests, report.SeasonalSideQuests))
-	sb.WriteString("Cara lapor: `#lapor sidequest [nama kegiatan] [jumlah]`\n")
+	sb.WriteString("Cara lapor: `#lapor sidequest <nama kegiatan> <jumlah>`\n")
+	sb.WriteString("Gunakan nama kegiatan sesuai yang tertera di atas.\n")
 	sb.WriteString("Contoh:\n")
-	sb.WriteString("#lapor sidequest jalan 4000\n")
+	sb.WriteString("#lapor sidequest jalan kaki 4000\n")
 	sb.WriteString("#lapor sidequest sepeda 5 km\n")
-	sb.WriteString("#lapor sidequest plank 60 detik")
+	if len(tasks) > 2 {
+		sb.WriteString(fmt.Sprintf("#lapor sidequest %s %s\n", strings.ToLower(tasks[2].Name), formatQuestTarget(tasks[2])))
+	}
+	if len(tasks) > 3 {
+		sb.WriteString(fmt.Sprintf("#lapor sidequest %s %s\n", strings.ToLower(tasks[3].Name), formatQuestTarget(tasks[3])))
+	}
 
 	return sb.String(), nil
 }
@@ -180,6 +186,7 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 
 	var completedTasks []string
 	var rejected []string
+	totalSideQuestPoints := 0
 
 	for _, line := range inputLines {
 		namePart, val := parseLineFloat(line)
@@ -193,7 +200,7 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 				matched = true
 				added := 0
 				if task.Unit == "100m" {
-					if val < 50.0 { // e.g. "lari 2.5" is 2.5 km -> 25 units of 100m
+					if val < 50.0 {
 						added = int(val * 10.0)
 					} else {
 						added = int(val)
@@ -212,6 +219,7 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 
 				tasks[idx].Progress = task.Target
 				completedTasks = append(completedTasks, task.Name)
+				totalSideQuestPoints += sideQuestPoints(task.Difficulty)
 			}
 		}
 		if !matched {
@@ -221,7 +229,7 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 
 	if len(completedTasks) == 0 {
 		if len(rejected) > 0 {
-			return "Side quest belum diterima. Targetnya harus tercapai dulu ya. 💪\n\n- " + strings.Join(rejected, "\n- ") + "\n\nCek target hari ini dengan `#mysidequest`, lalu lapor ulang: `#lapor sidequest <kegiatan> <jumlah>`", nil
+			return "💪 *Semangat! Tinggal sedikit lagi...* 🔥\n\n" + strings.Join(rejected, "\n") + "\n\nAyo lanjutkan sampai target lalu lapor ulang ya! Kamu pasti bisa! ✨\n\n📜 Cek detail target: `#mysidequest`\n📝 Lapor ulang: `#lapor sidequest <kegiatan> <jumlah>`", nil
 		}
 		return "Gagal membaca laporan side quest. Contoh: `#lapor sidequest jalan 4000` atau `#lapor sidequest sepeda 5 km`", nil
 	}
@@ -237,7 +245,7 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 	}
 
 	activityText := "Side quest: " + strings.Join(completedTasks, ", ")
-	reportResult, err := reportUC.ExecuteSideQuest(ctx, userID, name, activityText, len(completedTasks), now)
+	reportResult, err := reportUC.ExecuteSideQuest(ctx, userID, name, activityText, len(completedTasks), totalSideQuestPoints, now)
 	if err != nil {
 		return "", err
 	}
@@ -247,10 +255,12 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 	if len(completedTasks) > 0 {
 		sb.WriteString("🎉 *SIDE QUEST BERHASIL DISELESAIKAN!* 🏆\n\n")
 		sb.WriteString("Selamat, kamu menyelesaikan:\n")
-		for _, name := range completedTasks {
-			sb.WriteString(fmt.Sprintf("- %s\n", name))
+		for _, task := range tasks {
+			if task.Progress >= task.Target {
+				sb.WriteString(fmt.Sprintf("- *%s* (%s)\n", task.Name, formatQuestTarget(task)))
+			}
 		}
-		sb.WriteString("\n💰 Reward: ½ XP per side quest valid.\n\n")
+		sb.WriteString("\n💰 Reward: XP bonus per side quest valid.\n\n")
 	}
 
 	sb.WriteString("📜 *Daftar Quest Saat Ini:*\n")
@@ -267,6 +277,26 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 	sb.WriteString(reportResult)
 
 	return sb.String(), nil
+}
+
+// sideQuestPoints returns the base points for a completed side quest task
+// based on its difficulty. These multipliers are computed behind the scenes;
+// the user-facing notification does not show the raw multiplier values.
+//
+//	Easy:   3 pts (0.3 × 10 base)
+//	Medium: 4 pts (0.4 × 10 base)
+//	Hard:   5 pts (0.5 × 10 base)
+func sideQuestPoints(difficulty string) int {
+	switch strings.ToLower(strings.TrimSpace(difficulty)) {
+	case "easy":
+		return 3
+	case "medium":
+		return 4
+	case "hard":
+		return 5
+	default:
+		return 5
+	}
 }
 
 func parseLineFloat(line string) (string, float64) {
@@ -306,21 +336,23 @@ func formatQuestValue(task domain.QuestTask, value int) string {
 	return fmt.Sprintf("%d %s", value, task.Unit)
 }
 
+// formatQuestProgressBar builds a task-count-based completion bar.
+// Each task contributes equally regardless of its numerical target so that
+// completing Jalan Kaki (4000 langkah) moves the bar the same amount as
+// completing Chair Squat (18x). This avoids the old value-weighted bar where
+// a single easy quest completion dominated the percentage.
 func formatQuestProgressBar(tasks []domain.QuestTask) string {
-	totalTarget := 0
-	totalProgress := 0
+	completed := 0
 	for _, t := range tasks {
-		prog := t.Progress
-		if prog > t.Target {
-			prog = t.Target
+		if t.Progress >= t.Target {
+			completed++
 		}
-		totalTarget += t.Target
-		totalProgress += prog
 	}
 
+	total := len(tasks)
 	percentage := 0
-	if totalTarget > 0 {
-		percentage = (totalProgress * 100) / totalTarget
+	if total > 0 {
+		percentage = (completed * 100) / total
 	}
 
 	barLen := 10
@@ -334,5 +366,5 @@ func formatQuestProgressBar(tasks []domain.QuestTask) string {
 			bar.WriteString("░")
 		}
 	}
-	return fmt.Sprintf("[%s] %d%%", bar.String(), percentage)
+	return fmt.Sprintf("[%s] %d%% (%d/%d selesai)", bar.String(), percentage, completed, total)
 }
