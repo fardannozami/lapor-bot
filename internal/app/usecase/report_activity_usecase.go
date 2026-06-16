@@ -19,9 +19,10 @@ type ReportActivityUsecase struct {
 }
 
 type reportActivityOptions struct {
-	sideQuestCount int
-	activityText   string
-	now            time.Time
+	sideQuestCount  int
+	activityText    string
+	now             time.Time
+	sideQuestPoints int // total points from side quest difficulty multipliers (computed in DailyQuestUsecase)
 }
 
 func NewReportActivityUsecase(repo domain.ReportRepository) *ReportActivityUsecase {
@@ -37,14 +38,15 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	return uc.execute(ctx, userID, name, workout, reportActivityOptions{})
 }
 
-func (uc *ReportActivityUsecase) ExecuteSideQuest(ctx context.Context, userID, name, activityText string, completedCount int, now time.Time) (string, error) {
+func (uc *ReportActivityUsecase) ExecuteSideQuest(ctx context.Context, userID, name, activityText string, completedCount, sideQuestPoints int, now time.Time) (string, error) {
 	if completedCount < 1 {
 		completedCount = 1
 	}
 	return uc.execute(ctx, userID, name, nil, reportActivityOptions{
-		sideQuestCount: completedCount,
-		activityText:   activityText,
-		now:            now,
+		sideQuestCount:  completedCount,
+		activityText:    activityText,
+		now:             now,
+		sideQuestPoints: sideQuestPoints,
 	})
 }
 
@@ -187,7 +189,11 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		}
 	}
 	if isSideQuest {
-		basePoints = 5
+		if opts.sideQuestPoints > 0 {
+			basePoints = opts.sideQuestPoints
+		} else {
+			basePoints = 5 // fallback for callers that don't pass difficulty points
+		}
 		streakBonus = 0
 		seasonalFirstBonus = 0
 		report.TotalSideQuests += opts.sideQuestCount
@@ -278,7 +284,7 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 			expBreakdown += " (first season report +5)"
 		}
 		if isSideQuest {
-			expBreakdown += " (side quest, ½ XP)"
+			expBreakdown += " (side quest)"
 		} else if isRepeatReport {
 			expBreakdown += " (repeat report, ½ XP)"
 		}

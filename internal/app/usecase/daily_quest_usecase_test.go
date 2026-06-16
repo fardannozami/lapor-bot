@@ -133,8 +133,8 @@ func TestDailyQuestViewAndComplete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected update progress error: %v", err)
 	}
-	if !strings.Contains(progressMsg, "Side quest belum diterima") {
-		t.Errorf("expected below-target side quest to be rejected, got %q", progressMsg)
+	if !strings.Contains(progressMsg, "Semangat") {
+		t.Errorf("expected below-target side quest to be rejected with motivational message, got %q", progressMsg)
 	}
 
 	// 3. Complete walking side quest.
@@ -149,8 +149,8 @@ func TestDailyQuestViewAndComplete(t *testing.T) {
 	if repo.upsertedReport.TotalSideQuests != 1 || repo.upsertedReport.SeasonalSideQuests != 1 {
 		t.Errorf("expected side quest counters to increase, got lifetime=%d season=%d", repo.upsertedReport.TotalSideQuests, repo.upsertedReport.SeasonalSideQuests)
 	}
-	if repo.upsertedReport.TotalPoints != 205 {
-		t.Errorf("expected side quest to add 5 points, got %d", repo.upsertedReport.TotalPoints)
+	if repo.upsertedReport.TotalPoints != 203 {
+		t.Errorf("expected side quest (easy) to add 3 points, got total=%d (expected 203)", repo.upsertedReport.TotalPoints)
 	}
 }
 

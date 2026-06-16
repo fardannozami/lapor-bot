@@ -97,7 +97,7 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{Text: text}, err
 	}
 
-	if containsCommand(msg, "#lapor") {
+	if strings.Contains(msg, "#lapor") {
 		workout := domain.ParseHevy(message)
 		text, err := uc.reportUC.Execute(ctx, userID, name, workout)
 		return MessageResponse{Text: text}, err
@@ -203,13 +203,4 @@ func extractSideQuestReport(message string) (string, bool) {
 		return strings.TrimSpace(message[idx+len(command):]), true
 	}
 	return "", false
-}
-
-func containsCommand(message, command string) bool {
-	idx := strings.Index(message, command)
-	if idx == -1 {
-		return false
-	}
-	end := idx + len(command)
-	return end == len(message) || message[end] == ' ' || message[end] == '\n' || message[end] == '\t'
 }

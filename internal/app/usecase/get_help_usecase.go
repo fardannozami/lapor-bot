@@ -10,12 +10,12 @@ var helpSections = []struct {
 	{
 		emoji:   "📝",
 		title:   "Melaporkan Aktivitas",
-		content: "*#lapor* — Laporkan workout atau aktivitas harianmu.\nContoh: `#lapor` atau `#lapor Push Day`\n\n*#lapor sidequest [kegiatan] [jumlah]* — Laporkan side quest dari `#mysidequest`. Contoh: `#lapor sidequest jalan 4000`. Side quest hanya ½ XP, tapi tetap dihitung untuk streak, stats, leaderboard, dan goal.\n\n🔄 Setiap laporan yang valid akan menambah streak mingguanmu dan total hari aktif.\n❄️ *Streak Freeze* — kamu punya 1 freeze gratis per season. Freeze otomatis melindungi 1 minggu absen. Dapatkan +1 freeze lagi saat kamu mencapai 4 minggu streak!\n\n📌 *Max 3x laporan per hari*: Kamu bisa lapor maksimal 3x dalam sehari. Laporan ke-2 dan ke-3 tetap dihitung 1 hari tapi XP dibagi 2.\n📌 *#lapor-kemarin* — Laporan khusus untuk hari kemarin. Sama seperti #lapor, XP dibagi 2. Max 3x per hari.",
+		content: "*#lapor* — Laporkan workout atau aktivitas harianmu.\nContoh: `#lapor` atau `#lapor Push Day`\n\n*#lapor sidequest [kegiatan] [jumlah]* — Laporkan side quest dari `#mysidequest`. Gunakan nama kegiatan sesuai yang tertera di daftar quest. Contoh: `#lapor sidequest jalan kaki 4000`. Side quest memberi XP bonus kecil, tapi tetap dihitung untuk streak, stats, leaderboard, dan goal.\n\n🔄 Setiap laporan yang valid akan menambah streak mingguanmu dan total hari aktif.\n❄️ *Streak Freeze* — kamu punya 1 freeze gratis per season. Freeze otomatis melindungi 1 minggu absen. Dapatkan +1 freeze lagi saat kamu mencapai 4 minggu streak!\n\n📌 *Max 3x laporan per hari*: Kamu bisa lapor maksimal 3x dalam sehari. Laporan ke-2 dan ke-3 tetap dihitung 1 hari tapi XP dibagi 2.\n📌 *#lapor-kemarin* — Laporan khusus untuk hari kemarin. Sama seperti #lapor, XP dibagi 2. Max 3x per hari.",
 	},
 	{
 		emoji:   "✨",
 		title:   "Side Quest Harian",
-		content: "*#mysidequest* — Lihat side quest easy, medium, dan hard hari ini. Wajib pilih job dulu lewat `#job <id>` agar mendapat side quest.\n\nEasy selalu jalan kaki minimal 4.000 langkah atau sepeda 5 km. Medium/hard berisi latihan ringan yang bisa dilakukan di rumah/kantor, dan naik sedikit sesuai level job.\n\nLapor dengan `#lapor sidequest [kegiatan] [jumlah]`. Target harus tercapai dulu; kalau kurang, laporan ditolak dan kamu bisa ulang setelah menambah aktivitas.",
+		content: "*#mysidequest* — Lihat side quest easy, medium, dan hard hari ini. Wajib pilih job dulu lewat `#job <id>` agar mendapat side quest.\n\nEasy: jalan kaki minimal 4.000 langkah atau sepeda 5 km (pilih salah satu). Medium/hard berisi latihan ringan yang bisa dilakukan di rumah/kantor, dan naik sedikit sesuai level job. XP bonus bervariasi per difficulty, dihitung otomatis di belakang.\n\nLapor dengan `#lapor sidequest [kegiatan] [jumlah]`. Nama kegiatan harus sesuai yang tertera di `#mysidequest`. Target harus tercapai dulu; kalau kurang, laporan ditolak dan kamu bisa ulang setelah menambah aktivitas.",
 	},
 	{
 		emoji:   "❌",
@@ -120,9 +120,9 @@ func (uc *GetHelpUsecase) ExecuteTutorial() string {
 	msg += "✨ *Flow Side Quest Harian*\n"
 	msg += "1. Pilih job dulu dengan `#job <id>` agar side quest terbuka.\n"
 	msg += "2. Setiap pagi bot memberi reminder di grup; cek detail quest kamu dengan `#mysidequest`.\n"
-	msg += "3. Pilih easy, medium, hard, atau beberapa sekaligus jika mau.\n"
-	msg += "4. Lapor dengan format `#lapor sidequest <kegiatan> <jumlah>`, contoh `#lapor sidequest jalan 4000` atau `#lapor sidequest sepeda 5 km`.\n"
-	msg += "5. Side quest memberi ½ XP, tetap masuk streak, stats, leaderboard, goal, dan total side quest di `#mystats`/`#achievements`.\n\n"
+	msg += "3. Pilih easy (jalan kaki atau sepeda), medium, hard, atau beberapa sekaligus.\n"
+	msg += "4. Lapor dengan format `#lapor sidequest <kegiatan> <jumlah>`, gunakan nama kegiatan yang tertera di `#mysidequest`. Contoh: `#lapor sidequest jalan kaki 4000`, `#lapor sidequest sepeda 5 km`, `#lapor sidequest chair squat 18`.\n"
+	msg += "5. Side quest memberi XP bonus kecil (bervariasi per difficulty), tetap masuk streak, stats, leaderboard, goal, dan total side quest di `#mystats`/`#achievements`.\n\n"
 	msg += "_Catatan: Bot hanya merespon di grup yang sudah dikonfigurasi. Semangat terus! 💪_"
 	return msg
 }

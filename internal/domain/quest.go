@@ -44,17 +44,28 @@ func GenerateDailyQuest(jobClass string, level int, date time.Time) []QuestTask 
 		hardBonus = 5
 	}
 
+	// Medium: light exercises doable at home/office as movement reminders.
+	// Level bonus gently scales with hunter level, capped at Lv.15.
 	mediumOptions := []QuestTask{
 		{ID: "squat", Name: "Chair Squat / Sit-to-Stand", Difficulty: "medium", Target: 18 + mediumBonus*2, Unit: "x", RewardPoints: 5},
 		{ID: "pushup", Name: "Wall Push-up / Desk Push-up", Difficulty: "medium", Target: 15 + mediumBonus*2, Unit: "x", RewardPoints: 5},
 		{ID: "stretching", Name: "Office Stretching", Difficulty: "medium", Target: 8 + mediumBonus, Unit: "menit", RewardPoints: 5},
 		{ID: "shadowboxing", Name: "Shadow Boxing Ringan", Difficulty: "medium", Target: 6 + mediumBonus, Unit: "menit", RewardPoints: 5},
+		{ID: "highknees", Name: "High Knees (Marching)", Difficulty: "medium", Target: 1 + mediumBonus, Unit: "menit", RewardPoints: 5},
+		{ID: "armcircles", Name: "Arm Circles", Difficulty: "medium", Target: 2 + mediumBonus, Unit: "menit", RewardPoints: 5},
+		{ID: "calfraises", Name: "Calf Raises (Jinjit)", Difficulty: "medium", Target: 20 + mediumBonus*2, Unit: "x", RewardPoints: 5},
+		{ID: "shouldershrugs", Name: "Shoulder Shrugs", Difficulty: "medium", Target: 15 + mediumBonus*2, Unit: "x", RewardPoints: 5},
 	}
+	// Hard: slightly more effort, still home-friendly. Level bonus caps at Lv.20.
 	hardOptions := []QuestTask{
 		{ID: "plank", Name: "Plank", Difficulty: "hard", Target: 45 + hardBonus*5, Unit: "detik", RewardPoints: 5},
 		{ID: "jumpingjacks", Name: "Jumping Jacks", Difficulty: "hard", Target: 35 + hardBonus*3, Unit: "x", RewardPoints: 5},
 		{ID: "burpee", Name: "Burpee Ringan", Difficulty: "hard", Target: 8 + hardBonus, Unit: "x", RewardPoints: 5},
 		{ID: "yoga", Name: "Mobility Flow", Difficulty: "hard", Target: 12 + hardBonus, Unit: "menit", RewardPoints: 5},
+		{ID: "mountainclimber", Name: "Mountain Climber", Difficulty: "hard", Target: 30 + hardBonus*5, Unit: "detik", RewardPoints: 5},
+		{ID: "lunges", Name: "Lunges (Bergantian)", Difficulty: "hard", Target: 10 + hardBonus, Unit: "x per kaki", RewardPoints: 5},
+		{ID: "glutebridge", Name: "Glute Bridge", Difficulty: "hard", Target: 15 + hardBonus*2, Unit: "x", RewardPoints: 5},
+		{ID: "reversecrunch", Name: "Reverse Crunch", Difficulty: "hard", Target: 10 + hardBonus, Unit: "x", RewardPoints: 5},
 	}
 
 	return []QuestTask{
@@ -105,6 +116,24 @@ func MatchTask(input string, taskID string) bool {
 		return strings.Contains(input, "cardio") || strings.Contains(input, "kardio")
 	case "weight":
 		return strings.Contains(input, "beban") || strings.Contains(input, "weight") || strings.Contains(input, "strength")
+	// Medium additions — home/office movement reminders
+	case "highknees":
+		return strings.Contains(input, "high knee") || strings.Contains(input, "marching") || strings.Contains(input, "knee") && strings.Contains(input, "high")
+	case "armcircles":
+		return strings.Contains(input, "arm circle") || strings.Contains(input, "circle") || strings.Contains(input, "putaran lengan")
+	case "calfraises":
+		return strings.Contains(input, "calf") || strings.Contains(input, "jinjit")
+	case "shouldershrugs":
+		return strings.Contains(input, "shrug") || strings.Contains(input, "bahu")
+	// Hard additions — slightly more effort, still home-friendly
+	case "mountainclimber":
+		return strings.Contains(input, "mountain") || strings.Contains(input, "climber") || strings.Contains(input, "panjat")
+	case "lunges":
+		return strings.Contains(input, "lunge") || strings.Contains(input, "lunjak")
+	case "glutebridge":
+		return strings.Contains(input, "glute") || strings.Contains(input, "bridge") || strings.Contains(input, "pinggul") || strings.Contains(input, "jembatan")
+	case "reversecrunch":
+		return strings.Contains(input, "reverse crunch") || strings.Contains(input, "crunch") && !strings.Contains(input, "bicycle")
 	}
 	return false
 }
@@ -115,9 +144,9 @@ func FormatQuestProgressTask(task QuestTask) string {
 	if task.Unit == "100m" {
 		targetKm := float64(task.Target) / 10.0
 		progressKm := float64(task.Progress) / 10.0
-		return fmt.Sprintf("%s %s: %.1f/%.1f km (+½ XP)", difficulty, task.Name, progressKm, targetKm)
+		return fmt.Sprintf("%s %s: %.1f/%.1f km", difficulty, task.Name, progressKm, targetKm)
 	}
-	return fmt.Sprintf("%s %s: %d/%d %s (+½ XP)", difficulty, task.Name, task.Progress, task.Target, task.Unit)
+	return fmt.Sprintf("%s %s: %d/%d %s", difficulty, task.Name, task.Progress, task.Target, task.Unit)
 }
 
 // FormatQuestTask returns a descriptive string for a quest task without showing progress (showing only target).
@@ -125,9 +154,9 @@ func FormatQuestTask(task QuestTask) string {
 	difficulty := formatQuestDifficulty(task.Difficulty)
 	if task.Unit == "100m" {
 		targetKm := float64(task.Target) / 10.0
-		return fmt.Sprintf("%s %s: %.1f km (+½ XP)", difficulty, task.Name, targetKm)
+		return fmt.Sprintf("%s %s: %.1f km", difficulty, task.Name, targetKm)
 	}
-	return fmt.Sprintf("%s %s: %d %s (+½ XP)", difficulty, task.Name, task.Target, task.Unit)
+	return fmt.Sprintf("%s %s: %d %s", difficulty, task.Name, task.Target, task.Unit)
 }
 
 func formatQuestDifficulty(difficulty string) string {

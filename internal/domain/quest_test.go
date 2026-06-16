@@ -42,6 +42,7 @@ func TestMatchTask(t *testing.T) {
 		taskID string
 		want   bool
 	}{
+		// Original exercises
 		{"pushup 5", "pushup", true},
 		{"push up 10", "pushup", true},
 		{"Push-Up 3", "pushup", true},
@@ -52,6 +53,26 @@ func TestMatchTask(t *testing.T) {
 		{"cycling 20", "sepeda", true},
 		{"burpee 10", "burpee", true},
 		{"something else 10", "pushup", false},
+		// New medium exercises
+		{"high knees 1 menit", "highknees", true},
+		{"marching 2 menit", "highknees", true},
+		{"arm circle 2 menit", "armcircles", true},
+		{"putaran lengan 1 menit", "armcircles", true},
+		{"calf raises 20", "calfraises", true},
+		{"jinjit 20", "calfraises", true},
+		{"shoulder shrug 15", "shouldershrugs", true},
+		{"shrug bahu 15", "shouldershrugs", true},
+		// New hard exercises
+		{"mountain climber 30 detik", "mountainclimber", true},
+		{"gerakan panjat 30", "mountainclimber", true},
+		{"lunges 10", "lunges", true},
+		{"lunjak 10", "lunges", true},
+		{"glute bridge 15", "glutebridge", true},
+		{"jembatan pinggul 15", "glutebridge", true},
+		{"reverse crunch 10", "reversecrunch", true},
+		// Negative cases
+		{"bicycle crunch 10", "reversecrunch", false}, // should not match: exclude "bicycle"
+		{"random text", "highknees", false},
 	}
 
 	for _, tt := range tests {
