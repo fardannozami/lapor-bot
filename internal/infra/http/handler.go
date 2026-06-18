@@ -176,6 +176,7 @@ type EnrichedReport struct {
 	WeekActivity          []bool                      `json:"week_activity"`
 	EstimatedWeeklyPoints int                         `json:"estimated_weekly_points"`
 	IsActiveToday         bool                        `json:"is_active_today"`
+	TodaySideQuests       []domain.QuestTask          `json:"today_side_quests,omitempty"`
 }
 
 // TierProgress is precomputed for the web UI so templates/components only render it.
@@ -508,7 +509,17 @@ func (s *Server) HandleGetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	weekActivity, weekActiveDays := buildWeekActivity(activityDates, weekStart)
-	s.writeJSON(w, http.StatusOK, enrichReportWithMasking(report, today, weekActivity, weekActiveDays, false))
+	enriched := enrichReportWithMasking(report, today, weekActivity, weekActiveDays, false)
+	if strings.TrimSpace(report.JobClass) != "" {
+		questUC := usecase.NewDailyQuestUsecase(s.repo)
+		tasks, err := questUC.GetOrGenerateQuestList(r.Context(), report.UserID, report.JobClass, report.Level, now)
+		if err != nil {
+			s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		enriched.TodaySideQuests = tasks
+	}
+	s.writeJSON(w, http.StatusOK, enriched)
 }
 
 func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {

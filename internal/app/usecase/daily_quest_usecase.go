@@ -40,7 +40,7 @@ func (u *DailyQuestUsecase) GetOrGenerateQuestList(ctx context.Context, userID, 
 	}
 
 	// Generate and save new quest
-	tasks := domain.GenerateDailyQuest(jobClass, level, now)
+	tasks := domain.GenerateDailyQuestForUser(userID, jobClass, level, now)
 	bytes, err := json.Marshal(tasks)
 	if err != nil {
 		return nil, err
@@ -147,11 +147,11 @@ func (u *DailyQuestUsecase) ViewQuest(ctx context.Context, userID, name string, 
 	sb.WriteString("Contoh:\n")
 	sb.WriteString("#lapor sidequest jalan kaki 4000\n")
 	sb.WriteString("#lapor sidequest sepeda 5 km\n")
-	if len(tasks) > 2 {
-		sb.WriteString(fmt.Sprintf("#lapor sidequest %s %s\n", strings.ToLower(tasks[2].Name), formatQuestTarget(tasks[2])))
-	}
-	if len(tasks) > 3 {
-		sb.WriteString(fmt.Sprintf("#lapor sidequest %s %s\n", strings.ToLower(tasks[3].Name), formatQuestTarget(tasks[3])))
+	for _, task := range tasks {
+		if task.ID == "easycardio" {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("#lapor sidequest %s %s\n", strings.ToLower(task.Name), formatQuestTarget(task)))
 	}
 
 	return sb.String(), nil
@@ -199,7 +199,13 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 			if domain.MatchTask(namePart, task.ID) {
 				matched = true
 				added := 0
-				if task.Unit == "100m" {
+				if task.ID == "easycardio" {
+					if !isEasyCardioComplete(namePart, val) {
+						rejected = append(rejected, fmt.Sprintf("%s butuh minimal jalan kaki 4000 langkah atau sepeda 5 km, laporanmu baru %s", task.Name, formatEasyCardioReport(namePart, val)))
+						continue
+					}
+					added = task.Target
+				} else if task.Unit == "100m" {
 					if val < 50.0 {
 						added = int(val * 10.0)
 					} else {
@@ -326,14 +332,43 @@ func parseLineFloat(line string) (string, float64) {
 }
 
 func formatQuestTarget(task domain.QuestTask) string {
+	if task.ID == "easycardio" {
+		return "4000 langkah / 5 km"
+	}
 	return formatQuestValue(task, task.Target)
 }
 
 func formatQuestValue(task domain.QuestTask, value int) string {
+	if task.ID == "easycardio" {
+		if value >= task.Target {
+			return "selesai"
+		}
+		return "belum selesai"
+	}
 	if task.Unit == "100m" {
 		return fmt.Sprintf("%.1f km", float64(value)/10.0)
 	}
 	return fmt.Sprintf("%d %s", value, task.Unit)
+}
+
+func isEasyCardioComplete(namePart string, value float64) bool {
+	if domain.MatchTask(namePart, "jalan") {
+		return value >= 4000
+	}
+	if domain.MatchTask(namePart, "sepeda") {
+		return value >= 5 && value < 1000 || value >= 5000
+	}
+	return false
+}
+
+func formatEasyCardioReport(namePart string, value float64) string {
+	if domain.MatchTask(namePart, "sepeda") && value < 1000 {
+		return fmt.Sprintf("%.1f km", value)
+	}
+	if domain.MatchTask(namePart, "sepeda") {
+		return fmt.Sprintf("%.0f m", value)
+	}
+	return fmt.Sprintf("%.0f langkah", value)
 }
 
 // formatQuestProgressBar builds a task-count-based completion bar.
