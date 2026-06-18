@@ -1,30 +1,24 @@
-# Build Stage
-FROM golang:1.25-alpine AS builder
+# Stage 1: Build React Frontend
+FROM node:20-alpine AS frontend-builder
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
 
+# Stage 2: Build Go Backend
+FROM golang:1.25-alpine AS backend-builder
 WORKDIR /app
-
-# Install git for fetching dependencies
 RUN apk add --no-cache git
-
-# Copy go mod and sum files
 COPY go.mod go.sum ./
-
-# Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
 RUN go mod download
-
-# Copy source code
 COPY . .
-
-# Build the application
-# CGO_ENABLED=0 for static binary (modernc.org/sqlite is pure Go)
 RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/bot
 
-# Run Stage
+# Stage 3: Run Stage
 FROM alpine:latest
-
 WORKDIR /app
 
-# Install certificates for external connections (required for WhatsApp) and timezone data
 # Install certificates for external connections (required for WhatsApp), timezone data, and curl for healthchecks
 RUN apk --no-cache add ca-certificates tzdata curl
 
@@ -32,7 +26,10 @@ RUN apk --no-cache add ca-certificates tzdata curl
 RUN mkdir -p /app/data
 
 # Copy binary from builder
-COPY --from=builder /app/main .
+COPY --from=backend-builder /app/main .
+
+# Copy built React assets
+COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
 # Expose port
 EXPOSE 8080

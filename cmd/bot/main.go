@@ -446,8 +446,8 @@ func main() {
 
 	log.Printf("Starting HTTP server on port %s", cfg.Port)
 
-	// 12. HTTP server (Healthcheck + Strava)
-	httpServer := botHTTP.NewServer(linkStravaUC, processStravaUC, waService.GetClient(), cfg)
+	// 12. HTTP server (Healthcheck + Strava + Leaderboard API)
+	httpServer := botHTTP.NewServer(repo, linkStravaUC, processStravaUC, waService.GetClient(), cfg)
 	mux := http.NewServeMux()
 	httpServer.RegisterHandlers(mux)
 
