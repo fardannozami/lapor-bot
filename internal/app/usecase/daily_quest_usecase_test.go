@@ -122,8 +122,8 @@ func TestDailyQuestViewAndComplete(t *testing.T) {
 	if err := json.Unmarshal([]byte(qJSON), &tasks); err != nil {
 		t.Fatalf("failed to parse stored quest tasks: %v", err)
 	}
-	if len(tasks) != 4 {
-		t.Fatalf("expected 4 generated tasks, got %d", len(tasks))
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 generated tasks, got %d", len(tasks))
 	}
 
 	t.Logf("Generated tasks: %+v", tasks)

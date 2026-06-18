@@ -58,6 +58,17 @@ export interface EnrichedReport {
   week_activity: boolean[];
   estimated_weekly_points: number;
   is_active_today: boolean;
+  today_side_quests?: QuestTask[];
+}
+
+export interface QuestTask {
+  id: string;
+  name: string;
+  difficulty: 'easy' | 'medium' | 'hard' | string;
+  target: number;
+  progress: number;
+  unit: string;
+  reward_points: number;
 }
 
 export interface GlobalSummary {
