@@ -15,6 +15,7 @@ import (
 	"github.com/fardannozami/whatsapp-gateway/internal/app/usecase"
 	"github.com/fardannozami/whatsapp-gateway/internal/config"
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
+	"github.com/fardannozami/whatsapp-gateway/internal/domain/phone"
 	"go.mau.fi/whatsmeow"
 )
 
@@ -44,6 +45,7 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api/leaderboard", s.HandleLeaderboard)
 	mux.HandleFunc("/api/summary", s.HandleSummary)
 	mux.HandleFunc("/api/motivation", s.HandleMotivation)
+	mux.HandleFunc("/api/user", s.HandleGetUser)
 	mux.HandleFunc("/", s.HandleStatic)
 }
 
@@ -275,6 +277,10 @@ func buildWeekActivity(activityDates []time.Time, weekStart time.Time) ([]bool, 
 }
 
 func enrichReport(r *domain.Report, today time.Time, weekActivity []bool, weekActiveDays int) EnrichedReport {
+	return enrichReportWithMasking(r, today, weekActivity, weekActiveDays, true)
+}
+
+func enrichReportWithMasking(r *domain.Report, today time.Time, weekActivity []bool, weekActiveDays int, mask bool) EnrichedReport {
 	xpProg := domain.GetNumericLevelProgress(r.TotalPoints)
 	lvl := domain.GetLevel(r.TotalPoints)
 	rank := domain.GetSeasonRank(r.SeasonalPoints)
@@ -317,8 +323,13 @@ func enrichReport(r *domain.Report, today time.Time, weekActivity []bool, weekAc
 		daysSinceLastReport = 0
 	}
 
+	userID := r.UserID
+	if mask {
+		userID = maskPhone(r.UserID)
+	}
+
 	return EnrichedReport{
-		UserID:                maskPhone(r.UserID),
+		UserID:                userID,
 		Name:                  r.Name,
 		JobClass:              r.JobClass,
 		JobName:               jobName,
@@ -463,6 +474,41 @@ func (s *Server) HandleMotivation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeJSON(w, http.StatusOK, map[string]string{"quote": usecase.RandomQuote()})
+}
+
+func (s *Server) HandleGetUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.writeJSON(w, http.StatusNoContent, nil)
+		return
+	}
+
+	rawPhone := r.URL.Query().Get("phone")
+	normalized, err := phone.Normalize(rawPhone)
+	if err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
+		return
+	}
+
+	report, err := s.repo.GetReport(r.Context(), normalized)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if report == nil {
+		s.writeJSON(w, http.StatusNotFound, map[string]string{"error": "User tidak ditemukan"})
+		return
+	}
+
+	now := time.Now()
+	today := domain.GetToday(now)
+	weekStart := domain.GetStartOfISOWeekStrict(now)
+	activityDates, err := s.repo.GetUserActivityDates(r.Context(), report.UserID)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	weekActivity, weekActiveDays := buildWeekActivity(activityDates, weekStart)
+	s.writeJSON(w, http.StatusOK, enrichReportWithMasking(report, today, weekActivity, weekActiveDays, false))
 }
 
 func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
