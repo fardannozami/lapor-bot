@@ -26,7 +26,8 @@ const selectColumns = `user_id, name, COALESCE(job_class, ''), streak, activity_
 	COALESCE(seasonal_points, 0), COALESCE(seasonal_activity_count, 0),
 	COALESCE(seasonal_max_streak, 0), COALESCE(seasonal_achievements, ''),
 	COALESCE(streak_freezes, 0), COALESCE(goals_completed, 0),
-	COALESCE(total_side_quests, 0), COALESCE(seasonal_side_quests, 0)`
+	COALESCE(total_side_quests, 0), COALESCE(seasonal_side_quests, 0),
+	COALESCE(str, 0), COALESCE(sta, 0), COALESCE(agi, 0), COALESCE(vit, 0)`
 
 func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, error) {
 	var report domain.Report
@@ -39,6 +40,7 @@ func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, e
 		&report.SeasonalMaxStreak, &report.SeasonalAchievements,
 		&report.StreakFreezes, &report.GoalsCompleted,
 		&report.TotalSideQuests, &report.SeasonalSideQuests,
+		&report.Str, &report.Sta, &report.Agi, &report.Vit,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -63,8 +65,8 @@ func (r *ReportRepository) GetReport(ctx context.Context, userID string) (*domai
 
 func upsertReport(ctx context.Context, execer execContexter, report *domain.Report) error {
 	query := `
-		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, level, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes, goals_completed, total_side_quests, seasonal_side_quests)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, level, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes, goals_completed, total_side_quests, seasonal_side_quests, str, sta, agi, vit)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			name = excluded.name,
 			job_class = excluded.job_class,
@@ -84,7 +86,11 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 			seasonal_achievements = excluded.seasonal_achievements,
 			streak_freezes = excluded.streak_freezes,
 			total_side_quests = excluded.total_side_quests,
-			seasonal_side_quests = excluded.seasonal_side_quests
+			seasonal_side_quests = excluded.seasonal_side_quests,
+			str = excluded.str,
+			sta = excluded.sta,
+			agi = excluded.agi,
+			vit = excluded.vit
 	`
 	_, err := execer.ExecContext(ctx, query,
 		report.UserID, report.Name, report.JobClass, report.Streak, report.ActivityCount,
@@ -93,6 +99,7 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 		report.SeasonalPoints, report.SeasonalActivityCount, report.SeasonalMaxStreak,
 		report.SeasonalAchievements, report.StreakFreezes, report.GoalsCompleted,
 		report.TotalSideQuests, report.SeasonalSideQuests,
+		report.Str, report.Sta, report.Agi, report.Vit,
 	)
 	return err
 }
@@ -288,6 +295,10 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN goals_completed INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN total_side_quests INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_side_quests INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN str INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN sta INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN agi INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN vit INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN report_count INTEGER NOT NULL DEFAULT 1")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN activity_text TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE strava_accounts ADD COLUMN name TEXT")

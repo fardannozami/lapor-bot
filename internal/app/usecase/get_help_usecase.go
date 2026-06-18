@@ -62,6 +62,11 @@ var helpSections = []struct {
 		title:   "Bantuan",
 		content: "*#help* — Tampilkan panduan ini kapan saja!",
 	},
+	{
+		emoji:   "⚔️",
+		title:   "Status RPG (Attributes)",
+		content: "Bot akan membaca laporanmu dan menaikkan status tertentu berdasarkan kata kunci aktivitas.\n\n💪 *STR (Strength)*: beban, weight, strength, gym, angkat, powerlifting, push, pull, leg\n🏃‍♂️ *STA (Stamina)*: lari, run, running, sepeda, cycle, hiit, kardio, cardio, renang, swim\n⚡ *AGI (Agility)*: bola, futsal, basket, bulutangkis, tenis, sprint, muaythai, boxing, calisthenics, padel, padle\n🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, recovery, jalan, walk, meditasi\n\nJika tidak ada kata kunci spesifik, laporan akan otomatis meningkatkan *VIT*.",
+	},
 }
 
 type GetHelpUsecase struct{}
@@ -95,7 +100,19 @@ func (uc *GetHelpUsecase) Execute() string {
 🏃 #strava — hubungkan Strava via chat pribadi
 ✏️ #setname [nama] — ubah nama tampil
 📚 #tutorial — cara pakai bot lengkap
+⚔️ #attributes — info kata kunci status RPG
 ❓ #help — list command ini`
+}
+
+func (uc *GetHelpUsecase) ExecuteAttributes() string {
+	msg := "⚔️ *Status RPG (Attributes)* ⚔️\n\n"
+	msg += "Setiap kali kamu `#lapor`, bot akan membaca kata kunci dari laporanmu dan memberikan atribut ke status tertentu. Berikut daftar kata kuncinya:\n\n"
+	msg += "💪 *STR (Strength)*: beban, weight, strength, gym, angkat, powerlifting, push, pull, leg\n"
+	msg += "🏃‍♂️ *STA (Stamina)*: lari, run, running, sepeda, cycle, hiit, kardio, cardio, renang, swim\n"
+	msg += "⚡ *AGI (Agility)*: bola, futsal, basket, bulutangkis, tenis, sprint, muaythai, boxing, calisthenics, padel, padle\n"
+	msg += "🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, recovery, jalan, walk, meditasi\n\n"
+	msg += "💡 *Tips:* Jika tidak ada kata kunci di atas yang cocok dalam teks laporanmu, secara default atributmu akan otomatis masuk ke *VIT*."
+	return msg
 }
 
 func (uc *GetHelpUsecase) ExecuteTutorial() string {

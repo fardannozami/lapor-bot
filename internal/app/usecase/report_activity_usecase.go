@@ -38,6 +38,12 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	return uc.execute(ctx, userID, name, workout, reportActivityOptions{})
 }
 
+func (uc *ReportActivityUsecase) ExecuteWithMessage(ctx context.Context, userID, name, message string, workout *domain.HevyWorkout) (string, error) {
+	return uc.execute(ctx, userID, name, workout, reportActivityOptions{
+		activityText: message,
+	})
+}
+
 func (uc *ReportActivityUsecase) ExecuteSideQuest(ctx context.Context, userID, name, activityText string, completedCount, sideQuestPoints int, now time.Time) (string, error) {
 	if completedCount < 1 {
 		completedCount = 1
@@ -206,6 +212,45 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	report.TotalPoints += reportPoints
 	report.SeasonalPoints += reportPoints
 
+	activityForParse := opts.activityText
+	if workout != nil {
+		activityForParse += " " + workout.Title
+		for _, ex := range workout.Exercises {
+			activityForParse += " " + ex
+		}
+	}
+	attrs := domain.DetermineAttributes(activityForParse)
+	var statGains []string
+	if reportPoints > 0 && len(attrs) > 0 {
+		statPoints := reportPoints / len(attrs)
+		
+		scalingLevel := oldNumericLevel
+		if scalingLevel < 1 {
+			scalingLevel = 1
+		}
+		statPoints = statPoints / scalingLevel
+		
+		if statPoints == 0 {
+			statPoints = 1 // Ensure at least 1 point if it divided down to 0
+		}
+		for _, attr := range attrs {
+			switch attr {
+			case domain.AttrStr:
+				report.Str += statPoints
+				statGains = append(statGains, fmt.Sprintf("STR +%d", statPoints))
+			case domain.AttrSta:
+				report.Sta += statPoints
+				statGains = append(statGains, fmt.Sprintf("STA +%d", statPoints))
+			case domain.AttrAgi:
+				report.Agi += statPoints
+				statGains = append(statGains, fmt.Sprintf("AGI +%d", statPoints))
+			case domain.AttrVit:
+				report.Vit += statPoints
+				statGains = append(statGains, fmt.Sprintf("VIT +%d", statPoints))
+			}
+		}
+	}
+
 	var newAchievements []domain.Achievement
 	var comebackAchievements []domain.ComebackAchievement
 	pointsGained := 0
@@ -289,6 +334,10 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 			expBreakdown += " (repeat report, ½ XP)"
 		}
 
+		if len(statGains) > 0 {
+			expBreakdown += fmt.Sprintf("\n💪 Attributes: %s", strings.Join(statGains, ", "))
+		}
+
 		if isSideQuest {
 			response = fmt.Sprintf("Side quest diterima, %s%s menyelesaikan %d side quest. Tetap dihitung untuk streak, stats, leaderboard, dan goal. 🔥\n%s",
 				cyclePrefix, name, opts.sideQuestCount, expBreakdown)
@@ -361,11 +410,20 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 
 	response += fmt.Sprintf("\n%s", domain.FormatNumericLevelProgressBar(report.TotalPoints))
 	response += fmt.Sprintf("\n%s", domain.FormatProgressBar(report.TotalPoints))
+	response += fmt.Sprintf("\n\n%s", formatCurrentAttributes(report))
 
 	return response, nil
 }
 
 func (uc *ReportActivityUsecase) ExecuteYesterday(ctx context.Context, userID, name string, workout *domain.HevyWorkout) (string, error) {
+	return uc.executeYesterday(ctx, userID, name, "", workout)
+}
+
+func (uc *ReportActivityUsecase) ExecuteYesterdayWithMessage(ctx context.Context, userID, name, message string, workout *domain.HevyWorkout) (string, error) {
+	return uc.executeYesterday(ctx, userID, name, message, workout)
+}
+
+func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, name, activityText string, workout *domain.HevyWorkout) (string, error) {
 	lock := uc.userLock(userID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -491,6 +549,45 @@ func (uc *ReportActivityUsecase) ExecuteYesterday(ctx context.Context, userID, n
 	report.TotalPoints += reportPoints
 	report.SeasonalPoints += reportPoints
 
+	activityForParse := activityText
+	if workout != nil {
+		activityForParse += " " + workout.Title
+		for _, ex := range workout.Exercises {
+			activityForParse += " " + ex
+		}
+	}
+	attrs := domain.DetermineAttributes(activityForParse)
+	var statGains []string
+	if reportPoints > 0 && len(attrs) > 0 {
+		statPoints := reportPoints / len(attrs)
+		
+		scalingLevel := oldNumericLevel
+		if scalingLevel < 1 {
+			scalingLevel = 1
+		}
+		statPoints = statPoints / scalingLevel
+		
+		if statPoints == 0 {
+			statPoints = 1 // Ensure at least 1 point
+		}
+		for _, attr := range attrs {
+			switch attr {
+			case domain.AttrStr:
+				report.Str += statPoints
+				statGains = append(statGains, fmt.Sprintf("STR +%d", statPoints))
+			case domain.AttrSta:
+				report.Sta += statPoints
+				statGains = append(statGains, fmt.Sprintf("STA +%d", statPoints))
+			case domain.AttrAgi:
+				report.Agi += statPoints
+				statGains = append(statGains, fmt.Sprintf("AGI +%d", statPoints))
+			case domain.AttrVit:
+				report.Vit += statPoints
+				statGains = append(statGains, fmt.Sprintf("VIT +%d", statPoints))
+			}
+		}
+	}
+
 	newAchievements := domain.CheckNewSeasonAchievements(report)
 	pointsGained := 0
 
@@ -564,6 +661,10 @@ func (uc *ReportActivityUsecase) ExecuteYesterday(ctx context.Context, userID, n
 		}
 		expBreakdown += " (lapor kemarin, ½ XP)"
 
+		if len(statGains) > 0 {
+			expBreakdown += fmt.Sprintf("\n💪 Attributes: %s", strings.Join(statGains, ", "))
+		}
+
 		response = fmt.Sprintf("Laporan kemarin diterima, %s%s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)\n%s",
 			cyclePrefix, name, report.ActivityCount, report.Streak, expBreakdown)
 		if report.JobClass != "" {
@@ -628,6 +729,7 @@ func (uc *ReportActivityUsecase) ExecuteYesterday(ctx context.Context, userID, n
 
 	response += fmt.Sprintf("\n%s", domain.FormatNumericLevelProgressBar(report.TotalPoints))
 	response += fmt.Sprintf("\n%s", domain.FormatProgressBar(report.TotalPoints))
+	response += fmt.Sprintf("\n\n%s", formatCurrentAttributes(report))
 
 	return response, nil
 }
@@ -681,4 +783,16 @@ func (uc *ReportActivityUsecase) getNextComebackTarget(report *domain.Report) *d
 		}
 	}
 	return nil
+}
+
+func formatCurrentAttributes(report *domain.Report) string {
+	str := report.Str
+	if str < 1 { str = 1 }
+	sta := report.Sta
+	if sta < 1 { sta = 1 }
+	agi := report.Agi
+	if agi < 1 { agi = 1 }
+	vit := report.Vit
+	if vit < 1 { vit = 1 }
+	return fmt.Sprintf("🛡️ Stats: STR %d | STA %d | AGI %d | VIT %d", str, sta, agi, vit)
 }
