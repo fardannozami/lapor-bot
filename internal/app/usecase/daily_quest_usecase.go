@@ -87,7 +87,7 @@ func (u *DailyQuestUsecase) SendDailyQuests(ctx context.Context, now time.Time, 
 	}
 
 	dateStr := domain.GetToday(now).Format("02 Jan 2006")
-	msgText := fmt.Sprintf("🌅 *Selamat pagi, Hunters!*\n\nSide quest hari ini sudah terbuka untuk %d hunter yang sudah memilih job. Buka `#mysidequest` untuk lihat pilihan easy, medium, dan hard hari ini.\n\nPilih yang ringan dulu juga boleh—minimal jalan kaki 4.000 langkah atau sepeda 5 km, atau gerakan singkat di rumah/kantor. Side quest cuma bonus kecil; misi utama tetap konsisten olahraga dan lapor di grup. ✨\n\n📅 %s\n📝 Lapor side quest: `#lapor sidequest <kegiatan> <jumlah>`", eligibleCount, dateStr)
+	msgText := fmt.Sprintf("🌅 *Selamat pagi, Hunters!*\n\nSide quest hari ini sudah terbuka untuk %d hunter yang sudah memilih job. Buka `#mysidequest` untuk lihat pilihan easy, medium, dan hard hari ini.\n\nPilih yang ringan dulu juga boleh—minimal jalan kaki 4.000 langkah atau sepeda 5 km, atau gerakan singkat di rumah/kantor. Side quest cuma bonus kecil; misi utama tetap konsisten olahraga dan lapor di grup. ✨\n\n📅 %s\n📝 Lapor side quest: `#lapor sidequest <kegiatan> <jumlah>`\n\n🌐 Lihat klasemen & stats: https://lapor-bot.web.id/", eligibleCount, dateStr)
 
 	targetJID, err := types.ParseJID(groupID)
 	if err != nil {
