@@ -75,13 +75,13 @@ func DetermineAttributes(text string) []AttributeType {
 	if strings.Contains(text, "beban") || strings.Contains(text, "weight") || strings.Contains(text, "strength") || strings.Contains(text, "gym") || strings.Contains(text, "angkat") || strings.Contains(text, "powerlifting") || strings.Contains(text, "push") || strings.Contains(text, "pull") || strings.Contains(text, "leg") {
 		attrs = append(attrs, AttrStr)
 	}
-	if strings.Contains(text, "lari") || strings.Contains(text, "run") || strings.Contains(text, "sepeda") || strings.Contains(text, "cycle") || strings.Contains(text, "hiit") || strings.Contains(text, "kardio") || strings.Contains(text, "cardio") || strings.Contains(text, "renang") || strings.Contains(text, "swim") {
+	if strings.Contains(text, "lari") || strings.Contains(text, "run") || strings.Contains(text, "running") || strings.Contains(text, "sepeda") || strings.Contains(text, "cycle") || strings.Contains(text, "hiit") || strings.Contains(text, "kardio") || strings.Contains(text, "cardio") || strings.Contains(text, "renang") || strings.Contains(text, "swim") {
 		attrs = append(attrs, AttrSta)
 	}
-	if strings.Contains(text, "bola") || strings.Contains(text, "futsal") || strings.Contains(text, "basket") || strings.Contains(text, "bulutangkis") || strings.Contains(text, "tenis") || strings.Contains(text, "sprint") || strings.Contains(text, "muaythai") || strings.Contains(text, "boxing") || strings.Contains(text, "calisthenics") || strings.Contains(text, "agility") {
+	if strings.Contains(text, "bola") || strings.Contains(text, "futsal") || strings.Contains(text, "basket") || strings.Contains(text, "bulutangkis") || strings.Contains(text, "tenis") || strings.Contains(text, "sprint") || strings.Contains(text, "muaythai") || strings.Contains(text, "boxing") || strings.Contains(text, "calisthenics") || strings.Contains(text, "padel") || strings.Contains(text, "padle") {
 		attrs = append(attrs, AttrAgi)
 	}
-	if strings.Contains(text, "yoga") || strings.Contains(text, "pilates") || strings.Contains(text, "stretching") || strings.Contains(text, "recovery") || strings.Contains(text, "jalan") || strings.Contains(text, "walk") || strings.Contains(text, "meditasi") || strings.Contains(text, "sleep") {
+	if strings.Contains(text, "yoga") || strings.Contains(text, "pilates") || strings.Contains(text, "stretching") || strings.Contains(text, "recovery") || strings.Contains(text, "jalan") || strings.Contains(text, "walk") || strings.Contains(text, "meditasi") {
 		attrs = append(attrs, AttrVit)
 	}
 

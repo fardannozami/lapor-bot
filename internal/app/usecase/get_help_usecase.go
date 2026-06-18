@@ -65,7 +65,7 @@ var helpSections = []struct {
 	{
 		emoji:   "⚔️",
 		title:   "Status RPG (Attributes)",
-		content: "Bot akan membaca laporanmu dan menaikkan status tertentu berdasarkan kata kunci aktivitas.\n\n💪 *STR (Strength)*: beban, weight, strength, gym, angkat, powerlifting\n🏃‍♂️ *STA (Stamina)*: lari, run, sepeda, cycle, hiit, kardio, cardio, renang, swim\n⚡ *AGI (Agility)*: bola, futsal, basket, bulutangkis, tenis, sprint, muaythai, boxing, calisthenics, agility\n🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, recovery, jalan, walk, meditasi, sleep\n\nJika tidak ada kata kunci spesifik, laporan akan otomatis meningkatkan *VIT*.",
+		content: "Bot akan membaca laporanmu dan menaikkan status tertentu berdasarkan kata kunci aktivitas.\n\n💪 *STR (Strength)*: beban, weight, strength, gym, angkat, powerlifting\n🏃‍♂️ *STA (Stamina)*: lari, run, running, sepeda, cycle, hiit, kardio, cardio, renang, swim\n⚡ *AGI (Agility)*: bola, futsal, basket, bulutangkis, tenis, sprint, muaythai, boxing, calisthenics, padel, padle\n🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, recovery, jalan, walk, meditasi\n\nJika tidak ada kata kunci spesifik, laporan akan otomatis meningkatkan *VIT*.",
 	},
 }
 

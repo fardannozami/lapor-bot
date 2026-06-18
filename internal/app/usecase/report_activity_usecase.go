@@ -223,6 +223,13 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	var statGains []string
 	if reportPoints > 0 && len(attrs) > 0 {
 		statPoints := reportPoints / len(attrs)
+		
+		scalingLevel := oldNumericLevel
+		if scalingLevel < 1 {
+			scalingLevel = 1
+		}
+		statPoints = statPoints / scalingLevel
+		
 		if statPoints == 0 {
 			statPoints = 1 // Ensure at least 1 point if it divided down to 0
 		}
@@ -553,6 +560,13 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	var statGains []string
 	if reportPoints > 0 && len(attrs) > 0 {
 		statPoints := reportPoints / len(attrs)
+		
+		scalingLevel := oldNumericLevel
+		if scalingLevel < 1 {
+			scalingLevel = 1
+		}
+		statPoints = statPoints / scalingLevel
+		
 		if statPoints == 0 {
 			statPoints = 1 // Ensure at least 1 point
 		}
