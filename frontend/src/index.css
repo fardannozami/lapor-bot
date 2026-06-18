@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-dark-bg: #090d16;
+  --color-dark-card: #111827;
+  --color-dark-border: #1f2937;
+  --color-dark-input: #1f2937;
+  
+  --color-system-blue: #00f0ff;
+  --color-system-purple: #a855f7;
+  --color-system-red: #ff3b30;
+  --color-system-gold: #eab308;
+  --color-system-green: #10b981;
+  
+  --font-orbitron: "Orbitron", sans-serif;
+  --font-inter: "Inter", sans-serif;
+
+  --shadow-neon-blue: 0 0 15px rgba(0, 240, 255, 0.35);
+  --shadow-neon-purple: 0 0 15px rgba(168, 85, 247, 0.35);
+  --shadow-neon-red: 0 0 15px rgba(255, 59, 48, 0.35);
+  --shadow-neon-gold: 0 0 15px rgba(234, 179, 8, 0.35);
+}
+
+@layer base {
+  body {
+    @apply bg-dark-bg text-gray-200 font-inter antialiased;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(168, 85, 247, 0.08) 0, transparent 50%), 
+      radial-gradient(at 100% 100%, rgba(0, 240, 255, 0.08) 0, transparent 50%);
+    background-attachment: fixed;
+  }
+}
+
+/* Custom scrollbars for a clean system look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f2937;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(17, 24, 39, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-glow-blue {
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+}
+
+.glass-glow-purple {
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.1);
+}
+
+.glass-glow-red {
+  border: 1px solid rgba(255, 59, 48, 0.2);
+  box-shadow: 0 0 15px rgba(255, 59, 48, 0.1);
+}
+
+.glass-glow-gold {
+  border: 1px solid rgba(234, 179, 8, 0.2);
+  box-shadow: 0 0 15px rgba(234, 179, 8, 0.1);
+}
