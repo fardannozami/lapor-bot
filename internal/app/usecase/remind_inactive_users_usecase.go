@@ -193,6 +193,7 @@ func BuildReminderMessage(
 	// Append health pillar reminders (olahraga, makanan, istirahat, kelola stres)
 	sb.WriteString(BuildWellnessReminder())
 	sb.WriteString("\n\n✨ Sudah punya job? Cek side quest hari ini dengan `#mysidequest` untuk bonus gerak ringan sebelum hari selesai.")
+	sb.WriteString("\n\n🌐 Lihat klasemen & stats: https://lapor-bot.web.id/")
 
 	mentions = deduplicateMentions(mentions)
 	return sb.String(), mentions

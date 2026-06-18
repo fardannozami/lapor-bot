@@ -79,29 +79,14 @@ func (uc *GetHelpUsecase) Execute() string {
 	return `🤖 *Command Lapor Bot*
 
 📝 #lapor — laporan aktivitas harian (max 3x/hari)
-✨ #mysidequest — lihat side quest hari ini
-✨ #lapor sidequest [kegiatan] [jumlah] — lapor side quest ½ XP
+✨ #lapor sidequest [kegiatan] [jumlah] — lapor side quest
 📌 #lapor-kemarin — laporan khusus hari kemarin (max 3x/hari)
 ❌ #cancel — batalkan laporan hari ini
 🧹 #cancel-all — batalkan semua laporan hari ini
-📊 #mystats — statistik personal
-🎯 #goal set [1-7] [aktivitas] — set goal 7 hari sejak sekarang
-🎯 #goal — progress goal aktif
-🔄 #goal reset — reset goal aktif
-🏆 #leaderboard — leaderboard lifetime
-📅 #leaderboard-weekly — leaderboard minggu ini
-🏹 #leaderboard-seasonal — leaderboard season
-🎖️ #ranks — rank hunter season
-🏅 #achievements — detail badge dan syarat unlock
-🔄 #comeback — progress comeback challenge
-🧭 #jobs — daftar job
-🧭 #job [id] — pilih job hunter
-✨ #motivasi — quote motivasi
-🏃 #strava — hubungkan Strava via chat pribadi
-✏️ #setname [nama] — ubah nama tampil
-📚 #tutorial — cara pakai bot lengkap
-⚔️ #attributes — info kata kunci status RPG
-❓ #help — list command ini`
+📚 #tutorial — panduan lengkap penggunaan bot
+❓ #help — list command ini
+
+🌐 Klasemen & stats personal: https://lapor-bot.web.id/`
 }
 
 func (uc *GetHelpUsecase) ExecuteAttributes() string {
@@ -140,6 +125,7 @@ func (uc *GetHelpUsecase) ExecuteTutorial() string {
 	msg += "3. Pilih easy (jalan kaki atau sepeda), medium, hard, atau beberapa sekaligus.\n"
 	msg += "4. Lapor dengan format `#lapor sidequest <kegiatan> <jumlah>`, gunakan nama kegiatan yang tertera di `#mysidequest`. Contoh: `#lapor sidequest jalan kaki 4000`, `#lapor sidequest sepeda 5 km`, `#lapor sidequest chair squat 18`.\n"
 	msg += "5. Side quest memberi XP bonus kecil (bervariasi per difficulty), tetap masuk streak, stats, leaderboard, goal, dan total side quest di `#mystats`/`#achievements`.\n\n"
-	msg += "_Catatan: Bot hanya merespon di grup yang sudah dikonfigurasi. Semangat terus! 💪_"
+	msg += "_Catatan: Bot hanya merespon di grup yang sudah dikonfigurasi. Semangat terus! 💪_\n\n" +
+		"🌐 Klasemen & stats personal: https://lapor-bot.web.id/"
 	return msg
 }

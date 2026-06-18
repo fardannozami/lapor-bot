@@ -69,6 +69,7 @@ func (u *WeeklyHunterRanksAnnouncementUsecase) Execute(ctx context.Context, now 
 	}
 
 	sb.WriteString("\nTetap konsisten berlatih untuk menaikkan rank-mu! Semangat🔥")
+	sb.WriteString("\n\n🌐 Lihat klasemen & stats: https://lapor-bot.web.id/")
 
 	return sb.String(), nil
 }

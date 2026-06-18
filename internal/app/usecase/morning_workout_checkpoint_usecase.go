@@ -62,6 +62,7 @@ func BuildMorningWorkoutCheckpointMessage(activeToday, pendingToday []*domain.Re
 	}
 
 	sb.WriteString("\n\n✨ Kalau sudah punya job, cek bonus gerak harian dengan `#mysidequest`.")
+	sb.WriteString("\n\n🌐 Lihat klasemen & stats: https://lapor-bot.web.id/")
 
 	return sb.String()
 }

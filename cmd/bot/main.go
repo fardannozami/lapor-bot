@@ -391,6 +391,7 @@ func main() {
 			}
 
 			response += usecase.BuildWellnessReminder()
+			response += "\n\n🌐 Lihat klasemen & stats: https://lapor-bot.web.id/"
 
 			targetJID, err := types.ParseJID(cfg.GroupID)
 			if err != nil {
