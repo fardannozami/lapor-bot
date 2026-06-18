@@ -1,14 +1,46 @@
 import React, { useState, useMemo } from 'react';
-import { Search, SlidersHorizontal, Flame, Trophy, Award, Activity, User } from 'lucide-react';
-import type { EnrichedReport } from '../types';
+import { Search, SlidersHorizontal, Flame, Trophy, Award, User, CalendarDays } from 'lucide-react';
+import type { EnrichedReport, TierProgress } from '../types';
 
 interface LeaderboardTableProps {
   hunters: EnrichedReport[];
   onSelectHunter: (hunter: EnrichedReport) => void;
 }
 
-type TabType = 'seasonal' | 'lifetime' | 'streak';
+type TabType = 'seasonal' | 'lifetime' | 'streak' | 'week';
 const PAGE_SIZE = 15;
+
+const ProgressBar: React.FC<{ progress: TierProgress; valueLabel: string; tone?: 'gold' | 'blue' | 'red' | 'green' }> = ({
+  progress,
+  valueLabel,
+  tone = 'blue',
+}) => {
+  const gradient = {
+    gold: 'from-system-gold to-system-purple',
+    blue: 'from-system-blue to-system-purple',
+    red: 'from-system-red to-system-gold',
+    green: 'from-system-green to-system-blue',
+  }[tone];
+
+  return (
+    <div className="min-w-[180px]">
+      <div className="h-2.5 w-full rounded-full bg-gray-900 border border-gray-800 overflow-hidden">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r ${gradient} transition-all duration-500`}
+          style={{ width: `${progress.percent}%` }}
+        />
+      </div>
+      <div className="mt-1 flex justify-between text-[9px] font-mono text-gray-500">
+        <span>{valueLabel}</span>
+        {progress.is_max ? (
+          <span className="text-system-gold">MAX</span>
+        ) : (
+          <span>→ {progress.next_icon} {progress.next_name} ({progress.remaining} pts)</span>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onSelectHunter }) => {
   const [search, setSearch] = useState('');
@@ -54,11 +86,19 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
           return b.activity_count - a.activity_count;
         }
         return b.total_points - a.total_points;
-      } else { // activeTab === 'streak'
+      } else if (activeTab === 'streak') {
         if (b.streak === a.streak) {
-          return b.seasonal_activity_count - a.seasonal_activity_count;
+          return b.max_streak - a.max_streak;
         }
         return b.streak - a.streak;
+      } else {
+        if (b.week_active_days === a.week_active_days) {
+          if (b.streak === a.streak) {
+            return a.name.localeCompare(b.name);
+          }
+          return b.streak - a.streak;
+        }
+        return b.week_active_days - a.week_active_days;
       }
     });
 
@@ -99,12 +139,160 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
     }
   };
 
+  const getStreakStatus = (hunter: EnrichedReport) => {
+    if (hunter.days_since_last_report <= 7 && hunter.streak > 0) return '🔥 Active';
+    if (hunter.comeback_streak > 0 || hunter.days_since_last_report <= 14) return '🗡️ Comeback';
+    return '💔 Inactive';
+  };
+
+  const renderHunterCell = (hunter: EnrichedReport) => (
+    <td className="py-4 pl-4 align-middle">
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center border border-gray-800 group-hover:border-system-blue transition-colors">
+            <User size={14} className="text-gray-400" />
+          </div>
+          {hunter.is_active_today && (
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-system-green border-2 border-dark-bg rounded-full animate-pulse"></span>
+          )}
+        </div>
+        <div>
+          <div className="text-sm font-semibold text-white group-hover:text-system-blue transition-colors">
+            {hunter.name}
+          </div>
+          <div className="text-[10px] text-gray-500 font-mono">{hunter.user_id}</div>
+        </div>
+      </div>
+    </td>
+  );
+
+  const renderJobCell = (hunter: EnrichedReport) => (
+    <td className="py-4 pl-4 align-middle">
+      <span className={`text-xs px-2.5 py-1 rounded-md border font-mono ${getJobBadgeClass(hunter.job_class)}`}>
+        {hunter.job_icon} {hunter.job_name}
+      </span>
+    </td>
+  );
+
+  const renderStreak = (weeks: number) => (
+    <span className="flex items-center justify-center gap-1 text-system-red font-mono">
+      <Flame size={14} />
+      <span className="font-bold">{weeks}</span>
+      <span className="text-[10px] text-gray-500">minggu</span>
+    </span>
+  );
+
+  const renderWeekDots = (hunter: EnrichedReport) => (
+    <div className="flex justify-center gap-1" aria-label={`${hunter.week_active_days} dari 7 hari aktif minggu ini`}>
+      {hunter.week_activity.map((active, idx) => (
+        <span
+          key={`${hunter.user_id}-week-${idx}`}
+          className={`h-3 w-3 rounded-sm border ${active ? 'bg-system-green border-system-green/60 shadow-neon-purple' : 'bg-gray-900 border-gray-800'}`}
+          title={active ? 'Aktif' : 'Belum aktif'}
+        />
+      ))}
+    </div>
+  );
+
+  const renderRows = () => visibleHunters.map((hunter, idx) => {
+    const rank = pageStartRank + idx;
+    const rowClass = `group transition-all hover:bg-gray-800/20 cursor-pointer ${
+      rank < 3 ? 'bg-gradient-to-r from-gray-950/20 to-transparent' : ''
+    }`;
+
+    if (activeTab === 'seasonal') {
+      return (
+        <tr key={hunter.user_id} onClick={() => onSelectHunter(hunter)} className={rowClass}>
+          <td className="py-4 pl-4 text-center font-mono align-middle"><div className="flex justify-center">{getRankBadge(rank)}</div></td>
+          {renderHunterCell(hunter)}
+          {renderJobCell(hunter)}
+          <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-white">
+            <span className="font-bold">{hunter.rank_icon} {hunter.rank_name}</span>
+          </td>
+          <td className="py-4 pl-4 text-center align-middle text-sm">{renderStreak(hunter.streak)}</td>
+          <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
+            <span className="font-bold">{hunter.seasonal_activity_count}</span>
+            <span className="text-[10px] text-gray-500"> hari / season ini</span>
+          </td>
+          <td className="py-4 pl-4 pr-4 align-middle">
+            <ProgressBar progress={hunter.season_rank_progress} valueLabel={`${hunter.seasonal_points} season pts`} tone="gold" />
+          </td>
+        </tr>
+      );
+    }
+
+    if (activeTab === 'lifetime') {
+      return (
+        <tr key={hunter.user_id} onClick={() => onSelectHunter(hunter)} className={rowClass}>
+          <td className="py-4 pl-4 text-center font-mono align-middle"><div className="flex justify-center">{getRankBadge(rank)}</div></td>
+          {renderHunterCell(hunter)}
+          {renderJobCell(hunter)}
+          <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-white">
+            <span className="font-bold">{hunter.level_icon} {hunter.level_name}</span>
+          </td>
+          <td className="py-4 pl-4 text-center font-mono align-middle text-sm text-gray-300">
+            <span className="font-bold">Lv.{hunter.level}</span>
+          </td>
+          <td className="py-4 pl-4 align-middle">
+            <ProgressBar progress={hunter.level_tier_progress} valueLabel={`${hunter.total_points} lifetime XP`} tone="blue" />
+          </td>
+          <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
+            <span className="font-bold">{hunter.activity_count}</span>
+            <span className="text-[10px] text-gray-500"> hari lifetime</span>
+          </td>
+          <td className="py-4 pl-4 text-center align-middle text-sm pr-4">{renderStreak(hunter.max_streak)}</td>
+        </tr>
+      );
+    }
+
+    if (activeTab === 'streak') {
+      return (
+        <tr key={hunter.user_id} onClick={() => onSelectHunter(hunter)} className={rowClass}>
+          <td className="py-4 pl-4 text-center font-mono align-middle"><div className="flex justify-center">{getRankBadge(rank)}</div></td>
+          {renderHunterCell(hunter)}
+          {renderJobCell(hunter)}
+          <td className="py-4 pl-4 text-center align-middle text-sm">{renderStreak(hunter.streak)}</td>
+          <td className="py-4 pl-4 text-center align-middle text-sm">{renderStreak(hunter.max_streak)}</td>
+          <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
+            <span className="font-bold">{hunter.activity_count}</span>
+            <span className="text-[10px] text-gray-500"> hari lifetime</span>
+          </td>
+          <td className="py-4 pl-4 text-center align-middle font-mono text-sm pr-4 text-gray-300">{getStreakStatus(hunter)}</td>
+        </tr>
+      );
+    }
+
+    return (
+      <tr key={hunter.user_id} onClick={() => onSelectHunter(hunter)} className={rowClass}>
+        <td className="py-4 pl-4 text-center font-mono align-middle"><div className="flex justify-center">{getRankBadge(rank)}</div></td>
+        {renderHunterCell(hunter)}
+        {renderJobCell(hunter)}
+        <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
+          <span className="font-bold">{hunter.week_active_days}</span>
+          <span className="text-[10px] text-gray-500"> / 7 hari minggu ini</span>
+        </td>
+        <td className="py-4 pl-4 text-center align-middle">{renderWeekDots(hunter)}</td>
+        <td className="py-4 pl-4 text-center align-middle text-sm">{renderStreak(hunter.streak)}</td>
+        <td className="py-4 pl-4 text-right pr-4 font-mono font-bold align-middle text-system-gold">
+          {hunter.estimated_weekly_points} <span className="text-[9px] text-gray-500">PTS estimasi</span>
+        </td>
+      </tr>
+    );
+  });
+
+  const tableHeaders = {
+    seasonal: ['Rank', 'Hunter', 'Job', 'Season Rank', 'Streak (minggu)', 'Active Days (season ini)', 'Season Points + Progress'],
+    lifetime: ['Rank', 'Hunter', 'Job', 'Level Tier (lifetime)', 'Level Numeric', 'XP Progress ke Tier Berikutnya', 'Total Hari (lifetime)', 'Best Streak (minggu)'],
+    streak: ['Rank', 'Hunter', 'Job', 'Current Streak (minggu)', 'Best Streak (minggu)', 'Lifetime Days', 'Status'],
+    week: ['Rank', 'Hunter', 'Job', 'Hari Aktif Minggu Ini', 'Activity Dots (7 hari)', 'Streak (minggu)', 'PTS Estimasi'],
+  }[activeTab];
+
   return (
     <div className="glass rounded-3xl p-5 md:p-6 mb-8">
       {/* Top Controls: Tabs and Filters */}
       <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between mb-6 border-b border-gray-850 pb-5">
         {/* Leaderboard Mode Tabs */}
-        <div className="flex bg-gray-950/80 p-1.5 rounded-xl border border-gray-800/60 max-w-fit">
+        <div className="flex flex-wrap bg-gray-950/80 p-1.5 rounded-xl border border-gray-800/60 max-w-fit">
           <button
             onClick={() => {
               setActiveTab('seasonal');
@@ -117,7 +305,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
             }`}
           >
             <Trophy size={14} />
-            Season Ranks
+            Season Rank
           </button>
           <button
             onClick={() => {
@@ -146,6 +334,20 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
           >
             <Flame size={14} />
             Streak Masters
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('week');
+              setPage(1);
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
+              activeTab === 'week'
+                ? 'bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <CalendarDays size={14} />
+            Minggu Ini
           </button>
         </div>
 
@@ -189,106 +391,25 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
 
       {/* Table Renders */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[700px] border-collapse">
+        <table className="w-full min-w-[860px] border-collapse">
           <thead>
             <tr className="border-b border-gray-850 text-left text-gray-500 text-[10px] font-mono font-bold tracking-widest uppercase">
-              <th className="pb-3 pl-4 w-12 text-center">Rank</th>
-              <th className="pb-3 pl-4">Hunter</th>
-              <th className="pb-3 pl-4">Job Class</th>
-              <th className="pb-3 pl-4 text-center">Level</th>
-              <th className="pb-3 pl-4 text-center">Streak</th>
-              <th className="pb-3 pl-4 text-center">Active Days</th>
-              <th className="pb-3 pl-4 text-right pr-4">
-                {activeTab === 'seasonal' ? 'Season Points' : activeTab === 'lifetime' ? 'Total XP' : 'Current Streak'}
-              </th>
+              {tableHeaders.map((header, idx) => (
+                <th key={header} className={`pb-3 pl-4 ${idx === 0 ? 'w-12 text-center' : ''} ${idx >= 3 && idx !== tableHeaders.length - 1 ? 'text-center' : ''} ${idx === tableHeaders.length - 1 ? 'text-right pr-4' : ''}`}>
+                  {header}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-900/60">
             {filteredAndSorted.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-xs text-gray-500 font-mono italic">
+                <td colSpan={tableHeaders.length} className="py-8 text-center text-xs text-gray-500 font-mono italic">
                   No active hunters match the filters.
                 </td>
               </tr>
             ) : (
-              visibleHunters.map((hunter, idx) => {
-                const rank = pageStartRank + idx;
-                return (
-                <tr
-                  key={hunter.user_id}
-                  onClick={() => onSelectHunter(hunter)}
-                  className={`group transition-all hover:bg-gray-800/20 cursor-pointer ${
-                    rank < 3 ? 'bg-gradient-to-r from-gray-950/20 to-transparent' : ''
-                  }`}
-                >
-                  {/* Rank */}
-                  <td className="py-4 pl-4 text-center font-mono align-middle">
-                    <div className="flex justify-center">{getRankBadge(rank)}</div>
-                  </td>
-
-                  {/* Name */}
-                  <td className="py-4 pl-4 align-middle">
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center border border-gray-800 group-hover:border-system-blue transition-colors">
-                          <User size={14} className="text-gray-400" />
-                        </div>
-                        {hunter.is_active_today && (
-                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-system-green border-2 border-dark-bg rounded-full animate-pulse"></span>
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-white group-hover:text-system-blue transition-colors">
-                          {hunter.name}
-                        </div>
-                        <div className="text-[10px] text-gray-500 font-mono">{hunter.user_id}</div>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Job Class */}
-                  <td className="py-4 pl-4 align-middle">
-                    <span className={`text-xs px-2.5 py-1 rounded-md border font-mono ${getJobBadgeClass(hunter.job_class)}`}>
-                      {hunter.job_icon} {hunter.job_name}
-                    </span>
-                  </td>
-
-                  {/* Level */}
-                  <td className="py-4 pl-4 text-center font-mono align-middle text-sm text-gray-300">
-                    <span className="font-bold">Lv.{hunter.level}</span>
-                  </td>
-
-                  {/* Streak */}
-                  <td className="py-4 pl-4 text-center align-middle font-mono text-sm">
-                    <span className="flex items-center justify-center gap-1 text-system-red">
-                      <Flame size={14} />
-                      <span className="font-bold">{hunter.streak}</span>
-                      <span className="text-[10px] text-gray-500">w</span>
-                    </span>
-                  </td>
-
-                  {/* Active Days */}
-                  <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
-                    <span className="flex items-center justify-center gap-1">
-                      <Activity size={12} className="text-system-blue" />
-                      <span className="font-bold">{hunter.seasonal_activity_count}</span>
-                      <span className="text-[10px] text-gray-500">d</span>
-                    </span>
-                  </td>
-
-                  {/* Sort Target Value */}
-                  <td className="py-4 pl-4 text-right pr-4 font-mono font-bold align-middle">
-                    {activeTab === 'seasonal' ? (
-                      <span className="text-system-gold">{hunter.seasonal_points} <span className="text-[9px] text-gray-500">PTS</span></span>
-                    ) : activeTab === 'lifetime' ? (
-                      <span className="text-system-blue">{hunter.total_points} <span className="text-[9px] text-gray-500">XP</span></span>
-                    ) : (
-                      <span className="text-system-red">{hunter.streak} <span className="text-[9px] text-gray-500">WEEKS</span></span>
-                    )}
-                  </td>
-                </tr>
-                );
-              })
+              renderRows()
             )}
           </tbody>
         </table>

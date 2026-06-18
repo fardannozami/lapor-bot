@@ -5,6 +5,7 @@ import { StatsOverview } from './components/StatsOverview';
 import { LeaderboardTable } from './components/LeaderboardTable';
 import { HunterCard } from './components/HunterCard';
 import { ProfileModal } from './components/ProfileModal';
+import { MotivationBanner } from './components/MotivationBanner';
 
 const PAGE_SIZE = 15;
 type Theme = 'light' | 'dark';
@@ -181,6 +182,8 @@ function App() {
 
         {/* Stats Section */}
         <StatsOverview summary={summary} loading={loading} />
+
+        {!loading && !error && hunters.length > 0 && <MotivationBanner />}
 
         {/* Dynamic Display Area */}
         {loading ? (

@@ -84,19 +84,19 @@ func NumericLevelFromTotalPoints(totalPoints int) int {
 	return GetNumericLevelProgress(totalPoints).Level
 }
 
-// AllLevels defines the progression tiers in ascending order.
-// Curved to reward early engagement while making max tier a long-term achievement.
-// With ~17 weeks per 4-month season, dedicated users can reach Tier 5-6 in season 1,
-// Tier 7 in season 2-3, and Tier 8 in season 4+.
+// AllLevels defines lifetime progression tiers in ascending order.
+// Lifetime points never reset, so upper tiers are intentionally long-term goals
+// across many seasons instead of single-season finish lines.
 var AllLevels = []Level{
 	{Tier: 1, Name: "Newbie", Icon: "🌱", MinPoints: 0},
 	{Tier: 2, Name: "Fighter", Icon: "💪", MinPoints: 50},
-	{Tier: 3, Name: "Warrior", Icon: "⚔️", MinPoints: 120},
-	{Tier: 4, Name: "Champion", Icon: "🏆", MinPoints: 250},
-	{Tier: 5, Name: "Legend", Icon: "👑", MinPoints: 500},
-	{Tier: 6, Name: "Immortal", Icon: "🔱", MinPoints: 1000},
-	{Tier: 7, Name: "Titan", Icon: "⭐", MinPoints: 2000},
-	{Tier: 8, Name: "God", Icon: "⚡", MinPoints: 3500},
+	{Tier: 3, Name: "Warrior", Icon: "⚔️", MinPoints: 200},
+	{Tier: 4, Name: "Champion", Icon: "🏆", MinPoints: 500},
+	{Tier: 5, Name: "Legend", Icon: "👑", MinPoints: 1000},
+	{Tier: 6, Name: "Immortal", Icon: "🔱", MinPoints: 2500},
+	{Tier: 7, Name: "Titan", Icon: "⭐", MinPoints: 5000},
+	{Tier: 8, Name: "God", Icon: "⚡", MinPoints: 10000},
+	{Tier: 9, Name: "Cosmic", Icon: "🌌", MinPoints: 20000},
 }
 
 // AllSeasonRanks defines rank titles for the current season only.
@@ -180,6 +180,16 @@ func GetNextLevel(totalPoints int) (*Level, int) {
 	return nil, 0
 }
 
+// GetNextSeasonRank returns the next season rank and missing seasonal points, or nil at max rank.
+func GetNextSeasonRank(seasonalPoints int) (*Rank, int) {
+	for _, r := range AllSeasonRanks {
+		if seasonalPoints < r.MinPoints {
+			return &r, r.MinPoints - seasonalPoints
+		}
+	}
+	return nil, 0
+}
+
 // FormatLevel returns a display string like "Fighter 💪"
 func FormatLevel(totalPoints int) string {
 	lvl := GetLevel(totalPoints)
@@ -191,7 +201,8 @@ func FormatLevel(totalPoints int) string {
 func FormatProgressBar(totalPoints int) string {
 	next, _ := GetNextLevel(totalPoints)
 	if next == nil {
-		return "MAX LEVEL! 🔱"
+		current := GetLevel(totalPoints)
+		return fmt.Sprintf("MAX LEVEL! %s", current.Icon)
 	}
 
 	current := GetLevel(totalPoints)
