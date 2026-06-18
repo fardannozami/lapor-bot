@@ -5,6 +5,17 @@ export interface NumericLevelProgress {
   TotalPoints: number;
 }
 
+export interface TierProgress {
+  current_min: number;
+  next_min: number;
+  value: number;
+  percent: number;
+  remaining: number;
+  next_name: string;
+  next_icon: string;
+  is_max: boolean;
+}
+
 export interface EnrichedReport {
   user_id: string;
   name: string;
@@ -22,9 +33,11 @@ export interface EnrichedReport {
   level_name: string;
   level_icon: string;
   xp_progress: NumericLevelProgress;
+  level_tier_progress: TierProgress;
   achievements: string[];
   comeback_streak: number;
   inactive_days: number;
+  days_since_last_report: number;
   centurion_cycles: number;
   seasonal_points: number;
   seasonal_activity_count: number;
@@ -40,6 +53,10 @@ export interface EnrichedReport {
   vit: number;
   rank_name: string;
   rank_icon: string;
+  season_rank_progress: TierProgress;
+  week_active_days: number;
+  week_activity: boolean[];
+  estimated_weekly_points: number;
   is_active_today: boolean;
 }
 

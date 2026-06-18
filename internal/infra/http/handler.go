@@ -43,6 +43,7 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/strava/webhook", s.HandleStravaWebhook)
 	mux.HandleFunc("/api/leaderboard", s.HandleLeaderboard)
 	mux.HandleFunc("/api/summary", s.HandleSummary)
+	mux.HandleFunc("/api/motivation", s.HandleMotivation)
 	mux.HandleFunc("/", s.HandleStatic)
 }
 
@@ -148,9 +149,11 @@ type EnrichedReport struct {
 	LevelName             string                      `json:"level_name"`
 	LevelIcon             string                      `json:"level_icon"`
 	XPProgress            domain.NumericLevelProgress `json:"xp_progress"`
+	LevelTierProgress     TierProgress                `json:"level_tier_progress"`
 	Achievements          []string                    `json:"achievements"`
 	ComebackStreak        int                         `json:"comeback_streak"`
 	InactiveDays          int                         `json:"inactive_days"`
+	DaysSinceLastReport   int                         `json:"days_since_last_report"`
 	CenturionCycles       int                         `json:"centurion_cycles"`
 	SeasonalPoints        int                         `json:"seasonal_points"`
 	SeasonalActivityCount int                         `json:"seasonal_activity_count"`
@@ -166,7 +169,23 @@ type EnrichedReport struct {
 	Vit                   int                         `json:"vit"`
 	RankName              string                      `json:"rank_name"`
 	RankIcon              string                      `json:"rank_icon"`
+	SeasonRankProgress    TierProgress                `json:"season_rank_progress"`
+	WeekActiveDays        int                         `json:"week_active_days"`
+	WeekActivity          []bool                      `json:"week_activity"`
+	EstimatedWeeklyPoints int                         `json:"estimated_weekly_points"`
 	IsActiveToday         bool                        `json:"is_active_today"`
+}
+
+// TierProgress is precomputed for the web UI so templates/components only render it.
+type TierProgress struct {
+	CurrentMin int    `json:"current_min"`
+	NextMin    int    `json:"next_min"`
+	Value      int    `json:"value"`
+	Percent    int    `json:"percent"`
+	Remaining  int    `json:"remaining"`
+	NextName   string `json:"next_name"`
+	NextIcon   string `json:"next_icon"`
+	IsMax      bool   `json:"is_max"`
 }
 
 // GlobalSummary holds aggregated dashboard data.
@@ -186,7 +205,76 @@ func maskPhone(phone string) string {
 	return phone[:5] + "****" + phone[len(phone)-3:]
 }
 
-func enrichReport(r *domain.Report) EnrichedReport {
+func buildTierProgress(value, currentMin int, nextMin int, nextName, nextIcon string, isMax bool) TierProgress {
+	progress := TierProgress{
+		CurrentMin: currentMin,
+		NextMin:    nextMin,
+		Value:      value,
+		Percent:    100,
+		NextName:   nextName,
+		NextIcon:   nextIcon,
+		IsMax:      isMax,
+	}
+	if isMax {
+		return progress
+	}
+
+	progress.Remaining = nextMin - value
+	if progress.Remaining < 0 {
+		progress.Remaining = 0
+	}
+
+	rangeTotal := nextMin - currentMin
+	if rangeTotal <= 0 {
+		return progress
+	}
+	percent := ((value - currentMin) * 100) / rangeTotal
+	if percent < 0 {
+		percent = 0
+	}
+	if percent > 100 {
+		percent = 100
+	}
+	progress.Percent = percent
+	return progress
+}
+
+func buildLevelTierProgress(totalPoints int, level domain.Level) TierProgress {
+	next, _ := domain.GetNextLevel(totalPoints)
+	if next == nil {
+		return buildTierProgress(totalPoints, level.MinPoints, level.MinPoints, "", "", true)
+	}
+	return buildTierProgress(totalPoints, level.MinPoints, next.MinPoints, next.Name, next.Icon, false)
+}
+
+func buildSeasonRankProgress(seasonalPoints int, rank domain.Rank) TierProgress {
+	next, _ := domain.GetNextSeasonRank(seasonalPoints)
+	if next == nil {
+		return buildTierProgress(seasonalPoints, rank.MinPoints, rank.MinPoints, "", "", true)
+	}
+	return buildTierProgress(seasonalPoints, rank.MinPoints, next.MinPoints, next.Name, next.Icon, false)
+}
+
+func buildWeekActivity(activityDates []time.Time, weekStart time.Time) ([]bool, int) {
+	activeDates := make(map[string]bool, len(activityDates))
+	for _, date := range activityDates {
+		activeDates[date.Format(time.DateOnly)] = true
+	}
+
+	activity := make([]bool, 7)
+	activeDays := 0
+	for i := range activity {
+		date := weekStart.AddDate(0, 0, i)
+		active := activeDates[date.Format(time.DateOnly)]
+		activity[i] = active
+		if active {
+			activeDays++
+		}
+	}
+	return activity, activeDays
+}
+
+func enrichReport(r *domain.Report, today time.Time, weekActivity []bool, weekActiveDays int) EnrichedReport {
 	xpProg := domain.GetNumericLevelProgress(r.TotalPoints)
 	lvl := domain.GetLevel(r.TotalPoints)
 	rank := domain.GetSeasonRank(r.SeasonalPoints)
@@ -222,10 +310,12 @@ func enrichReport(r *domain.Report) EnrichedReport {
 		}
 	}
 
-	now := time.Now()
-	today := domain.GetToday(now)
 	lastReportDay := domain.GetToday(r.LastReportDate)
 	isActiveToday := today.Equal(lastReportDay)
+	daysSinceLastReport := int(today.Sub(lastReportDay).Hours() / 24)
+	if daysSinceLastReport < 0 {
+		daysSinceLastReport = 0
+	}
 
 	return EnrichedReport{
 		UserID:                maskPhone(r.UserID),
@@ -244,9 +334,11 @@ func enrichReport(r *domain.Report) EnrichedReport {
 		LevelName:             lvl.Name,
 		LevelIcon:             lvl.Icon,
 		XPProgress:            xpProg,
+		LevelTierProgress:     buildLevelTierProgress(r.TotalPoints, lvl),
 		Achievements:          achs,
 		ComebackStreak:        r.ComebackStreak,
 		InactiveDays:          r.InactiveDays,
+		DaysSinceLastReport:   daysSinceLastReport,
 		CenturionCycles:       r.CenturionCycles,
 		SeasonalPoints:        r.SeasonalPoints,
 		SeasonalActivityCount: r.SeasonalActivityCount,
@@ -262,6 +354,10 @@ func enrichReport(r *domain.Report) EnrichedReport {
 		Vit:                   r.Vit,
 		RankName:              rank.Name,
 		RankIcon:              rank.Icon,
+		SeasonRankProgress:    buildSeasonRankProgress(r.SeasonalPoints, rank),
+		WeekActiveDays:        weekActiveDays,
+		WeekActivity:          weekActivity,
+		EstimatedWeeklyPoints: weekActiveDays * 10,
 		IsActiveToday:         isActiveToday,
 	}
 }
@@ -290,8 +386,17 @@ func (s *Server) HandleLeaderboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var enriched []EnrichedReport
+	now := time.Now()
+	today := domain.GetToday(now)
+	weekStart := domain.GetStartOfISOWeekStrict(now)
 	for _, rep := range reports {
-		enriched = append(enriched, enrichReport(rep))
+		activityDates, err := s.repo.GetUserActivityDates(r.Context(), rep.UserID)
+		if err != nil {
+			s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		weekActivity, weekActiveDays := buildWeekActivity(activityDates, weekStart)
+		enriched = append(enriched, enrichReport(rep, today, weekActivity, weekActiveDays))
 	}
 
 	s.writeJSON(w, http.StatusOK, enriched)
@@ -352,6 +457,14 @@ func (s *Server) HandleSummary(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, summary)
 }
 
+func (s *Server) HandleMotivation(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.writeJSON(w, http.StatusNoContent, nil)
+		return
+	}
+	s.writeJSON(w, http.StatusOK, map[string]string{"quote": usecase.RandomQuote()})
+}
+
 func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -374,4 +487,3 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 
 	http.ServeFile(w, r, fullPath)
 }
-
