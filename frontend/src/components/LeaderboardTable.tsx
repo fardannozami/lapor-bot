@@ -8,11 +8,13 @@ interface LeaderboardTableProps {
 }
 
 type TabType = 'seasonal' | 'lifetime' | 'streak';
+const PAGE_SIZE = 15;
 
 export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onSelectHunter }) => {
   const [search, setSearch] = useState('');
   const [selectedJob, setSelectedJob] = useState('all');
   const [activeTab, setActiveTab] = useState<TabType>('seasonal');
+  const [page, setPage] = useState(1);
 
   const jobsList = [
     { id: 'all', name: 'All Jobs' },
@@ -63,6 +65,18 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
     return result;
   }, [hunters, search, selectedJob, activeTab]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const visibleHunters = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filteredAndSorted.slice(start, start + PAGE_SIZE);
+  }, [filteredAndSorted, safePage]);
+  const pageStartRank = (safePage - 1) * PAGE_SIZE;
+
+  const goToPage = (nextPage: number) => {
+    setPage(Math.min(Math.max(1, nextPage), totalPages));
+  };
+
   const getRankBadge = (idx: number) => {
     switch (idx) {
       case 0: return <span className="flex items-center justify-center w-7 h-7 rounded-full bg-system-gold/20 text-system-gold border border-system-gold/50 shadow-neon-gold text-xs font-bold font-orbitron">1st</span>;
@@ -92,7 +106,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
         {/* Leaderboard Mode Tabs */}
         <div className="flex bg-gray-950/80 p-1.5 rounded-xl border border-gray-800/60 max-w-fit">
           <button
-            onClick={() => setActiveTab('seasonal')}
+            onClick={() => {
+              setActiveTab('seasonal');
+              setPage(1);
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
               activeTab === 'seasonal'
                 ? 'bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue'
@@ -103,7 +120,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
             Season Ranks
           </button>
           <button
-            onClick={() => setActiveTab('lifetime')}
+            onClick={() => {
+              setActiveTab('lifetime');
+              setPage(1);
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
               activeTab === 'lifetime'
                 ? 'bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue'
@@ -114,7 +134,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
             Lifetime XP
           </button>
           <button
-            onClick={() => setActiveTab('streak')}
+            onClick={() => {
+              setActiveTab('streak');
+              setPage(1);
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
               activeTab === 'streak'
                 ? 'bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue'
@@ -134,7 +157,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
               type="text"
               placeholder="Search hunter..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="w-full sm:w-60 pl-10 pr-4 py-2 bg-gray-950/70 border border-gray-800 focus:border-system-blue focus:shadow-neon-blue rounded-xl text-xs text-white placeholder-gray-500 font-mono transition-all outline-none"
             />
             <Search className="absolute left-3.5 top-2.5 text-gray-500" size={14} />
@@ -145,7 +171,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
             <SlidersHorizontal className="absolute left-3.5 top-2.5 text-gray-500" size={14} />
             <select
               value={selectedJob}
-              onChange={(e) => setSelectedJob(e.target.value)}
+              onChange={(e) => {
+                setSelectedJob(e.target.value);
+                setPage(1);
+              }}
               className="w-full sm:w-44 pl-10 pr-8 py-2 bg-gray-950/70 border border-gray-800 focus:border-system-blue focus:shadow-neon-blue rounded-xl text-xs text-white font-mono transition-all outline-none appearance-none cursor-pointer"
             >
               {jobsList.map(job => (
@@ -182,17 +211,19 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
                 </td>
               </tr>
             ) : (
-              filteredAndSorted.map((hunter, idx) => (
+              visibleHunters.map((hunter, idx) => {
+                const rank = pageStartRank + idx;
+                return (
                 <tr
                   key={hunter.user_id}
                   onClick={() => onSelectHunter(hunter)}
                   className={`group transition-all hover:bg-gray-800/20 cursor-pointer ${
-                    idx < 3 ? 'bg-gradient-to-r from-gray-950/20 to-transparent' : ''
+                    rank < 3 ? 'bg-gradient-to-r from-gray-950/20 to-transparent' : ''
                   }`}
                 >
                   {/* Rank */}
                   <td className="py-4 pl-4 text-center font-mono align-middle">
-                    <div className="flex justify-center">{getRankBadge(idx)}</div>
+                    <div className="flex justify-center">{getRankBadge(rank)}</div>
                   </td>
 
                   {/* Name */}
@@ -256,11 +287,38 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
                     )}
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
+      <nav className="mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-900/60 pt-5" aria-label="Leaderboard pagination">
+        <p className="text-xs text-gray-500 font-mono uppercase tracking-wider">
+          Showing {filteredAndSorted.length === 0 ? 0 : pageStartRank + 1}-{Math.min(pageStartRank + PAGE_SIZE, filteredAndSorted.length)} of {filteredAndSorted.length} athletes
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => goToPage(safePage - 1)}
+            disabled={safePage <= 1}
+            className="px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white transition-colors"
+          >
+            Previous
+          </button>
+          <span className="px-3 py-2 text-xs font-mono text-gray-500">
+            Page {safePage} / {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => goToPage(safePage + 1)}
+            disabled={safePage >= totalPages}
+            className="px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      </nav>
     </div>
   );
 };

@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react';
-import { LayoutGrid, Table2, RefreshCw, AlertCircle, ShieldAlert, Cpu } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { LayoutGrid, Table2, RefreshCw, AlertCircle, ShieldAlert, HeartPulse, Sun, Moon } from 'lucide-react';
 import type { EnrichedReport, GlobalSummary } from './types';
 import { StatsOverview } from './components/StatsOverview';
 import { LeaderboardTable } from './components/LeaderboardTable';
 import { HunterCard } from './components/HunterCard';
 import { ProfileModal } from './components/ProfileModal';
+
+const PAGE_SIZE = 15;
+type Theme = 'light' | 'dark';
+
+function getInitialTheme(): Theme {
+  if (typeof document === 'undefined') return 'dark';
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+}
 
 function App() {
   const [hunters, setHunters] = useState<EnrichedReport[]>([]);
@@ -14,6 +22,18 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [cardPage, setCardPage] = useState(1);
+
+  const seasonTitle = summary
+    ? `SWEG Healthy Club - Season ${summary.current_season}`
+    : 'SWEG Healthy Club';
+  const cardTotalPages = Math.max(1, Math.ceil(hunters.length / PAGE_SIZE));
+  const safeCardPage = Math.min(cardPage, cardTotalPages);
+  const visibleCardHunters = useMemo(() => {
+    const start = (safeCardPage - 1) * PAGE_SIZE;
+    return hunters.slice(start, start + PAGE_SIZE);
+  }, [hunters, safeCardPage]);
 
   const fetchData = async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) {
@@ -39,10 +59,11 @@ function App() {
       }
       const leaderboardData = (await leaderboardRes.json()) as EnrichedReport[];
       setHunters(leaderboardData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
+      const message = err instanceof Error ? err.message : null;
       setError(
-        err.message || 'System Link Failure. Check connection to the Go server.'
+        message || 'System Link Failure. Check connection to the Go server.'
       );
     } finally {
       setLoading(false);
@@ -51,8 +72,26 @@ function App() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem('lapor-bot-theme', theme);
+    } catch {
+      return;
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    document.title = seasonTitle;
+  }, [seasonTitle]);
+
+  const goToCardPage = (page: number) => {
+    setCardPage(Math.min(Math.max(1, page), cardTotalPages));
+  };
 
   return (
     <div className="min-h-screen pb-16 px-4 md:px-8">
@@ -60,14 +99,14 @@ function App() {
       <header className="max-w-7xl mx-auto pt-8 pb-6 border-b border-gray-850 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-3 h-3 bg-system-blue shadow-neon-blue rounded-full animate-pulse"></div>
+            <div className="w-3 h-3 bg-system-green shadow-neon-purple rounded-full animate-pulse"></div>
             <h1 className="text-xl md:text-2xl font-black font-orbitron tracking-widest text-white uppercase flex items-center gap-2">
-              <Cpu className="text-system-blue" size={20} />
-              Hunter Status Monitor
+              <HeartPulse className="text-system-green" size={22} />
+              {seasonTitle}
             </h1>
           </div>
           <p className="text-xs text-gray-500 font-mono mt-1 tracking-wider uppercase">
-            Active Group Workout & Leveling System — [CONGRUENT OVERLAY CONNECTED]
+            Sporty workout progress board — 15 athletes per page for a lighter dashboard
           </p>
         </div>
 
@@ -84,7 +123,10 @@ function App() {
               <Table2 size={16} />
             </button>
             <button
-              onClick={() => setViewMode('cards')}
+              onClick={() => {
+                setViewMode('cards');
+                setCardPage(1);
+              }}
               className={`p-2 rounded-lg transition-colors ${
                 viewMode === 'cards' ? 'bg-gray-800 text-system-blue' : 'text-gray-500 hover:text-gray-300'
               }`}
@@ -93,6 +135,17 @@ function App() {
               <LayoutGrid size={16} />
             </button>
           </div>
+
+          <button
+            type="button"
+            aria-pressed={theme === 'dark'}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors"
+            title="Toggle light/dark theme"
+          >
+            {theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
+            {theme === 'dark' ? 'Dark' : 'Light'}
+          </button>
 
           <button
             onClick={() => fetchData(true)}
@@ -151,15 +204,43 @@ function App() {
         ) : viewMode === 'table' ? (
           <LeaderboardTable hunters={hunters} onSelectHunter={setSelectedHunter} />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {hunters.map((hunter) => (
-              <HunterCard
-                key={hunter.user_id}
-                hunter={hunter}
-                onClick={() => setSelectedHunter(hunter)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {visibleCardHunters.map((hunter) => (
+                <HunterCard
+                  key={hunter.user_id}
+                  hunter={hunter}
+                  onClick={() => setSelectedHunter(hunter)}
+                />
+              ))}
+            </div>
+            <nav className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 glass rounded-2xl p-4" aria-label="Card pagination">
+              <p className="text-xs text-gray-500 font-mono uppercase tracking-wider">
+                Showing {visibleCardHunters.length === 0 ? 0 : (safeCardPage - 1) * PAGE_SIZE + 1}-{Math.min(safeCardPage * PAGE_SIZE, hunters.length)} of {hunters.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => goToCardPage(safeCardPage - 1)}
+                  disabled={safeCardPage <= 1}
+                  className="px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-2 text-xs font-mono text-gray-500">
+                  Page {safeCardPage} / {cardTotalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => goToCardPage(safeCardPage + 1)}
+                  disabled={safeCardPage >= cardTotalPages}
+                  className="px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </nav>
+          </>
         )}
       </main>
 

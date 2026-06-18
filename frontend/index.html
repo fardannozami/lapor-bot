@@ -4,7 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WhatsApp Hunter Tracker - System HUD</title>
+    <meta name="theme-color" content="#22c55e" />
+    <script>
+      (function () {
+        var saved = null;
+        try {
+          saved = localStorage.getItem('lapor-bot-theme');
+        } catch (error) {}
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = saved || (prefersDark ? 'dark' : 'light');
+      })();
+    </script>
+    <title>SWEG Healthy Club</title>
   </head>
   <body>
     <div id="root"></div>
