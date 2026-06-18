@@ -77,6 +77,11 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{Text: text}, nil
 	}
 
+	if strings.Contains(msg, "#attributes") || strings.Contains(msg, "#attributs") || strings.Contains(msg, "#atributs") {
+		text := uc.helpUC.ExecuteAttributes()
+		return MessageResponse{Text: text}, nil
+	}
+
 	if strings.Contains(msg, "#lapor-kemarin") {
 		workout := domain.ParseHevy(message)
 		text, err := uc.reportUC.ExecuteYesterdayWithMessage(ctx, userID, name, message, workout)
