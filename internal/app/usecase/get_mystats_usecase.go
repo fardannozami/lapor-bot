@@ -73,6 +73,13 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 	}
 	sb.WriteString(fmt.Sprintf("🎖️ Level: Lv.%d • %s (lifetime)\n", report.Level, domain.FormatLevel(report.TotalPoints)))
 	sb.WriteString(fmt.Sprintf("🧭 Job: %s\n", domain.FormatJobClass(report.JobClass)))
+	
+	sb.WriteString("\n💪 Attributes:\n")
+	sb.WriteString(fmt.Sprintf("STR (Strength) : %d pts\n", max(1, report.Str)))
+	sb.WriteString(fmt.Sprintf("STA (Stamina)  : %d pts\n", max(1, report.Sta)))
+	sb.WriteString(fmt.Sprintf("AGI (Agility)  : %d pts\n", max(1, report.Agi)))
+	sb.WriteString(fmt.Sprintf("VIT (Vitality) : %d pts\n\n", max(1, report.Vit)))
+
 	sb.WriteString(fmt.Sprintf("📈 %s\n", domain.FormatNumericLevelProgressBar(report.TotalPoints)))
 	sb.WriteString(fmt.Sprintf("📊 %s\n\n", domain.FormatProgressBar(report.TotalPoints)))
 

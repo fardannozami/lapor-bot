@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -30,6 +31,10 @@ type Report struct {
 	GoalsCompleted        int       `json:"goals_completed" db:"goals_completed"`
 	TotalSideQuests       int       `json:"total_side_quests" db:"total_side_quests"`
 	SeasonalSideQuests    int       `json:"seasonal_side_quests" db:"seasonal_side_quests"`
+	Str                   int       `json:"str" db:"str"`
+	Sta                   int       `json:"sta" db:"sta"`
+	Agi                   int       `json:"agi" db:"agi"`
+	Vit                   int       `json:"vit" db:"vit"`
 }
 
 type ActivityLeaderboardEntry struct {
@@ -51,6 +56,41 @@ type WeeklyGoal struct {
 type GoalActivity struct {
 	Date     time.Time
 	Activity string
+}
+
+type AttributeType string
+
+const (
+	AttrStr AttributeType = "STR"
+	AttrSta AttributeType = "STA"
+	AttrAgi AttributeType = "AGI"
+	AttrVit AttributeType = "VIT"
+)
+
+// DetermineAttributes parses an activity text to find matching RPG attributes.
+func DetermineAttributes(text string) []AttributeType {
+	text = strings.ToLower(text)
+	var attrs []AttributeType
+
+	if strings.Contains(text, "beban") || strings.Contains(text, "weight") || strings.Contains(text, "strength") || strings.Contains(text, "gym") || strings.Contains(text, "angkat") || strings.Contains(text, "powerlifting") || strings.Contains(text, "push") || strings.Contains(text, "pull") || strings.Contains(text, "leg") {
+		attrs = append(attrs, AttrStr)
+	}
+	if strings.Contains(text, "lari") || strings.Contains(text, "run") || strings.Contains(text, "sepeda") || strings.Contains(text, "cycle") || strings.Contains(text, "hiit") || strings.Contains(text, "kardio") || strings.Contains(text, "cardio") || strings.Contains(text, "renang") || strings.Contains(text, "swim") {
+		attrs = append(attrs, AttrSta)
+	}
+	if strings.Contains(text, "bola") || strings.Contains(text, "futsal") || strings.Contains(text, "basket") || strings.Contains(text, "bulutangkis") || strings.Contains(text, "tenis") || strings.Contains(text, "sprint") || strings.Contains(text, "muaythai") || strings.Contains(text, "boxing") || strings.Contains(text, "calisthenics") || strings.Contains(text, "agility") {
+		attrs = append(attrs, AttrAgi)
+	}
+	if strings.Contains(text, "yoga") || strings.Contains(text, "pilates") || strings.Contains(text, "stretching") || strings.Contains(text, "recovery") || strings.Contains(text, "jalan") || strings.Contains(text, "walk") || strings.Contains(text, "meditasi") || strings.Contains(text, "sleep") {
+		attrs = append(attrs, AttrVit)
+	}
+
+	if len(attrs) == 0 {
+		// Default to VIT (General Health/Vitality) if no specific keywords match
+		attrs = append(attrs, AttrVit)
+	}
+
+	return attrs
 }
 
 // ReportCutoffOffset is the spare time allowed for late-night reporting.
