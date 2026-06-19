@@ -201,11 +201,16 @@ type GlobalSummary struct {
 	CurrentDay          int            `json:"current_day"`
 }
 
+// maskPhone hides all but the last 2 digits of a phone number so the public
+// leaderboard cannot be used to reconstruct real numbers.
+// ponytail: fixed-width mask (9 stars + 2 suffix) — no information about
+// prefix length leaks; ceiling: 2-digit suffix means 100 candidates per masked
+// value, acceptable for a public gamification dashboard.
 func maskPhone(phone string) string {
-	if len(phone) < 7 {
-		return "****"
+	if len(phone) <= 2 {
+		return "*********"
 	}
-	return phone[:5] + "****" + phone[len(phone)-3:]
+	return "*********" + phone[len(phone)-2:]
 }
 
 func buildTierProgress(value, currentMin int, nextMin int, nextName, nextIcon string, isMax bool) TierProgress {

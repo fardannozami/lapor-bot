@@ -368,7 +368,6 @@ func TestHandleMessage_NonCommand_ReturnsNoResponse(t *testing.T) {
 		"lapor",
 		"leaderboard",
 		"#invalid",
-		"#lapor",
 	}
 
 	for _, msgText := range testCases {
@@ -378,6 +377,53 @@ func TestHandleMessage_NonCommand_ReturnsNoResponse(t *testing.T) {
 		}
 		if result.Text != "" {
 			t.Errorf("Non-command message '%s' should not return a response, got '%s'", msgText, result.Text)
+		}
+	}
+}
+
+func TestHandleMessage_LegacyHashCommand_ReturnsNudge(t *testing.T) {
+	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
+	reportUC := usecase.NewReportActivityUsecase(repo)
+	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	updateNameUC := usecase.NewUpdateNameUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase())
+
+	ctx := context.Background()
+
+	// Active commands triggered with the legacy "#" prefix should nudge the
+	// user to switch to "/", preserving the original arguments.
+	tests := []struct {
+		input        string
+		wantContains string
+	}{
+		{"#lapor", "/lapor"},
+		{"#lapor Push Day", "/lapor Push Day"},
+		{"#lapor sidequest", "/lapor sidequest"},
+		{"#lapor sidequest jalan kaki 4000", "/lapor sidequest jalan kaki 4000"},
+		{"#lapor-kemarin", "/lapor-kemarin"},
+		{"#cancel", "/cancel"},
+		{"#cancel-all", "/cancel-all"},
+		{"#help", "/help"},
+		{"#tutorial", "/tutorial"},
+		{"#LAPOR", "/LAPOR"},
+	}
+	for _, tt := range tests {
+		result, err := handleUC.Execute(ctx, "user1", "User", tt.input)
+		if err != nil {
+			t.Fatalf("Unexpected error for '%s': %v", tt.input, err)
+		}
+		if result.Text == "" {
+			t.Errorf("Legacy command '%s' should return a nudge, got empty", tt.input)
+			continue
+		}
+		if !containsSubstring(result.Text, tt.wantContains) {
+			t.Errorf("Legacy command '%s': expected nudge to contain '%s', got '%s'", tt.input, tt.wantContains, result.Text)
+		}
+		if !containsSubstring(result.Text, "pensiu") && !containsSubstring(result.Text, "pensiun") {
+			t.Errorf("Legacy command '%s': nudge should mention the # retirement, got '%s'", tt.input, result.Text)
 		}
 	}
 }
