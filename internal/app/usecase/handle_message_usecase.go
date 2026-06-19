@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 	"unicode"
@@ -11,10 +12,50 @@ import (
 
 const commandPrefix = "/"
 
+// legacyCommandPrefix is the old "#" trigger. Users still sending "#lapor" get
+// a friendly nudge to switch to "/" so they become aware of the change.
+const legacyCommandPrefix = "#"
+
+// activeCommands lists every command currently wired in Execute, longest first
+// so "#lapor sidequest" matches before "#lapor".
+var activeCommands = []string{
+	"/lapor sidequest",
+	"/lapor-kemarin",
+	"/lapor",
+	"/cancel-all",
+	"/cancel",
+	"/tutorial",
+	"/help",
+}
+
 const unknownCommandMessage = "📋 Maaf, command yang kamu kirim belum tersedia nih! 😅\n\n" +
 	"Coba cek command yang bisa dipakai dengan `/help` atau langsung kunjungi:\n" +
 	"🌐 https://lapor-bot.web.id/\n\n" +
 	"Di sana kamu bisa lihat klasemen, stats personal, dan info lainnya! ✨"
+
+const legacyHashCommandMessage = "😅 Ups, command pakai *#* sudah pensiun nih!\n\n" +
+	"Waktu perubahan: semua command sekarang pakai */* (slash) ya, biar lebih gampang dan konsisten. " +
+	"Coba kirim ulang:\n\n" +
+	"👉 %s\n\n" +
+	"✨ Mau lihat semua command? Ketik /help"
+
+// legacyHashCommandSuggestion returns a friendly nudge when a user triggers an
+// active command with the old "#" prefix. Returns "" when the message is not a
+// legacy # command or does not match any active command, so ordinary hashtags
+// stay silent and don't spam the group.
+func legacyHashCommandSuggestion(loweredMsg, originalMsg string) string {
+	if !strings.HasPrefix(loweredMsg, legacyCommandPrefix) {
+		return ""
+	}
+	slashed := commandPrefix + loweredMsg[len(legacyCommandPrefix):]
+	for _, cmd := range activeCommands {
+		if hasCommand(slashed, cmd) {
+			suggested := commandPrefix + strings.TrimSpace(originalMsg[len(legacyCommandPrefix):])
+			return fmt.Sprintf(legacyHashCommandMessage, suggested)
+		}
+	}
+	return ""
+}
 
 type MessageResponse struct {
 	Text      string
@@ -76,6 +117,16 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 	msg := strings.ToLower(trimmedMessage)
 
 	if msg == "" {
+		return MessageResponse{}, nil
+	}
+
+	// Nudge users who still trigger commands with the legacy "#" prefix (e.g.
+	// "#lapor") to switch to the active "/" prefix. Only matches active
+	// commands; other hashtags stay silent.
+	if strings.HasPrefix(msg, legacyCommandPrefix) {
+		if suggestion := legacyHashCommandSuggestion(msg, trimmedMessage); suggestion != "" {
+			return MessageResponse{Text: suggestion}, nil
+		}
 		return MessageResponse{}, nil
 	}
 

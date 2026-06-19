@@ -123,7 +123,7 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 
 	if len(reports) == 0 {
 		sb.WriteString("Belum ada yang aktif di season ini.\n")
-		sb.WriteString("Jadilah yang pertama dengan #lapor! 💪")
+		sb.WriteString("Jadilah yang pertama dengan /lapor! 💪")
 		return sb.String(), nil
 	}
 
@@ -209,7 +209,7 @@ func (uc *GetLeaderboardUsecase) ExecuteRanks(ctx context.Context) (string, erro
 	}
 
 	if rank == 1 {
-		sb.WriteString("Belum ada hunter aktif season ini. Mulai dengan #lapor 💪")
+		sb.WriteString("Belum ada hunter aktif season ini. Mulai dengan /lapor 💪")
 		return sb.String(), nil
 	}
 

@@ -64,7 +64,7 @@ func (u *WeeklyHunterRanksAnnouncementUsecase) Execute(ctx context.Context, now 
 	}
 
 	if rank == 1 {
-		sb.WriteString("Belum ada hunter aktif season ini. Mulai dengan #lapor 💪")
+		sb.WriteString("Belum ada hunter aktif season ini. Mulai dengan /lapor 💪")
 		return sb.String(), nil
 	}
 
