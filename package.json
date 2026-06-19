@@ -1,8 +1,0 @@
-{
-  "name": "lapor-bot-workspace",
-  "private": true,
-  "workspaces": [
-    "frontend/*",
-    "packages/*"
-  ]
-}
