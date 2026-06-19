@@ -4,9 +4,9 @@ Bot WhatsApp sederhana untuk melacak aktivitas harian grup (cth: "30 Days of Swe
 
 ## Fitur
 
-- 📝 **Self-Reporting (`#lapor`)**: Member grup dapat melapor aktivitas harian mereka.
+- 📝 **Self-Reporting (`/lapor`)**: Member grup dapat melapor aktivitas harian mereka.
 - 🔥 **Streak Tracking**: Menghitung streak harian secara otomatis.
-- 🏆 **Leaderboard (`#leaderboard`)**: Menampilkan klasemen streak tertinggi.
+- 🏆 **Web Dashboard**: Menampilkan klasemen, stats personal, ranking season, dan achievement di https://lapor-bot.web.id/.
 - 📱 **Multi-Login Support**: Mendukung login menggunakan QR Code atau Pairing Code.
 - 💾 **SQLite Database**: Penyimpanan data ringan dan lokal.
 
@@ -84,32 +84,27 @@ Bot hanya merespon perintah berikut di dalam grup yang telah dikonfigurasi (`GRO
 
 | Perintah | Fungsi |
 | --- | --- |
-| `#lapor` | Merekam aktivitas harian user. Menambah streak jika laporan hari ini/kemarin. |
-| `#mysidequest` | Menampilkan side quest harian untuk user yang sudah memilih job. |
-| `#lapor sidequest [kegiatan] [jumlah]` | Melaporkan side quest. Reward ½ XP, tetap dihitung ke streak, stats, leaderboard, dan goal. |
-| `#cancel` | Membatalkan laporan hari ini. Hanya bisa digunakan di hari yang sama. |
-| `#leaderboard` | Menampilkan klasemen streak, daftar yang "Keep Streak" 🔥 dan "Lose Streak" 💔. |
-| `#leaderboard-weekly` | Menampilkan klasemen total hari aktif minggu ini. |
-| `#ranks` | Menampilkan ranking hunter selama season berjalan. |
-| `#mystats` | Menampilkan statistik personal ringkas (level, rank, streak, poin). |
-| `#achievements` | Menampilkan daftar badge season dan progress member. |
-| `#jobs` | Menampilkan daftar hunter jobs yang bisa dipilih. |
-| `#job [id]` | Memilih hunter job. Contoh: `#job ranger`. |
-| `#comeback` | Menampilkan status comeback challenge setelah absen. |
-| `#motivasi` | Menampilkan pesan motivasi acak untuk semangat berolahraga. |
-| `#help` | Menampilkan list command yang tersedia. |
-| `#tutorial` | Menampilkan panduan lengkap cara memakai bot. |
-| `#strava` | Menghubungkan akun Strava untuk laporan otomatis. |
-| `#setname [nama]` | Mengubah nama tampilan di leaderboard. |
+| `/lapor` | Merekam aktivitas harian user. Menambah streak jika laporan hari ini. |
+| `/lapor-kemarin` | Merekam laporan khusus hari kemarin. |
+| `/lapor sidequest` | Menampilkan side quest harian untuk user yang sudah punya job. |
+| `/lapor sidequest [kegiatan] [jumlah]` | Melaporkan side quest. Reward bonus kecil, tetap dihitung ke streak, stats, dan leaderboard. |
+| `/cancel` | Membatalkan laporan terakhir hari ini. Hanya bisa digunakan di hari yang sama. |
+| `/cancel-all` | Membatalkan semua laporan hari ini. |
+| `/help` | Menampilkan list command yang tersedia. |
+| `/tutorial` | Menampilkan panduan lengkap cara memakai bot, termasuk link web stats dan klasemen. |
+
+Command lain yang diawali `/` akan mendapat pesan fallback berisi link bantuan dan web dashboard. Pesan biasa tanpa prefix `/` tidak akan dibalas bot.
+
+🌐 Klasemen, stats personal, ranking season, achievement, dan progres lain tersedia di https://lapor-bot.web.id/.
 
 ### Fitur Gamifikasi 🏅
-- **Season Ranks (`#ranks`)**: Rank ala hunter dihitung dari seasonal points dan reset setiap season.
-- **Hunter Jobs (`#jobs`, `#job [id]`)**: Pilih job profile seperti fighter, tanker, assassin, mage, ranger, healer, atau necromancer. Job tampil di `#mystats` dan laporan harian.
-- **Side Quest (`#mysidequest`)**: Bonus gerak harian easy/medium/hard untuk user yang sudah punya job. Lapor dengan `#lapor sidequest jalan 4000` atau `#lapor sidequest sepeda 5 km`.
+- **Season Ranks**: Rank ala hunter dihitung dari seasonal points dan reset setiap season. Cek di web dashboard.
+- **Hunter Jobs**: Job profile seperti fighter, tanker, assassin, mage, ranger, healer, atau necromancer tampil di web dashboard dan laporan harian.
+- **Side Quest (`/lapor sidequest`)**: Bonus gerak harian easy/medium/hard untuk user yang sudah punya job. Lapor dengan `/lapor sidequest jalan 4000` atau `/lapor sidequest sepeda 5 km`.
 - **Season Badges**: Badge reset setiap season supaya semua member mulai berburu dari awal.
 - **Lifetime Level & EXP**: Total poin dan level numerik (`Lv.0+`) tetap tersimpan lintas season. EXP naik level memakai kurva `5×level² + 50×level + 100` agar makin tinggi level makin lama naiknya.
 - **Milestone Notification**: Dapat notifikasi khusus saat mencapai streak tertenu (7, 14, 30 hari, dst).
-- **Leaderboard**: Bersaing dengan teman untuk streak tertinggi.
+- **Leaderboard**: Bersaing dengan teman untuk streak tertinggi di https://lapor-bot.web.id/.
 
 ## Struktur Project
 

@@ -228,8 +228,8 @@ func TestSendDailyQuests(t *testing.T) {
 	if !strings.Contains(text, "Selamat pagi, Hunters") {
 		t.Errorf("expected text to contain title, got: %s", text)
 	}
-	if !strings.Contains(text, "#mysidequest") {
-		t.Errorf("expected text to prompt #mysidequest, got: %s", text)
+	if !strings.Contains(text, "/lapor sidequest") {
+		t.Errorf("expected text to prompt /lapor sidequest, got: %s", text)
 	}
 	if strings.Contains(text, "@") || strings.Contains(text, "Alice") || strings.Contains(text, "Bob") || strings.Contains(text, "Charlie") {
 		t.Errorf("daily side quest prompt should not mention or name users, got: %s", text)

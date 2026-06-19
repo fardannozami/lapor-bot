@@ -56,12 +56,12 @@ func BuildMorningWorkoutCheckpointMessage(activeToday, pendingToday []*domain.Re
 	}
 
 	if len(pendingToday) > 0 {
-		sb.WriteString("Masih pagi — ambil 10–30 menit buat jalan kaki, stretching, bodyweight workout, atau olahraga favoritmu. Setelah itu lapor di grup dengan `#lapor`. 🚀")
+		sb.WriteString("Masih pagi — ambil 10–30 menit buat jalan kaki, stretching, bodyweight workout, atau olahraga favoritmu. Setelah itu lapor di grup dengan `/lapor`. 🚀")
 	} else {
 		sb.WriteString("Mantap, semua sudah lapor hari ini. Grup sehat full power! 🏆")
 	}
 
-	sb.WriteString("\n\n✨ Kalau sudah punya job, cek bonus gerak harian dengan `#mysidequest`.")
+	sb.WriteString("\n\n✨ Kalau sudah punya job, cek bonus gerak harian dengan `/lapor sidequest`.")
 	sb.WriteString("\n\n🌐 Lihat klasemen & stats: https://lapor-bot.web.id/")
 
 	return sb.String()

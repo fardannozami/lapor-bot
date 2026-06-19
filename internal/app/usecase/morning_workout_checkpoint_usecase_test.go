@@ -35,8 +35,8 @@ func TestBuildMorningWorkoutCheckpointMessage(t *testing.T) {
 	for _, want := range []string{
 		"09:09 Workout Checkpoint",
 		"sudah ada 1 laporan olahraga",
-		"#lapor",
-		"#mysidequest",
+		"/lapor",
+		"/lapor sidequest",
 	} {
 		if !strings.Contains(msg, want) {
 			t.Fatalf("expected message to contain %q, got %q", want, msg)

@@ -4,9 +4,17 @@ import (
 	"context"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
 )
+
+const commandPrefix = "/"
+
+const unknownCommandMessage = "📋 Maaf, command yang kamu kirim belum tersedia nih! 😅\n\n" +
+	"Coba cek command yang bisa dipakai dengan `/help` atau langsung kunjungi:\n" +
+	"🌐 https://lapor-bot.web.id/\n\n" +
+	"Di sana kamu bisa lihat klasemen, stats personal, dan info lainnya! ✨"
 
 type MessageResponse struct {
 	Text      string
@@ -64,39 +72,44 @@ func NewHandleMessageUsecase(
 }
 
 func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, message string) (MessageResponse, error) {
-	msg := strings.ToLower(strings.TrimSpace(message))
+	trimmedMessage := strings.TrimSpace(message)
+	msg := strings.ToLower(trimmedMessage)
 
 	if msg == "" {
 		return MessageResponse{}, nil
 	}
 
-	if strings.Contains(msg, "#tutorial") {
+	if !strings.HasPrefix(msg, commandPrefix) {
+		return MessageResponse{}, nil
+	}
+
+	if hasCommand(msg, "/tutorial") {
 		text := uc.helpUC.ExecuteTutorial()
 		return MessageResponse{Text: text}, nil
 	}
 
-	if strings.Contains(msg, "#help") {
+	if hasCommand(msg, "/help") {
 		text := uc.helpUC.Execute()
 		return MessageResponse{Text: text}, nil
 	}
 
-	// if strings.Contains(msg, "#attributes") || strings.Contains(msg, "#attributs") || strings.Contains(msg, "#atributs") {
+	// if hasCommand(msg, "/attributes") || hasCommand(msg, "/attributs") || hasCommand(msg, "/atributs") {
 	// 	text := uc.helpUC.ExecuteAttributes()
 	// 	return MessageResponse{Text: text}, nil
 	// }
 
-	if strings.Contains(msg, "#lapor-kemarin") {
-		workout := domain.ParseHevy(message)
-		text, err := uc.reportUC.ExecuteYesterdayWithMessage(ctx, userID, name, message, workout)
+	if hasCommand(msg, "/lapor-kemarin") {
+		workout := domain.ParseHevy(trimmedMessage)
+		text, err := uc.reportUC.ExecuteYesterdayWithMessage(ctx, userID, name, trimmedMessage, workout)
 		return MessageResponse{Text: text}, err
 	}
 
-	// if strings.Contains(msg, "#mysidequest") {
+	// if hasCommand(msg, "/mysidequest") {
 	// 	text, err := uc.dailyQuestUC.ViewQuest(ctx, userID, name, time.Now())
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	if arg, ok := extractSideQuestReport(message); ok {
+	if arg, ok := extractSideQuestReport(trimmedMessage); ok {
 		if arg == "" {
 			text, err := uc.dailyQuestUC.ViewQuest(ctx, userID, name, time.Now())
 			return MessageResponse{Text: text}, err
@@ -105,89 +118,89 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{Text: text}, err
 	}
 
-	if strings.Contains(msg, "#lapor") {
-		workout := domain.ParseHevy(message)
-		text, err := uc.reportUC.ExecuteWithMessage(ctx, userID, name, message, workout)
+	if hasCommand(msg, "/lapor") {
+		workout := domain.ParseHevy(trimmedMessage)
+		text, err := uc.reportUC.ExecuteWithMessage(ctx, userID, name, trimmedMessage, workout)
 		return MessageResponse{Text: text}, err
 	}
 
-	if strings.Contains(msg, "#cancel-all") {
+	if hasCommand(msg, "/cancel-all") {
 		text, err := uc.cancelUC.ExecuteAll(ctx, userID, name)
 		return MessageResponse{Text: text}, err
 	}
 
-	if strings.Contains(msg, "#cancel") {
+	if hasCommand(msg, "/cancel") {
 		text, err := uc.cancelUC.Execute(ctx, userID, name)
 		return MessageResponse{Text: text}, err
 	}
 
-	// if strings.Contains(msg, "#motivasi") {
+	// if hasCommand(msg, "/motivasi") {
 	// 	text := uc.motivationUC.Execute()
 	// 	return MessageResponse{Text: text}, nil
 	// }
 
-	// if strings.Contains(msg, "#jobs") {
+	// if hasCommand(msg, "/jobs") {
 	// 	return MessageResponse{Text: uc.jobUC.List()}, nil
 	// }
 
-	// if strings.Contains(msg, "#goal") {
+	// if hasCommand(msg, "/goal") {
 	// 	text, err := uc.goalUC.Execute(ctx, userID, name, message)
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if strings.Contains(msg, "#job") {
-	// 	idx := strings.Index(msg, "#job")
-	// 	jobID := strings.TrimSpace(msg[idx+len("#job"):])
+	// if hasCommand(msg, "/job") {
+	// 	idx := strings.Index(msg, "/job")
+	// 	jobID := strings.TrimSpace(msg[idx+len("/job"):])
 	// 	if jobID == "" {
-	// 		return MessageResponse{Text: "Pilih job dengan format: #job <id>. Cek daftar job dengan #jobs."}, nil
+	// 		return MessageResponse{Text: "Pilih job dengan format: /job <id>. Cek daftar job dengan /jobs."}, nil
 	// 	}
 	// 	text, err := uc.jobUC.Select(ctx, userID, name, jobID)
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if strings.Contains(msg, "#setname") {
-	// 	idx := strings.Index(msg, "#setname")
-	// 	newName := strings.TrimSpace(message[idx+len("#setname"):])
+	// if hasCommand(msg, "/setname") {
+	// 	idx := strings.Index(msg, "/setname")
+	// 	newName := strings.TrimSpace(message[idx+len("/setname"):])
 	// 	text, err := uc.updateNameUC.Execute(ctx, userID, newName)
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if strings.Contains(msg, "#leaderboard-weekly") {
+	// if hasCommand(msg, "/leaderboard-weekly") {
 	// 	text, err := uc.weeklyLeaderboardUC.Execute(ctx)
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if strings.Contains(msg, "#leaderboard-seasonal") {
+	// if hasCommand(msg, "/leaderboard-seasonal") {
 	// 	text, err := uc.leaderboardUC.ExecuteSeasonal(ctx)
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if strings.Contains(msg, "#ranks") {
+	// if hasCommand(msg, "/ranks") {
 	// 	text, err := uc.leaderboardUC.ExecuteRanks(ctx)
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if strings.Contains(msg, "#leaderboard") {
+	// if hasCommand(msg, "/leaderboard") {
 	// 	text, err := uc.leaderboardUC.Execute(ctx)
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if strings.Contains(msg, "#mystats") {
+	// if hasCommand(msg, "/mystats") {
 	// 	text, err := uc.myStatsUC.Execute(ctx, userID, name)
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if strings.Contains(msg, "#achievements") {
+	// if hasCommand(msg, "/achievements") {
 	// 	text, err := uc.achievementsUC.Execute(ctx)
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if strings.Contains(msg, "#comeback") {
+	// if hasCommand(msg, "/comeback") {
 	// 	text, err := uc.comebackUC.Execute(ctx, userID, name)
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if strings.Contains(msg, "#strava") {
+	// if hasCommand(msg, "/strava") {
 	// 	authURL := uc.linkStravaUC.GetAuthURL(userID, name)
 	// 	text := fmt.Sprintf("🚴‍♂️ *Integrasi Strava* 🏃‍♂️\n\nKlik link di bawah ini untuk menghubungkan akun Strava kamu:\n\n%s\n\nSetelah berhasil, aktivitas larimu akan otomatis dilaporkan! 🎉", authURL)
 	// 	return MessageResponse{Text: text, IsPrivate: true}, nil
@@ -198,22 +211,26 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 	// 	return MessageResponse{Text: text}, nil
 	// }
 
-	return MessageResponse{
-		Text: "📋 Maaf, command yang kamu kirim belum tersedia nih! 😅\n\n" +
-			"Coba cek command yang bisa dipakai dengan `#help` atau langsung kunjungi:\n" +
-			"🌐 https://lapor-bot.web.id/\n\n" +
-			"Di sana kamu bisa lihat klasemen, stats personal, dan info lainnya! ✨",
-	}, nil
+	return MessageResponse{Text: unknownCommandMessage}, nil
 }
 
 func extractSideQuestReport(message string) (string, bool) {
 	lower := strings.ToLower(message)
-	for _, command := range []string{"#lapor sidequest", "#lapor-sidequest"} {
-		idx := strings.Index(lower, command)
-		if idx == -1 {
+	for _, command := range []string{"/lapor sidequest", "/lapor-sidequest"} {
+		if !hasCommand(lower, command) {
 			continue
 		}
-		return strings.TrimSpace(message[idx+len(command):]), true
+		return strings.TrimSpace(message[len(command):]), true
 	}
 	return "", false
+}
+
+func hasCommand(message, command string) bool {
+	if !strings.HasPrefix(message, command) {
+		return false
+	}
+	if len(message) == len(command) {
+		return true
+	}
+	return unicode.IsSpace(rune(message[len(command)]))
 }

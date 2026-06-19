@@ -237,7 +237,7 @@ function App() {
                 <ShieldAlert className="text-system-gold mx-auto mb-4 animate-bounce" size={40} />
                 <h3 className="text-lg font-bold text-white font-orbitron">No Roster Registered</h3>
                 <p className="text-xs text-gray-500 font-mono mt-2 max-w-sm mx-auto">
-                  The database does not contain any active reports yet. Have members submit a workout report using "#lapor" on WhatsApp!
+                  The database does not contain any active reports yet. Have members submit a workout report using "/lapor" on WhatsApp!
                 </p>
               </div>
             ) : viewMode === 'table' ? (
