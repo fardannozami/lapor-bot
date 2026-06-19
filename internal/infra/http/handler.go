@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -144,6 +145,7 @@ type EnrichedReport struct {
 	JobTrait              string                      `json:"job_trait"`
 	Streak                int                         `json:"streak"`
 	ActivityCount         int                         `json:"activity_count"`
+	TotalActiveDays       int                         `json:"total_active_days"`
 	LastReportDate        string                      `json:"last_report_date"`
 	MaxStreak             int                         `json:"max_streak"`
 	TotalPoints           int                         `json:"total_points"`
@@ -415,6 +417,22 @@ func buildPersonalGoal(goal *domain.WeeklyGoal, activities []domain.GoalActivity
 	}
 }
 
+func totalActiveDays(r *domain.Report) int {
+	return r.CenturionCycles*100 + r.ActivityCount
+}
+
+func sortEnrichedReportsBySeason(reports []EnrichedReport) {
+	sort.Slice(reports, func(i, j int) bool {
+		if reports[i].SeasonalPoints == reports[j].SeasonalPoints {
+			if reports[i].SeasonalActivityCount == reports[j].SeasonalActivityCount {
+				return reports[i].Name < reports[j].Name
+			}
+			return reports[i].SeasonalActivityCount > reports[j].SeasonalActivityCount
+		}
+		return reports[i].SeasonalPoints > reports[j].SeasonalPoints
+	})
+}
+
 func enrichReport(r *domain.Report, today time.Time, weekActivity []bool, weekActiveDays int) EnrichedReport {
 	return enrichReportWithMasking(r, today, weekActivity, weekActiveDays, true)
 }
@@ -477,6 +495,7 @@ func enrichReportWithMasking(r *domain.Report, today time.Time, weekActivity []b
 		JobTrait:              jobTrait,
 		Streak:                r.Streak,
 		ActivityCount:         r.ActivityCount,
+		TotalActiveDays:       totalActiveDays(r),
 		LastReportDate:        r.LastReportDate.Format(time.RFC3339),
 		MaxStreak:             r.MaxStreak,
 		TotalPoints:           r.TotalPoints,
@@ -548,6 +567,7 @@ func (s *Server) HandleLeaderboard(w http.ResponseWriter, r *http.Request) {
 		weekActivity, weekActiveDays := buildWeekActivity(activityDates, weekStart)
 		enriched = append(enriched, enrichReport(rep, today, weekActivity, weekActiveDays))
 	}
+	sortEnrichedReportsBySeason(enriched)
 
 	s.writeJSON(w, http.StatusOK, enriched)
 }
@@ -583,7 +603,7 @@ func (s *Server) HandleSummary(w http.ResponseWriter, r *http.Request) {
 			activeStreakCount++
 		}
 
-		totalWorkoutsLogged += rep.CenturionCycles*100 + rep.ActivityCount
+		totalWorkoutsLogged += totalActiveDays(rep)
 
 		jc := rep.JobClass
 		if jc == "" {

@@ -26,6 +26,7 @@ export interface EnrichedReport {
   job_trait: string;
   streak: number;
   activity_count: number;
+  total_active_days: number;
   last_report_date: string;
   max_streak: number;
   total_points: number;
