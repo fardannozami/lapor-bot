@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, SlidersHorizontal, Flame, Trophy, Award, User, CalendarDays } from 'lucide-react';
-import type { EnrichedReport, TierProgress } from '../types';
+import type { EnrichedReport, TierProgress } from '@lapor-bot/shared';
 
 interface LeaderboardTableProps {
   hunters: EnrichedReport[];

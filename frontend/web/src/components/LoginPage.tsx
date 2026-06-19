@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { LogIn, ArrowLeft, Phone, User, AlertCircle, Loader2 } from 'lucide-react';
-import type { EnrichedReport } from '../types';
+import type { EnrichedReport } from '@lapor-bot/shared';
 
 interface LoginPageProps {
   onLoginSuccess: (user: EnrichedReport) => void;
