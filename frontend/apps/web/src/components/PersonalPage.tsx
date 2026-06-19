@@ -557,7 +557,7 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
                 />
                 <StatCard
                   label="Lifetime Days"
-                  value={user.activity_count}
+                  value={user.total_active_days}
                   tone="text-white"
                 />
               </div>

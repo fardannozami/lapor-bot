@@ -19,6 +19,26 @@ func NewGetLeaderboardUsecase(repo domain.ReportRepository) *GetLeaderboardUseca
 	return &GetLeaderboardUsecase{repo: repo}
 }
 
+func sortReportsBySeason(reports []*domain.Report) {
+	sort.Slice(reports, func(i, j int) bool {
+		if reports[i].SeasonalPoints == reports[j].SeasonalPoints {
+			if reports[i].SeasonalActivityCount == reports[j].SeasonalActivityCount {
+				return reports[i].Name < reports[j].Name
+			}
+			return reports[i].SeasonalActivityCount > reports[j].SeasonalActivityCount
+		}
+		return reports[i].SeasonalPoints > reports[j].SeasonalPoints
+	})
+}
+
+func hasSeasonActivity(report *domain.Report) bool {
+	return report.SeasonalPoints > 0 || report.SeasonalActivityCount > 0
+}
+
+func totalActiveDays(report *domain.Report) int {
+	return report.CenturionCycles*100 + report.ActivityCount
+}
+
 func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	reports, err := uc.repo.GetAllReports(ctx)
 	if err != nil {
@@ -29,7 +49,7 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	displayDate := domain.GetToday(now)
 
 	// Session-aware start date (auto-cycles every 4 months)
-	sessionNumber, sessionStart := GetCurrentSessionInfo(now)
+	_, sessionStart := GetCurrentSessionInfo(now)
 	startDate := time.Date(sessionStart.Year(), sessionStart.Month(), sessionStart.Day(), 0, 0, 0, 0, time.UTC)
 
 	challengeDay := int(displayDate.Sub(startDate).Hours()/24) + 1
@@ -39,10 +59,7 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	// Lose streak: Last report < Yesterday.
 	// New submission: Reported Today AND Streak == 1 (and maybe created today?).
 
-	// Sort all reports by ActivityCount (total days) descending
-	sort.Slice(reports, func(i, j int) bool {
-		return reports[i].ActivityCount > reports[j].ActivityCount
-	})
+	sortReportsBySeason(reports)
 
 	// Count active vs lost for recap
 	activeCount := 0
@@ -70,9 +87,13 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	sb.WriteString(fmt.Sprintf("Recap day %d:\n", challengeDay))
 	sb.WriteString(fmt.Sprintf("%d peoples keep the streak 🔥\n", activeCount))
 	sb.WriteString(fmt.Sprintf("%d lose the streak 💔\n", lostCount))
-	sb.WriteString("\nUpdate klasemen sementara:\n")
+	sb.WriteString("\nUpdate klasemen season sementara:\n")
 
-	for rank, r := range reports {
+	rank := 1
+	for _, r := range reports {
+		if !hasSeasonActivity(r) {
+			continue
+		}
 		// Active if reported this week or last week
 		lastWeekStart := domain.GetStartOfISOWeek(r.LastReportDate)
 		weeksSinceLastReport := int(math.Round(currentWeekStart.Sub(lastWeekStart).Hours() / (24 * 7)))
@@ -82,16 +103,16 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 			cyclePrefix = fmt.Sprintf("[S1-C%d] ", r.CenturionCycles+1)
 		}
 
-		seasonalInfo := ""
-		if r.SeasonalPoints > 0 {
-			seasonalInfo = fmt.Sprintf(" | Season %d: %d pts", sessionNumber, r.SeasonalPoints)
-		}
-
 		if weeksSinceLastReport <= 1 {
-			sb.WriteString(fmt.Sprintf("%d. %s%s - %d days (%d weeks streak 🔥)%s\n", rank+1, cyclePrefix, r.Name, r.ActivityCount, r.Streak, seasonalInfo))
+			sb.WriteString(fmt.Sprintf("%d. %s%s — %d pts (%d hari season, %d hari lifetime, %d minggu streak 🔥)\n", rank, cyclePrefix, r.Name, r.SeasonalPoints, r.SeasonalActivityCount, totalActiveDays(r), r.Streak))
 		} else {
-			sb.WriteString(fmt.Sprintf("%d. %s%s - %d days (💔)%s\n", rank+1, cyclePrefix, r.Name, r.ActivityCount, seasonalInfo))
+			sb.WriteString(fmt.Sprintf("%d. %s%s — %d pts (%d hari season, %d hari lifetime, 💔)\n", rank, cyclePrefix, r.Name, r.SeasonalPoints, r.SeasonalActivityCount, totalActiveDays(r)))
 		}
+		rank++
+	}
+
+	if rank == 1 {
+		sb.WriteString("Belum ada hunter aktif season ini.\n")
 	}
 
 	sb.WriteString("\nYang udah keringetan langsung update/posting aja nanti dimasukkin klasemen 💪\n\nSemangat🔥")
@@ -110,13 +131,7 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 	seasonNumber, sessionStart := GetCurrentSessionInfo(now)
 	_ = sessionStart
 
-	// Sort by seasonal points descending
-	sort.Slice(reports, func(i, j int) bool {
-		if reports[i].SeasonalPoints == reports[j].SeasonalPoints {
-			return reports[i].SeasonalActivityCount > reports[j].SeasonalActivityCount
-		}
-		return reports[i].SeasonalPoints > reports[j].SeasonalPoints
-	})
+	sortReportsBySeason(reports)
 
 	sb := strings.Builder{}
 	sb.WriteString(fmt.Sprintf("🏆 *Season %d Leaderboard*\n\n", seasonNumber))
@@ -129,7 +144,7 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 
 	activeInSeason := 0
 	for _, r := range reports {
-		if r.SeasonalActivityCount > 0 {
+		if hasSeasonActivity(r) {
 			activeInSeason++
 		}
 	}
@@ -138,7 +153,7 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 
 	rank := 1
 	for _, r := range reports {
-		if r.SeasonalPoints == 0 && r.SeasonalActivityCount == 0 {
+		if !hasSeasonActivity(r) {
 			continue
 		}
 		cyclePrefix := ""
@@ -147,6 +162,11 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 		}
 		sb.WriteString(fmt.Sprintf("%d. %s%s — %d pts (%d hari)\n", rank, cyclePrefix, r.Name, r.SeasonalPoints, r.SeasonalActivityCount))
 		rank++
+	}
+	if rank == 1 {
+		sb.WriteString("Belum ada yang aktif di season ini.\n")
+		sb.WriteString("Jadilah yang pertama dengan /lapor! 💪")
+		return sb.String(), nil
 	}
 
 	sb.WriteString("\nSeasonal ranking dihitung dari poin yang diraih di season ini.\n")
@@ -166,15 +186,7 @@ func (uc *GetLeaderboardUsecase) ExecuteRanks(ctx context.Context) (string, erro
 	seasonNumber, _ := GetCurrentSessionInfo(now)
 	nextReset := GetNextResetTime(now)
 
-	sort.Slice(reports, func(i, j int) bool {
-		if reports[i].SeasonalPoints == reports[j].SeasonalPoints {
-			if reports[i].SeasonalActivityCount == reports[j].SeasonalActivityCount {
-				return reports[i].Name < reports[j].Name
-			}
-			return reports[i].SeasonalActivityCount > reports[j].SeasonalActivityCount
-		}
-		return reports[i].SeasonalPoints > reports[j].SeasonalPoints
-	})
+	sortReportsBySeason(reports)
 
 	sb := strings.Builder{}
 	sb.WriteString(fmt.Sprintf("🏹 *Season %d Ranks*\n", seasonNumber))
@@ -183,7 +195,7 @@ func (uc *GetLeaderboardUsecase) ExecuteRanks(ctx context.Context) (string, erro
 
 	rank := 1
 	for _, r := range reports {
-		if r.SeasonalPoints == 0 && r.SeasonalActivityCount == 0 {
+		if !hasSeasonActivity(r) {
 			continue
 		}
 

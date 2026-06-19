@@ -450,12 +450,12 @@ func TestStreak_LongGap_StreakResets(t *testing.T) {
 // Active 🔥: Reported today OR yesterday (still has time to report today)
 // Lost 💔: Last report was before yesterday (streak broken)
 //
-// Ranking: By ActivityCount (total days), NOT by streak
-// Someone with 30 days 💔 ranks above someone with 25 days 🔥
+// Ranking: By SeasonalPoints, then SeasonalActivityCount, then Name.
+// Lifetime days are displayed separately and include centurion cycles.
 //
 // =============================================================================
 
-func TestLeaderboard_RanksByActivityCount(t *testing.T) {
+func TestLeaderboard_RanksBySeasonPoints(t *testing.T) {
 	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewGetLeaderboardUsecase(repo)
 	ctx := context.Background()
@@ -466,25 +466,31 @@ func TestLeaderboard_RanksByActivityCount(t *testing.T) {
 
 	// Setup: 3 users with different activity counts and streak status
 	repo.reports["user1"] = &domain.Report{
-		UserID:         "user1",
-		Name:           "HighTotal_LostStreak",
-		Streak:         0,
-		ActivityCount:  30, // Highest total, but lost streak
-		LastReportDate: twoWeeksAgo,
+		UserID:                "user1",
+		Name:                  "HighTotal_LostStreak",
+		Streak:                0,
+		ActivityCount:         30,
+		SeasonalPoints:        90,
+		SeasonalActivityCount: 4,
+		LastReportDate:        twoWeeksAgo,
 	}
 	repo.reports["user2"] = &domain.Report{
-		UserID:         "user2",
-		Name:           "MediumTotal_ActiveStreak",
-		Streak:         25,
-		ActivityCount:  25, // Medium total, active streak
-		LastReportDate: yesterday,
+		UserID:                "user2",
+		Name:                  "MediumTotal_ActiveStreak",
+		Streak:                25,
+		ActivityCount:         25,
+		SeasonalPoints:        120,
+		SeasonalActivityCount: 2,
+		LastReportDate:        yesterday,
 	}
 	repo.reports["user3"] = &domain.Report{
-		UserID:         "user3",
-		Name:           "LowTotal_ActiveStreak",
-		Streak:         10,
-		ActivityCount:  10, // Lowest total, active streak
-		LastReportDate: now,
+		UserID:                "user3",
+		Name:                  "LowTotal_ActiveStreak",
+		Streak:                10,
+		ActivityCount:         10,
+		SeasonalPoints:        120,
+		SeasonalActivityCount: 5,
+		LastReportDate:        now,
 	}
 
 	// Get leaderboard
@@ -493,21 +499,20 @@ func TestLeaderboard_RanksByActivityCount(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// Verify ranking order in output (should be by ActivityCount)
-	// HighTotal should appear before MediumTotal, which appears before LowTotal
+	// Verify ranking order in output (should be by season points, then season active days)
 	pos1 := indexOf(result, "HighTotal_LostStreak")
 	pos2 := indexOf(result, "MediumTotal_ActiveStreak")
 	pos3 := indexOf(result, "LowTotal_ActiveStreak")
 
-	if pos1 > pos2 || pos2 > pos3 {
-		t.Errorf("Leaderboard should rank by ActivityCount: got positions %d, %d, %d", pos1, pos2, pos3)
+	if pos3 > pos2 || pos2 > pos1 {
+		t.Errorf("Leaderboard should rank by season points then active days: got positions high=%d, medium=%d, low=%d", pos1, pos2, pos3)
 	}
 
 	// Verify emojis and format
-	if !containsSubstring(result, "HighTotal_LostStreak - 30 days (💔)") {
+	if !containsSubstring(result, "HighTotal_LostStreak — 90 pts (4 hari season, 30 hari lifetime, 💔)") {
 		t.Errorf("Lost streak user should have 💔 emoji in ranking")
 	}
-	if !containsSubstring(result, "MediumTotal_ActiveStreak - 25 days (25 weeks streak 🔥)") {
+	if !containsSubstring(result, "MediumTotal_ActiveStreak — 120 pts (2 hari season, 25 hari lifetime, 25 minggu streak 🔥)") {
 		t.Errorf("Active streak user should have weeks streak and 🔥 emoji")
 	}
 }
@@ -570,7 +575,7 @@ func TestCenturion_PrestigeTransition(t *testing.T) {
 	}
 }
 
-func TestLeaderboard_CenturionSorting(t *testing.T) {
+func TestLeaderboard_UsesSeasonSortingAndDisplaysTotalActiveDays(t *testing.T) {
 	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewGetLeaderboardUsecase(repo)
 	ctx := context.Background()
@@ -581,30 +586,37 @@ func TestLeaderboard_CenturionSorting(t *testing.T) {
 	// User A: Cycle 0, Day 50 (Experienced)
 	// User B: Cycle 1, Day 1 (Just "lapped" the leaderboard)
 	repo.reports["userA"] = &domain.Report{
-		Name:            "OldGuard",
-		ActivityCount:   50,
-		CenturionCycles: 0,
-		LastReportDate:  now,
+		Name:                  "OldGuard",
+		ActivityCount:         50,
+		CenturionCycles:       0,
+		SeasonalPoints:        100,
+		SeasonalActivityCount: 5,
+		LastReportDate:        now,
 	}
 	repo.reports["userB"] = &domain.Report{
-		Name:            "PrestigePlayer",
-		ActivityCount:   1,
-		CenturionCycles: 1,
-		LastReportDate:  now,
+		Name:                  "PrestigePlayer",
+		ActivityCount:         1,
+		CenturionCycles:       1,
+		SeasonalPoints:        120,
+		SeasonalActivityCount: 3,
+		LastReportDate:        now,
 	}
 
 	result, _ := uc.Execute(ctx)
 
-	// Since we sort by ActivityCount DESC, Day 50 (OldGuard) should be higher than Day 1 (PrestigePlayer)
+	// Season points are canonical, so PrestigePlayer ranks higher even though its cycle day is 1.
 	posA := indexOf(result, "OldGuard")
 	posB := indexOf(result, "PrestigePlayer")
 
-	if posA > posB {
-		t.Errorf("Leaderboard should put Day 50 above Day 1 even if Day 1 is Cycle 2. Got positions A:%d, B:%d", posA, posB)
+	if posB > posA {
+		t.Errorf("Leaderboard should put higher season points first. Got positions A:%d, B:%d", posA, posB)
 	}
 
 	if !containsSubstring(result, "[S1-C2] PrestigePlayer") {
 		t.Errorf("Leaderboard should show [S1-C2] badge for the Prestige player")
+	}
+	if !containsSubstring(result, "101 hari lifetime") {
+		t.Errorf("Leaderboard should display centurion-aware lifetime days, got: %s", result)
 	}
 }
 
