@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Award, Shield, Heart, Zap, Swords, Flame, Trophy, Compass } from 'lucide-react';
-import type { EnrichedReport } from '../types';
+import type { EnrichedReport } from '@lapor-bot/shared';
 
 interface ProfileModalProps {
   hunter: EnrichedReport | null;

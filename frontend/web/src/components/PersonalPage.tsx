@@ -1,5 +1,5 @@
 import { ArrowLeft, Shield, Swords, Zap, Heart, Trophy, LogOut, ScrollText, CheckCircle2, Circle } from 'lucide-react';
-import type { EnrichedReport, QuestTask } from '../types';
+import type { EnrichedReport, QuestTask } from '@lapor-bot/shared';
 
 interface PersonalPageProps {
   user: EnrichedReport;

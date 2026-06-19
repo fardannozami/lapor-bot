@@ -1,6 +1,6 @@
 import React from 'react';
 import { Flame, Trophy, Activity, ArrowUpRight } from 'lucide-react';
-import type { EnrichedReport } from '../types';
+import type { EnrichedReport } from '@lapor-bot/shared';
 
 interface HunterCardProps {
   hunter: EnrichedReport;

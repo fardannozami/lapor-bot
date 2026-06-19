@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { LayoutGrid, Table2, RefreshCw, AlertCircle, ShieldAlert, HeartPulse, Sun, Moon, LogIn } from 'lucide-react';
-import type { EnrichedReport, GlobalSummary } from './types';
+import type { EnrichedReport, GlobalSummary } from '@lapor-bot/shared';
 import { StatsOverview } from './components/StatsOverview';
 import { LeaderboardTable } from './components/LeaderboardTable';
 import { HunterCard } from './components/HunterCard';

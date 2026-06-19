@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users, Flame, Activity, Shield } from 'lucide-react';
-import type { GlobalSummary } from '../types';
+import type { GlobalSummary } from '@lapor-bot/shared';
 
 interface StatsOverviewProps {
   summary: GlobalSummary | null;
