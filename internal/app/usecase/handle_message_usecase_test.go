@@ -288,14 +288,14 @@ func TestHandleMessage_LeaderboardCommand(t *testing.T) {
 		ActivityCount: 5,
 	}
 
-	// /leaderboard command is currently disabled — should get fallback message
+	// /leaderboard command is currently disabled — should be silent
 	msg, err := handleUC.Execute(ctx, "user1", "User", "/leaderboard")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-		t.Errorf("Disabled command should return fallback with website URL, got '%s'", msg.Text)
+	if msg.Text != "" {
+		t.Errorf("Disabled command should be silently ignored, got '%s'", msg.Text)
 	}
 }
 
@@ -317,8 +317,8 @@ func TestHandleMessage_LeaderboardCaseInsensitive(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", cmd, err)
 		}
-		if msg.Text == "" || !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-			t.Errorf("Disabled command '%s' should return fallback with website URL, got '%s'", cmd, msg.Text)
+		if msg.Text != "" {
+			t.Errorf("Disabled command '%s' should be silently ignored, got '%s'", cmd, msg.Text)
 		}
 	}
 }
@@ -345,8 +345,8 @@ func TestHandleMessage_WeeklyLeaderboardCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-		t.Fatalf("Disabled weekly leaderboard should return fallback with website URL, got %q", msg.Text)
+	if msg.Text != "" {
+		t.Fatalf("Disabled weekly leaderboard should be silently ignored, got %q", msg.Text)
 	}
 }
 
@@ -381,7 +381,7 @@ func TestHandleMessage_NonCommand_ReturnsNoResponse(t *testing.T) {
 	}
 }
 
-func TestHandleMessage_LegacyHashCommand_ReturnsNudge(t *testing.T) {
+func TestHandleMessage_HashCommand_WorksLikeSlash(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
@@ -393,42 +393,39 @@ func TestHandleMessage_LegacyHashCommand_ReturnsNudge(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Active commands triggered with the legacy "#" prefix should nudge the
-	// user to switch to "/", preserving the original arguments.
+	// Legacy "#" prefix should work exactly like "/" for all commands.
 	tests := []struct {
 		input        string
 		wantContains string
 	}{
-		{"#lapor", "/lapor"},
-		{"#lapor Push Day", "/lapor Push Day"},
-		{"#lapor sidequest", "/lapor sidequest"},
-		{"#lapor sidequest jalan kaki 4000", "/lapor sidequest jalan kaki 4000"},
-		{"#lapor-kemarin", "/lapor-kemarin"},
-		{"#cancel", "/cancel"},
-		{"#cancel-all", "/cancel-all"},
-		{"#help", "/help"},
-		{"#tutorial", "/tutorial"},
-		{"#LAPOR", "/LAPOR"},
+		{"#lapor", "Laporan diterima"},
+		{"#lapor Push Day", "Laporan diterima"},
+		{"#lapor sidequest", "belum terdaftar"},
+		{"#help", "Lapor Bot"},
+		{"#tutorial", "Panduan"},
+		{"#cancel", "belum pernah"},
+		{"#cancel-all", "belum pernah"},
+		{"#LAPOR", "Laporan diterima"},
 	}
 	for _, tt := range tests {
+		// Reset for each test case
+		repo.reports = make(map[string]*domain.Report)
+
 		result, err := handleUC.Execute(ctx, "user1", "User", tt.input)
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", tt.input, err)
 		}
 		if result.Text == "" {
-			t.Errorf("Legacy command '%s' should return a nudge, got empty", tt.input)
+			t.Errorf("Hash command '%s' should produce a response, got empty", tt.input)
 			continue
 		}
 		if !containsSubstring(result.Text, tt.wantContains) {
-			t.Errorf("Legacy command '%s': expected nudge to contain '%s', got '%s'", tt.input, tt.wantContains, result.Text)
-		}
-		if !containsSubstring(result.Text, "pensiu") && !containsSubstring(result.Text, "pensiun") {
-			t.Errorf("Legacy command '%s': nudge should mention the # retirement, got '%s'", tt.input, result.Text)
+			t.Errorf("Hash command '%s': expected to contain '%s', got '%s'", tt.input, tt.wantContains, result.Text)
 		}
 	}
 }
 
-func TestHandleMessage_UnknownSlashCommand_ReturnsFallback(t *testing.T) {
+func TestHandleMessage_UnknownHashCommand_Silent(t *testing.T) {
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
 	reportUC := usecase.NewReportActivityUsecase(repo)
 	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
@@ -440,14 +437,43 @@ func TestHandleMessage_UnknownSlashCommand_ReturnsFallback(t *testing.T) {
 
 	ctx := context.Background()
 
-	testCases := []string{"/invalid", "/mystats", "/laporhalo"}
+	// Unknown hash commands should be silently ignored (bot does not react)
+	tests := []string{
+		"#random",
+		"#makan",
+		"#olahraga",
+	}
+	for _, msgText := range tests {
+		result, err := handleUC.Execute(ctx, "user1", "User", msgText)
+		if err != nil {
+			t.Fatalf("Unexpected error for '%s': %v", msgText, err)
+		}
+		if result.Text != "" {
+			t.Errorf("Unknown hash command '%s' should be silently ignored, got '%s'", msgText, result.Text)
+		}
+	}
+}
+
+func TestHandleMessage_UnknownSlashCommand_Silent(t *testing.T) {
+	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
+	reportUC := usecase.NewReportActivityUsecase(repo)
+	leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
+	myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+	comebackUC := usecase.NewComebackChallengeUsecase(repo)
+	updateNameUC := usecase.NewUpdateNameUsecase(repo)
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase())
+
+	ctx := context.Background()
+
+	testCases := []string{"/invalid", "/mystats", "/laporhalo", "/leaderboard"}
 	for _, msgText := range testCases {
 		result, err := handleUC.Execute(ctx, "user1", "User", msgText)
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", msgText, err)
 		}
-		if !containsSubstring(result.Text, "https://lapor-bot.web.id/") {
-			t.Errorf("Unknown slash command '%s' should return fallback with website URL, got '%s'", msgText, result.Text)
+		if result.Text != "" {
+			t.Errorf("Unknown slash command '%s' should be silently ignored, got '%s'", msgText, result.Text)
 		}
 	}
 }
@@ -534,8 +560,8 @@ func TestHandleMessage_GamificationCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error for /mystats: %v", err)
 	}
-	if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-		t.Errorf("Disabled /mystats should return fallback with website URL, got: %s", msg.Text)
+	if msg.Text != "" {
+		t.Errorf("Disabled /mystats should be silently ignored, got: %s", msg.Text)
 	}
 
 	// /achievements is now disabled — should get fallback
@@ -543,8 +569,8 @@ func TestHandleMessage_GamificationCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error for /achievements: %v", err)
 	}
-	if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-		t.Errorf("Disabled /achievements should return fallback with website URL, got: %s", msg.Text)
+	if msg.Text != "" {
+		t.Errorf("Disabled /achievements should be silently ignored, got: %s", msg.Text)
 	}
 }
 
@@ -560,13 +586,13 @@ func TestHandleMessage_JobCommands(t *testing.T) {
 
 	ctx := context.Background()
 
-	// /jobs command is now disabled — should get fallback
+	// /jobs command is now disabled — should be silent
 	msg, err := handleUC.Execute(ctx, "user1", "Hunter", "/jobs")
 	if err != nil {
 		t.Fatalf("unexpected error for /jobs: %v", err)
 	}
-	if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-		t.Fatalf("Disabled /jobs should return fallback with website URL, got %q", msg.Text)
+	if msg.Text != "" {
+		t.Fatalf("Disabled /jobs should be silently ignored, got %q", msg.Text)
 	}
 
 	repo.reports["user1"] = &domain.Report{
@@ -575,13 +601,13 @@ func TestHandleMessage_JobCommands(t *testing.T) {
 		TotalPoints: 100,
 	}
 
-	// /job command is now disabled — should get fallback
+	// /job command is now disabled — should be silent
 	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "/job ranger")
 	if err != nil {
 		t.Fatalf("unexpected error for /job: %v", err)
 	}
-	if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-		t.Fatalf("Disabled /job should return fallback with website URL, got %q", msg.Text)
+	if msg.Text != "" {
+		t.Fatalf("Disabled /job should be silently ignored, got %q", msg.Text)
 	}
 
 	// /job command is now disabled — set job directly in repo for lapor test
@@ -592,8 +618,8 @@ func TestHandleMessage_JobCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error for /mystats: %v", err)
 	}
-	if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-		t.Fatalf("Disabled /mystats should return fallback with website URL, got %q", msg.Text)
+	if msg.Text != "" {
+		t.Fatalf("Disabled /mystats should be silently ignored, got %q", msg.Text)
 	}
 
 	// /lapor still works and should show the job
@@ -623,16 +649,16 @@ func TestHandleMessage_SetNameCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-		t.Errorf("Disabled /setname should return fallback, got: %s", msg.Text)
+	if msg.Text != "" {
+		t.Errorf("Disabled /setname should be silently ignored, got: %s", msg.Text)
 	}
 
 	msg, err = handleUC.Execute(ctx, "userVip", "King Budi", "/setname Budi Solo")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-		t.Errorf("Disabled /setname should return fallback, got: %s", msg.Text)
+	if msg.Text != "" {
+		t.Errorf("Disabled /setname should be silently ignored, got: %s", msg.Text)
 	}
 }
 
@@ -668,7 +694,7 @@ func TestHandleMessage_LaporDoesNotUpdateName(t *testing.T) {
 	}
 }
 
-func TestHandleMessage_LaporWithNonWhitespaceChars_ReturnsFallback(t *testing.T) {
+func TestHandleMessage_LaporWithNonWhitespaceChars_ReturnsNoResponse(t *testing.T) {
 	// /lapor must match a real command token so accidental slash words do not
 	// create activity reports.
 	repo := &mockReportRepo{reports: make(map[string]*domain.Report)}
@@ -695,8 +721,8 @@ func TestHandleMessage_LaporWithNonWhitespaceChars_ReturnsFallback(t *testing.T)
 		if err != nil {
 			t.Fatalf("Test %d: unexpected error for %q: %v", i, cmd, err)
 		}
-		if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-			t.Errorf("Test %d: %q should return fallback, got %q", i, cmd, msg.Text)
+		if msg.Text != "" {
+			t.Errorf("Test %d: %q should be silently ignored, got %q", i, cmd, msg.Text)
 		}
 		if repo.reports["user1"] != nil {
 			t.Errorf("Test %d: %q should not create an activity report", i, cmd)
@@ -772,13 +798,13 @@ func TestHandleMessage_MySideQuestCommand(t *testing.T) {
 		Level:       1,
 	}
 
-	// /mysidequest command is now disabled — should get fallback
+	// /mysidequest command is now disabled — should be silent
 	msg, err := handleUC.Execute(ctx, "user123", "TestUser", "/mysidequest")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if !containsSubstring(msg.Text, "https://lapor-bot.web.id/") {
-		t.Errorf("Disabled /mysidequest should return fallback with website URL, got '%s'", msg.Text)
+	if msg.Text != "" {
+		t.Errorf("Disabled /mysidequest should be silently ignored, got '%s'", msg.Text)
 	}
 }
