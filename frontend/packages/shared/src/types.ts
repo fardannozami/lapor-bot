@@ -58,13 +58,42 @@ export interface EnrichedReport {
   week_activity: boolean[];
   estimated_weekly_points: number;
   is_active_today: boolean;
+  daily_activity?: DailyActivity[];
+  current_daily_streak?: number;
+  longest_daily_streak?: number;
+  active_days_in_window?: number;
+  active_goal?: PersonalGoal;
   today_side_quests?: QuestTask[];
+}
+
+export interface DailyActivity {
+  date: string;
+  count: number;
+  active: boolean;
+}
+
+export interface GoalDay {
+  date: string;
+  day_label: string;
+  activity: string;
+  active: boolean;
+}
+
+export interface PersonalGoal {
+  target_days: number;
+  activity: string;
+  start_at: string;
+  end_at: string;
+  completed_days: number;
+  remaining_days: number;
+  percent: number;
+  days: GoalDay[];
 }
 
 export interface QuestTask {
   id: string;
   name: string;
-  difficulty: 'easy' | 'medium' | 'hard' | string;
+  difficulty: "easy" | "medium" | "hard" | string;
   target: number;
   progress: number;
   unit: string;
