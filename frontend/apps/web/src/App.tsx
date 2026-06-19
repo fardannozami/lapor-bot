@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { LayoutGrid, Table2, RefreshCw, AlertCircle, ShieldAlert, HeartPulse, Sun, Moon, LogIn } from 'lucide-react';
-import type { EnrichedReport, GlobalSummary } from '@lapor-bot/shared';
+import { useReports } from '@lapor-bot/shared';
+import type { EnrichedReport } from '@lapor-bot/shared';
 import { StatsOverview } from './components/StatsOverview';
 import { LeaderboardTable } from './components/LeaderboardTable';
 import { HunterCard } from './components/HunterCard';
@@ -19,12 +20,8 @@ function getInitialTheme(): Theme {
 }
 
 function App() {
-  const [hunters, setHunters] = useState<EnrichedReport[]>([]);
-  const [summary, setSummary] = useState<GlobalSummary | null>(null);
+  const { summary, hunters, loading, refreshing, error, refresh } = useReports();
   const [selectedHunter, setSelectedHunter] = useState<EnrichedReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [cardPage, setCardPage] = useState(1);
@@ -41,46 +38,7 @@ function App() {
     return hunters.slice(start, start + PAGE_SIZE);
   }, [hunters, safeCardPage]);
 
-  const fetchData = async (showRefreshIndicator = false) => {
-    if (showRefreshIndicator) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
 
-    try {
-      // Fetch summary statistics
-      const summaryRes = await fetch('/api/summary');
-      if (!summaryRes.ok) {
-        throw new Error(`Failed to fetch summary: ${summaryRes.statusText}`);
-      }
-      const summaryData = (await summaryRes.json()) as GlobalSummary;
-      setSummary(summaryData);
-
-      // Fetch leaderboard list
-      const leaderboardRes = await fetch('/api/leaderboard');
-      if (!leaderboardRes.ok) {
-        throw new Error(`Failed to fetch leaderboard: ${leaderboardRes.statusText}`);
-      }
-      const leaderboardData = (await leaderboardRes.json()) as EnrichedReport[];
-      setHunters(leaderboardData);
-    } catch (err: unknown) {
-      console.error(err);
-      const message = err instanceof Error ? err.message : null;
-      setError(
-        message || 'System Link Failure. Check connection to the Go server.'
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchData();
-  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -163,7 +121,7 @@ function App() {
           </button>
 
           <button
-            onClick={() => fetchData(true)}
+            onClick={() => refresh()}
             disabled={loading || refreshing}
             className="flex items-center gap-2 px-4.5 py-2 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors disabled:opacity-50"
           >
@@ -205,9 +163,9 @@ function App() {
                   <p className="font-bold font-mono uppercase text-xs tracking-wider text-system-red">
                     System Link Disrupted
                   </p>
-                  <p className="mt-1 text-xs font-mono">{error}</p>
+                  <p className="mt-1 text-xs font-mono">{error instanceof Error ? error.message : String(error)}</p>
                   <button
-                    onClick={() => fetchData()}
+                    onClick={() => refresh()}
                     className="mt-3 text-xs font-bold text-white hover:underline uppercase tracking-wide block font-mono"
                   >
                     Reconnect System Core
@@ -217,7 +175,7 @@ function App() {
             )}
 
             {/* Stats Section */}
-            <StatsOverview summary={summary} loading={loading} />
+            <StatsOverview summary={summary ?? null} loading={loading} />
 
             {!loading && !error && hunters.length > 0 && <MotivationBanner />}
 

@@ -14,6 +14,7 @@
     "@lapor-bot/design-system": "*",
     "@lapor-bot/shared": "*",
     "@lapor-bot/ui": "*",
+    "@tanstack/react-query": "^5.101.0",
     "lucide-react": "^1.21.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { LogIn, ArrowLeft, Phone, User, AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '@lapor-bot/shared';
 import type { EnrichedReport } from '@lapor-bot/shared';
 
 interface LoginPageProps {
@@ -10,42 +11,33 @@ interface LoginPageProps {
 export function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   const [countryCode, setCountryCode] = useState('62');
   const [phone, setPhone] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const { login, loading, error: authError } = useAuth();
+
+  const error = validationError || authError;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setValidationError(null);
 
     if (!countryCode || !/^\d+$/.test(countryCode)) {
-      setError('Kode negara wajib diisi (angka saja).');
+      setValidationError('Kode negara wajib diisi (angka saja).');
       return;
     }
 
     const digits = phone.replace(/\D/g, '');
     if (!digits) {
-      setError('Nomor telepon wajib diisi.');
+      setValidationError('Nomor telepon wajib diisi.');
       return;
     }
     if (digits.length < 6 || digits.length > 14) {
-      setError('Nomor harus 6-14 digit (tanpa kode negara).');
+      setValidationError('Nomor harus 6-14 digit (tanpa kode negara).');
       return;
     }
 
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/user?phone=${countryCode}${digits}`);
-      if (res.status === 404) {
-        setError('User tidak ditemukan. Pastikan nomor sudah pernah lapor di grup.');
-        return;
-      }
-      if (!res.ok) throw new Error('Gagal menghubungi server.');
-      const data = (await res.json()) as EnrichedReport;
-      onLoginSuccess(data);
-    } catch {
-      setError('Gagal menghubungi server. Coba lagi nanti.');
-    } finally {
-      setLoading(false);
+    const user = await login(`${countryCode}${digits}`);
+    if (user) {
+      onLoginSuccess(user);
     }
   };
 
