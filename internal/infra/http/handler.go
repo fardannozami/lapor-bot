@@ -176,6 +176,11 @@ type EnrichedReport struct {
 	WeekActivity          []bool                      `json:"week_activity"`
 	EstimatedWeeklyPoints int                         `json:"estimated_weekly_points"`
 	IsActiveToday         bool                        `json:"is_active_today"`
+	DailyActivity         []DailyActivity             `json:"daily_activity,omitempty"`
+	CurrentDailyStreak    int                         `json:"current_daily_streak,omitempty"`
+	LongestDailyStreak    int                         `json:"longest_daily_streak,omitempty"`
+	ActiveDaysInWindow    int                         `json:"active_days_in_window,omitempty"`
+	ActiveGoal            *PersonalGoal               `json:"active_goal,omitempty"`
 	TodaySideQuests       []domain.QuestTask          `json:"today_side_quests,omitempty"`
 }
 
@@ -189,6 +194,31 @@ type TierProgress struct {
 	NextName   string `json:"next_name"`
 	NextIcon   string `json:"next_icon"`
 	IsMax      bool   `json:"is_max"`
+}
+
+// DailyActivity is a compact contribution-calendar cell for a personal profile.
+type DailyActivity struct {
+	Date   string `json:"date"`
+	Count  int    `json:"count"`
+	Active bool   `json:"active"`
+}
+
+type GoalDay struct {
+	Date     string `json:"date"`
+	DayLabel string `json:"day_label"`
+	Activity string `json:"activity"`
+	Active   bool   `json:"active"`
+}
+
+type PersonalGoal struct {
+	TargetDays    int       `json:"target_days"`
+	Activity      string    `json:"activity"`
+	StartAt       string    `json:"start_at"`
+	EndAt         string    `json:"end_at"`
+	CompletedDays int       `json:"completed_days"`
+	RemainingDays int       `json:"remaining_days"`
+	Percent       int       `json:"percent"`
+	Days          []GoalDay `json:"days"`
 }
 
 // GlobalSummary holds aggregated dashboard data.
@@ -280,6 +310,109 @@ func buildWeekActivity(activityDates []time.Time, weekStart time.Time) ([]bool, 
 		}
 	}
 	return activity, activeDays
+}
+
+func buildDailyActivity(activityDates []time.Time, today time.Time, days int) ([]DailyActivity, int, int, int) {
+	activeDates := make(map[string]bool, len(activityDates))
+	for _, date := range activityDates {
+		activeDates[date.Format(time.DateOnly)] = true
+	}
+
+	start := today.AddDate(0, 0, -(days - 1))
+	activity := make([]DailyActivity, 0, days)
+	activeDays := 0
+	for i := 0; i < days; i++ {
+		date := start.AddDate(0, 0, i)
+		active := activeDates[date.Format(time.DateOnly)]
+		count := 0
+		if active {
+			count = 1
+			activeDays++
+		}
+		activity = append(activity, DailyActivity{
+			Date:   date.Format(time.DateOnly),
+			Count:  count,
+			Active: active,
+		})
+	}
+
+	currentStreak := 0
+	for date := today; activeDates[date.Format(time.DateOnly)]; date = date.AddDate(0, 0, -1) {
+		currentStreak++
+	}
+
+	longestStreak := 0
+	runningStreak := 0
+	var previousActiveDay time.Time
+	for _, day := range activityDates {
+		day = domain.GetToday(day)
+		if !previousActiveDay.IsZero() && day.Equal(previousActiveDay) {
+			continue
+		}
+		if !previousActiveDay.IsZero() && day.Equal(previousActiveDay.AddDate(0, 0, 1)) {
+			runningStreak++
+		} else {
+			runningStreak = 1
+		}
+		if runningStreak > longestStreak {
+			longestStreak = runningStreak
+		}
+		previousActiveDay = day
+	}
+
+	return activity, activeDays, currentStreak, longestStreak
+}
+
+var profileDayLabels = []string{"Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"}
+
+func buildPersonalGoal(goal *domain.WeeklyGoal, activities []domain.GoalActivity) *PersonalGoal {
+	activityByDate := make(map[string]string, len(activities))
+	for _, activity := range activities {
+		activityByDate[activity.Date.Format(time.DateOnly)] = strings.TrimSpace(activity.Activity)
+	}
+
+	startDate := domain.GetToday(goal.StartAt.UTC())
+	endDate := domain.GetToday(goal.EndAt.Add(-time.Nanosecond).UTC())
+	days := make([]GoalDay, 0, 7)
+	for date := startDate; !date.After(endDate); date = date.AddDate(0, 0, 1) {
+		activity, active := activityByDate[date.Format(time.DateOnly)]
+		if activity == "" {
+			activity = "—"
+		}
+		days = append(days, GoalDay{
+			Date:     date.Format(time.DateOnly),
+			DayLabel: profileDayLabels[date.Weekday()],
+			Activity: activity,
+			Active:   active,
+		})
+	}
+
+	completedDays := len(activityByDate)
+	if completedDays > goal.TargetDays {
+		completedDays = goal.TargetDays
+	}
+	remainingDays := goal.TargetDays - completedDays
+	if remainingDays < 0 {
+		remainingDays = 0
+	}
+	percent := 0
+	if goal.TargetDays > 0 {
+		percent = (completedDays * 100) / goal.TargetDays
+	}
+	if percent > 100 {
+		percent = 100
+	}
+
+	return &PersonalGoal{
+		TargetDays:    goal.TargetDays,
+		Activity:      goal.Activity,
+		StartAt:       goal.StartAt.Format(time.RFC3339),
+		EndAt:         goal.EndAt.Format(time.RFC3339),
+		CompletedDays: completedDays,
+		RemainingDays: remainingDays,
+		Percent:       percent,
+		Days:          days,
+	}
 }
 
 func enrichReport(r *domain.Report, today time.Time, weekActivity []bool, weekActiveDays int) EnrichedReport {
@@ -515,6 +648,26 @@ func (s *Server) HandleGetUser(w http.ResponseWriter, r *http.Request) {
 	}
 	weekActivity, weekActiveDays := buildWeekActivity(activityDates, weekStart)
 	enriched := enrichReportWithMasking(report, today, weekActivity, weekActiveDays, false)
+	dailyActivity, activeDaysInWindow, currentDailyStreak, longestDailyStreak := buildDailyActivity(activityDates, today, 35)
+	enriched.DailyActivity = dailyActivity
+	enriched.ActiveDaysInWindow = activeDaysInWindow
+	enriched.CurrentDailyStreak = currentDailyStreak
+	enriched.LongestDailyStreak = longestDailyStreak
+
+	goal, err := s.repo.GetActiveGoal(r.Context(), report.UserID, now)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if goal != nil {
+		activities, err := s.repo.GetGoalActivities(r.Context(), report.UserID, goal.StartAt, goal.EndAt)
+		if err != nil {
+			s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		enriched.ActiveGoal = buildPersonalGoal(goal, activities)
+	}
+
 	if strings.TrimSpace(report.JobClass) != "" {
 		questUC := usecase.NewDailyQuestUsecase(s.repo)
 		tasks, err := questUC.GetOrGenerateQuestList(r.Context(), report.UserID, report.JobClass, report.Level, now)
