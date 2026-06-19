@@ -1,10 +1,13 @@
 # Stage 1: Build React Frontend
 FROM node:20-alpine AS frontend-builder
-WORKDIR /frontend
-COPY frontend/package*.json ./
-RUN npm install
-COPY frontend/ ./
-RUN npm run build
+WORKDIR /app
+COPY package*.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY frontend/web/package.json ./frontend/web/
+RUN npm ci
+COPY packages/shared/ ./packages/shared/
+COPY frontend/web/ ./frontend/web/
+RUN npm run build --workspace=@lapor-bot/web
 
 # Stage 2: Build Go Backend
 FROM golang:1.25-alpine AS backend-builder
@@ -29,7 +32,7 @@ RUN mkdir -p /app/data
 COPY --from=backend-builder /app/main .
 
 # Copy built React assets
-COPY --from=frontend-builder /frontend/dist ./frontend/dist
+COPY --from=frontend-builder /app/frontend/web/dist ./frontend/dist
 
 # Expose port
 EXPOSE 8080
