@@ -41,7 +41,7 @@ Season %d sedang berjalan. Setelah season berjalan selesai, bot akan otomatis la
 💡 *Artinya:*
 Seasonal ranking mulai dari awal, tapi progres lifetime tetap lanjut. Ini kesempatan baru untuk berburu rank tanpa kehilangan level! 🎯
 
-📌 Manfaatkan Season %d ini sebaik mungkin. Laporkan aktivitasmu dengan #lapor!
+📌 Manfaatkan Season %d ini sebaik mungkin. Laporkan aktivitasmu dengan /lapor!
 
 *Semangat Season %d!* 🚀🔥`, seasonNumber, nextSeason, seasonNumber, nextSeason, seasonNumber, seasonNumber)
 }

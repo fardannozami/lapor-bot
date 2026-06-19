@@ -144,8 +144,8 @@ func TestBuildReminderMessage(t *testing.T) {
 	if !strings.Contains(msg, "Ada *2 orang* yang sudah bergerak") {
 		t.Error("expected reminder to appreciate active users collectively")
 	}
-	if !strings.Contains(msg, "#mysidequest") {
-		t.Error("expected 15:15 reminder to include #mysidequest info")
+	if !strings.Contains(msg, "/lapor sidequest") {
+		t.Error("expected 15:15 reminder to include /lapor sidequest info")
 	}
 	for _, active := range activeToday {
 		if strings.Contains(msg, active.Name) || strings.Contains(msg, active.UserID) {

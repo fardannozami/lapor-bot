@@ -80,7 +80,7 @@ func (uc *CancelReportUsecase) cancelToday(ctx context.Context, userID, name str
 		msg += fmt.Sprintf("📌 Sisa laporan hari ini: %d/%d\n", remainingReports, MaxDailyReports)
 		msg += fmt.Sprintf("📅 Total hari aktif tetap: %d\n", report.ActivityCount)
 		msg += fmt.Sprintf("⭐ Total poin sekarang: %d\n", report.TotalPoints)
-		msg += "\nKalau ingin menghapus semua laporan hari ini, ketik #cancel-all."
+		msg += "\nKalau ingin menghapus semua laporan hari ini, ketik /cancel-all."
 		return msg, nil
 	}
 
@@ -128,7 +128,7 @@ func (uc *CancelReportUsecase) cancelToday(ctx context.Context, userID, name str
 		msg += fmt.Sprintf("🔄 Comeback streak: %d minggu\n", newReport.ComebackStreak)
 	}
 
-	msg += "\n_Kamu bisa lapor lagi hari ini dengan #lapor._"
+	msg += "\n_Kamu bisa lapor lagi hari ini dengan /lapor._"
 	return msg, nil
 }
 

@@ -161,7 +161,7 @@ Halo para pejuang keringat! 🏋️‍♂️
 🆕 *Season %d dimulai SEKARANG!*
 Semua peserta mulai dari titik yang sama untuk seasonal ranking. Tapi level dan EXP lifetime kamu tetap ada! 💪
 
-📌 Langsung laporkan aktivitas pertamamu di Season %d dengan mengirim #lapor!
+📌 Langsung laporkan aktivitas pertamamu di Season %d dengan mengirim /lapor!
 
 *Semangat Season %d!* 🚀🔥`, sessionNumber, seasonTransition, sessionNumber, sessionNumber, sessionNumber)
 }

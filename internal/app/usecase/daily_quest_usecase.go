@@ -87,7 +87,7 @@ func (u *DailyQuestUsecase) SendDailyQuests(ctx context.Context, now time.Time, 
 	}
 
 	dateStr := domain.GetToday(now).Format("02 Jan 2006")
-	msgText := fmt.Sprintf("🌅 *Selamat pagi, Hunters!*\n\nSide quest hari ini sudah terbuka untuk %d hunter yang sudah memilih job. Buka `#mysidequest` untuk lihat pilihan easy, medium, dan hard hari ini.\n\nPilih yang ringan dulu juga boleh—minimal jalan kaki 4.000 langkah atau sepeda 5 km, atau gerakan singkat di rumah/kantor. Side quest cuma bonus kecil; misi utama tetap konsisten olahraga dan lapor di grup. ✨\n\n📅 %s\n📝 Lapor side quest: `#lapor sidequest <kegiatan> <jumlah>`\n\n🌐 Lihat klasemen & stats: https://lapor-bot.web.id/", eligibleCount, dateStr)
+	msgText := fmt.Sprintf("🌅 *Selamat pagi, Hunters!*\n\nSide quest hari ini sudah terbuka untuk %d hunter yang sudah memilih job. Buka `/lapor sidequest` untuk lihat pilihan easy, medium, dan hard hari ini.\n\nPilih yang ringan dulu juga boleh—minimal jalan kaki 4.000 langkah atau sepeda 5 km, atau gerakan singkat di rumah/kantor. Side quest cuma bonus kecil; misi utama tetap konsisten olahraga dan lapor di grup. ✨\n\n📅 %s\n📝 Lapor side quest: `/lapor sidequest <kegiatan> <jumlah>`\n\n🌐 Lihat klasemen & stats: https://lapor-bot.web.id/", eligibleCount, dateStr)
 
 	targetJID, err := types.ParseJID(groupID)
 	if err != nil {
@@ -114,10 +114,10 @@ func (u *DailyQuestUsecase) ViewQuest(ctx context.Context, userID, name string, 
 	}
 
 	if report == nil {
-		return fmt.Sprintf("Halo %s, kamu belum terdaftar di database. Silakan lakukan laporan pertama dengan `#lapor` terlebih dahulu! 💪", name), nil
+		return fmt.Sprintf("Halo %s, kamu belum terdaftar di database. Silakan lakukan laporan pertama dengan `/lapor` terlebih dahulu! 💪", name), nil
 	}
 	if strings.TrimSpace(report.JobClass) == "" {
-		return "🔒 *Side quest belum terbuka.*\n\nKamu perlu memilih job dulu agar bisa mendapat side quest harian. Cek `#jobs`, lalu pilih dengan `#job <id>` setelah syarat poin terpenuhi.", nil
+		return "🔒 *Side quest belum terbuka.*\n\nSide quest tersedia untuk profil yang sudah punya job. Untuk sementara, cek progres dan info profil di web: https://lapor-bot.web.id/", nil
 	}
 
 	tasks, err := u.GetOrGenerateQuestList(ctx, userID, report.JobClass, report.Level, now)
@@ -128,7 +128,7 @@ func (u *DailyQuestUsecase) ViewQuest(ctx context.Context, userID, name string, 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("📜 *Side Quest Hari Ini - %s* 🏹\n", report.Name))
 	sb.WriteString(fmt.Sprintf("Job: %s (Lv.%d)\n", domain.FormatJobClass(report.JobClass), report.Level))
-	sb.WriteString("Reward: XP bonus per side quest yang valid (easy/medium/hard). #lapor utama tetap prioritas.\n\n")
+	sb.WriteString("Reward: XP bonus per side quest yang valid (easy/medium/hard). /lapor utama tetap prioritas.\n\n")
 
 	completed := 0
 	for i, t := range tasks {
@@ -142,16 +142,16 @@ func (u *DailyQuestUsecase) ViewQuest(ctx context.Context, userID, name string, 
 
 	sb.WriteString(fmt.Sprintf("\nProgress hari ini: %s\n", formatQuestProgressBar(tasks)))
 	sb.WriteString(fmt.Sprintf("Total side quest selesai: %d lifetime • %d season\n\n", report.TotalSideQuests, report.SeasonalSideQuests))
-	sb.WriteString("Cara lapor: `#lapor sidequest <nama kegiatan> <jumlah>`\n")
+	sb.WriteString("Cara lapor: `/lapor sidequest <nama kegiatan> <jumlah>`\n")
 	sb.WriteString("Gunakan nama kegiatan sesuai yang tertera di atas.\n")
 	sb.WriteString("Contoh:\n")
-	sb.WriteString("#lapor sidequest jalan kaki 4000\n")
-	sb.WriteString("#lapor sidequest sepeda 5 km\n")
+	sb.WriteString("/lapor sidequest jalan kaki 4000\n")
+	sb.WriteString("/lapor sidequest sepeda 5 km\n")
 	for _, task := range tasks {
 		if task.ID == "easycardio" {
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("#lapor sidequest %s %s\n", strings.ToLower(task.Name), formatQuestTarget(task)))
+		sb.WriteString(fmt.Sprintf("/lapor sidequest %s %s\n", strings.ToLower(task.Name), formatQuestTarget(task)))
 	}
 
 	return sb.String(), nil
@@ -165,10 +165,10 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 	}
 
 	if report == nil {
-		return fmt.Sprintf("Halo %s, kamu belum terdaftar di database. Silakan lakukan laporan pertama dengan `#lapor` terlebih dahulu! 💪", name), nil
+		return fmt.Sprintf("Halo %s, kamu belum terdaftar di database. Silakan lakukan laporan pertama dengan `/lapor` terlebih dahulu! 💪", name), nil
 	}
 	if strings.TrimSpace(report.JobClass) == "" {
-		return "🔒 Side quest hanya tersedia setelah kamu memilih job. Cek `#jobs`, lalu pilih dengan `#job <id>` saat syarat poin sudah terpenuhi.", nil
+		return "🔒 Side quest tersedia untuk profil yang sudah punya job. Untuk sementara, cek progres dan info profil di web: https://lapor-bot.web.id/", nil
 	}
 	today := domain.GetToday(now)
 	dailyCount, err := u.repo.GetDailyActivityCount(ctx, userID, today)
@@ -176,7 +176,7 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 		return "", err
 	}
 	if dailyCount >= MaxDailyReports {
-		return fmt.Sprintf("Batas laporan harian sudah penuh (%dx). Side quest belum diterima agar progres quest tidak kepisah dari stats. Kalau salah input, pakai #cancel dulu lalu lapor ulang. 🙏", MaxDailyReports), nil
+		return fmt.Sprintf("Batas laporan harian sudah penuh (%dx). Side quest belum diterima agar progres quest tidak kepisah dari stats. Kalau salah input, pakai /cancel dulu lalu lapor ulang. 🙏", MaxDailyReports), nil
 	}
 
 	tasks, err := u.GetOrGenerateQuestList(ctx, userID, report.JobClass, report.Level, now)
@@ -216,7 +216,7 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 				}
 
 				if task.Progress >= task.Target {
-					return fmt.Sprintf("%s sudah selesai hari ini. Pilih side quest lain di `#mysidequest` kalau masih mau lanjut. ✅", task.Name), nil
+					return fmt.Sprintf("%s sudah selesai hari ini. Pilih side quest lain di `/lapor sidequest` kalau masih mau lanjut. ✅", task.Name), nil
 				}
 				if added < task.Target {
 					rejected = append(rejected, fmt.Sprintf("%s butuh minimal %s, laporanmu baru %s", task.Name, formatQuestTarget(task), formatQuestValue(task, added)))
@@ -235,9 +235,9 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 
 	if len(completedTasks) == 0 {
 		if len(rejected) > 0 {
-			return "💪 *Semangat! Tinggal sedikit lagi...* 🔥\n\n" + strings.Join(rejected, "\n") + "\n\nAyo lanjutkan sampai target lalu lapor ulang ya! Kamu pasti bisa! ✨\n\n📜 Cek detail target: `#mysidequest`\n📝 Lapor ulang: `#lapor sidequest <kegiatan> <jumlah>`", nil
+			return "💪 *Semangat! Tinggal sedikit lagi...* 🔥\n\n" + strings.Join(rejected, "\n") + "\n\nAyo lanjutkan sampai target lalu lapor ulang ya! Kamu pasti bisa! ✨\n\n📜 Cek detail target: `/lapor sidequest`\n📝 Lapor ulang: `/lapor sidequest <kegiatan> <jumlah>`", nil
 		}
-		return "Gagal membaca laporan side quest. Contoh: `#lapor sidequest jalan 4000` atau `#lapor sidequest sepeda 5 km`", nil
+		return "Gagal membaca laporan side quest. Contoh: `/lapor sidequest jalan 4000` atau `/lapor sidequest sepeda 5 km`", nil
 	}
 
 	// Save updated tasks list

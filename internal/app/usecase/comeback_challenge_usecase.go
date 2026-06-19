@@ -23,7 +23,7 @@ func (uc *ComebackChallengeUsecase) Execute(ctx context.Context, userID, name st
 	}
 
 	if report == nil {
-		return fmt.Sprintf("Halo %s, kamu belum pernah laporan aktivitas. Yuk mulai dengan ketik #lapor!", name), nil
+		return fmt.Sprintf("Halo %s, kamu belum pernah laporan aktivitas. Yuk mulai dengan ketik /lapor!", name), nil
 	}
 
 	sb := strings.Builder{}

@@ -82,7 +82,7 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	}
 
 	if dailyCount >= MaxDailyReports {
-		msg := fmt.Sprintf("%s sudah laporan %dx hari ini, ayo jangan curang! 😉\n\nBatas harian adalah %d laporan: laporan pertama untuk progres utama, laporan ke-2 dan ke-3 hanya bonus ½ XP. Kalau tadi salah input, pakai #cancel untuk hapus laporan terakhir atau #cancel-all untuk hapus semua laporan hari ini. 🙏", report.Name, MaxDailyReports, MaxDailyReports)
+		msg := fmt.Sprintf("%s sudah laporan %dx hari ini, ayo jangan curang! 😉\n\nBatas harian adalah %d laporan: laporan pertama untuk progres utama, laporan ke-2 dan ke-3 hanya bonus ½ XP. Kalau tadi salah input, pakai /cancel untuk hapus laporan terakhir atau /cancel-all untuk hapus semua laporan hari ini. 🙏", report.Name, MaxDailyReports, MaxDailyReports)
 		msg += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
 		return msg, nil
 	}
@@ -223,13 +223,13 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	var statGains []string
 	if reportPoints > 0 && len(attrs) > 0 {
 		statPoints := reportPoints / len(attrs)
-		
+
 		scalingLevel := oldNumericLevel
 		if scalingLevel < 1 {
 			scalingLevel = 1
 		}
 		statPoints = statPoints / scalingLevel
-		
+
 		if statPoints == 0 {
 			statPoints = 1 // Ensure at least 1 point if it divided down to 0
 		}
@@ -398,7 +398,7 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 			response += fmt.Sprintf("\n\n❄️ Bonus: +1 Streak Freeze! (Total: %d)", report.StreakFreezes)
 		}
 
-		response += "\nDetail badge & cerita unlock: #achievements"
+		response += "\nDetail badge & cerita unlock: https://lapor-bot.web.id/"
 	}
 
 	response += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
@@ -446,7 +446,7 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	}
 
 	if report != nil && domain.GetToday(report.LastReportDate).Equal(today) {
-		return fmt.Sprintf("%s sudah laporan hari ini. Gunakan #lapor untuk laporan tambahan hari ini. 💪", report.Name), nil
+		return fmt.Sprintf("%s sudah laporan hari ini. Gunakan /lapor untuk laporan tambahan hari ini. 💪", report.Name), nil
 	}
 
 	if report != nil {
@@ -560,13 +560,13 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	var statGains []string
 	if reportPoints > 0 && len(attrs) > 0 {
 		statPoints := reportPoints / len(attrs)
-		
+
 		scalingLevel := oldNumericLevel
 		if scalingLevel < 1 {
 			scalingLevel = 1
 		}
 		statPoints = statPoints / scalingLevel
-		
+
 		if statPoints == 0 {
 			statPoints = 1 // Ensure at least 1 point
 		}
@@ -717,7 +717,7 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 			response += fmt.Sprintf("\n\n❄️ Bonus: +1 Streak Freeze! (Total: %d)", report.StreakFreezes)
 		}
 
-		response += "\nDetail badge & cerita unlock: #achievements"
+		response += "\nDetail badge & cerita unlock: https://lapor-bot.web.id/"
 	}
 
 	response += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
@@ -787,12 +787,20 @@ func (uc *ReportActivityUsecase) getNextComebackTarget(report *domain.Report) *d
 
 func formatCurrentAttributes(report *domain.Report) string {
 	str := report.Str
-	if str < 1 { str = 1 }
+	if str < 1 {
+		str = 1
+	}
 	sta := report.Sta
-	if sta < 1 { sta = 1 }
+	if sta < 1 {
+		sta = 1
+	}
 	agi := report.Agi
-	if agi < 1 { agi = 1 }
+	if agi < 1 {
+		agi = 1
+	}
 	vit := report.Vit
-	if vit < 1 { vit = 1 }
+	if vit < 1 {
+		vit = 1
+	}
 	return fmt.Sprintf("🛡️ Stats: STR %d | STA %d | AGI %d | VIT %d", str, sta, agi, vit)
 }

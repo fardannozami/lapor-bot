@@ -145,7 +145,7 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
                 Side Quest Hari Ini
               </h3>
               <p className="text-xs text-gray-500 font-mono mt-1 leading-relaxed">
-                Sama seperti <span className="text-gray-300">#mysidequest</span>. Selesaikan via WhatsApp dengan format <span className="text-gray-300">#lapor sidequest &lt;kegiatan&gt; &lt;jumlah&gt;</span>.
+                Sama seperti <span className="text-gray-300">/lapor sidequest</span>. Selesaikan via WhatsApp dengan format <span className="text-gray-300">/lapor sidequest &lt;kegiatan&gt; &lt;jumlah&gt;</span>.
               </p>
             </div>
             <div className="text-right shrink-0">
@@ -159,7 +159,7 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
           {sideQuests.length === 0 ? (
             <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-4 text-center">
               <p className="text-sm text-gray-400 font-mono">Side quest belum terbuka.</p>
-              <p className="text-xs text-gray-600 font-mono mt-1">Pilih job dulu di WhatsApp dengan #jobs dan #job &lt;id&gt;.</p>
+              <p className="text-xs text-gray-600 font-mono mt-1">Side quest tersedia untuk profil yang sudah punya job.</p>
             </div>
           ) : (
             <div className="space-y-3">
