@@ -1,0 +1,14 @@
+{
+  "name": "@lapor-bot/contract",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^6.0.0"
+  }
+}

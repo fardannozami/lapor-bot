@@ -1,73 +1,66 @@
-# React + TypeScript + Vite
+# @lapor-bot/frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the cross-platform frontend monorepo for Lapor Bot, built with Turborepo. It manages both web and mobile applications from a unified codebase, utilizing shared packages for UI, contracts, and design systems.
 
-Currently, two official plugins are available:
+## Project Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+This monorepo uses npm workspaces and is structured as follows:
 
-## React Compiler
+### Apps
+- `apps/web`: The web application (Next.js/React).
+- `apps/mobile`: The mobile application (React Native/Expo).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Packages
+- `packages/ui`: Shared UI components used across applications.
+- `packages/design-system`: Design tokens, themes, and foundational styles.
+- `packages/contract`: API contracts and schemas shared between the frontend and the backend.
+- `packages/shared`: Shared utilities, helpers, and types.
 
-## Expanding the ESLint configuration
+## Prerequisites
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Node.js (v18+ recommended)
+- npm (v11.12.1 is specified in packageManager)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Scripts and Workflows
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Commands are executed using Turbo at the root of the `frontend` directory.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Install Dependencies
+
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+To start the development servers for all applications and packages:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+### Build
+
+To build all apps and packages:
+
+```bash
+npm run build
+```
+
+### Lint & Format
+
+To run linters across the project:
+
+```bash
+npm run lint
+```
+
+To format code with Prettier:
+
+```bash
+npm run format
+```
+
+## Adding New Packages or Apps
+
+When adding a new package or app to this monorepo, ensure you update the `package.json` inside the new folder to appropriately link any internal dependencies using `"workspace:*"` or the specific package name.
