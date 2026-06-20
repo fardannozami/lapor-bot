@@ -92,6 +92,19 @@ function StatCard({
 }
 
 export function PersonalPage({ user, onLogout }: PersonalPageProps) {
+  const getJobColor = (jobId: string) => {
+    switch (jobId?.toLowerCase()) {
+      case 'fighter': return 'text-system-red bg-system-red/10 border-system-red/30';
+      case 'tank': return 'text-system-gold bg-system-gold/10 border-system-gold/30';
+      case 'assassin': return 'text-system-purple bg-system-purple/10 border-system-purple/30';
+      case 'mage': return 'text-red-400 bg-red-400/10 border-red-400/30';
+      case 'ranger': return 'text-system-blue bg-system-blue/10 border-system-blue/30';
+      case 'healer': return 'text-system-green bg-system-green/10 border-system-green/30';
+      case 'necromancer': return 'text-gray-400 bg-gray-800/40 border-gray-600/30';
+      default: return 'text-gray-400 bg-gray-800/30 border-gray-700/30';
+    }
+  };
+
   const glowClass = getRankGlow(user.rank_name);
   const sideQuests = user.today_side_quests ?? [];
   const dailyActivity = user.daily_activity ?? [];
@@ -209,6 +222,8 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
             value={`${user.active_days_in_window ?? 0}/${dailyActivity.length || 35}`}
             tone="text-system-blue"
           />
+        </section>
+
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-6">
             {/* Daily Streak Map — improved looks + on-theme wording */}
@@ -388,7 +403,7 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
                     Side Quest Hari Ini
                   </h3>
                   <p className="text-xs text-gray-500 font-mono mt-1 leading-relaxed">
-                    Selesaikan via WhatsApp: <span className="text-gray-300">/lapor sidequest <kegiatan> <jumlah></span>.
+                    Selesaikan via WhatsApp: <span className="text-gray-300">/lapor sidequest &lt;kegiatan&gt; &lt;jumlah&gt;</span>.
                   </p>
                 </div>
                 <div className="text-right shrink-0">
@@ -398,6 +413,8 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
                   <div className="text-[10px] text-gray-500 font-mono uppercase">
                     Selesai
                   </div>
+                </div>
+              </div>
 
               {sideQuests.length === 0 ? (
                 <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-4 text-center">
@@ -456,6 +473,27 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
 
           {/* Right aside — attributes and achievements post incoming */}
           <aside className="space-y-6">
+            {/* Job Profile — same layout as public leaderboard click (ProfileModal) */}
+            <section className={`glass rounded-3xl p-6 ${glowClass}`}>
+              <h3 className="text-xs text-system-gold font-mono font-bold uppercase tracking-widest mb-3">
+                Job Profile
+              </h3>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-2xl">{user.job_icon}</span>
+                <span className={`text-xs px-2.5 py-1 rounded-full border font-mono ${getJobColor(user.job_class)}`}>
+                  {user.job_name}
+                </span>
+              </div>
+              <p className="text-sm text-gray-300 leading-relaxed">
+                {user.job_description}
+              </p>
+              {user.job_trait && (
+                <div className="mt-3 p-2.5 rounded-lg bg-gray-950/50 border border-gray-800 text-xs text-gray-400 font-mono">
+                  <span className="text-system-gold font-bold">Trait:</span> {user.job_trait}
+                </div>
+              )}
+            </section>
+
             <section className={`glass rounded-3xl p-6 ${glowClass}`}>
               <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">
                 <Activity className="text-system-blue" size={18} />

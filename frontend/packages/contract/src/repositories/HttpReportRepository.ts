@@ -1,4 +1,4 @@
-import type { IReportRepository, EnrichedReport, GlobalSummary } from '@lapor-bot/shared';
+import type { IReportRepository, EnrichedReport, GlobalSummary, JobInfo } from '@lapor-bot/shared';
 import { HttpClient } from '../http/HttpClient';
 
 export class HttpReportRepository extends HttpClient implements IReportRepository {
@@ -12,5 +12,25 @@ export class HttpReportRepository extends HttpClient implements IReportRepositor
 
   async getSummary(): Promise<GlobalSummary> {
     return this.get<GlobalSummary>('/api/summary');
+  }
+
+  async updateName(phone: string, name: string): Promise<{success: boolean; message: string}> {
+    return this.post<{success: boolean; message: string}>('/api/user/name', { phone, name });
+  }
+
+  async selectJob(phone: string, jobId: string): Promise<{success: boolean; message: string}> {
+    return this.post<{success: boolean; message: string}>('/api/user/job', { phone, jobId });
+  }
+
+  async setGoal(phone: string, targetDays: number, activity: string): Promise<{success: boolean; message: string}> {
+    return this.post<{success: boolean; message: string}>('/api/user/goal', { phone, targetDays, activity });
+  }
+
+  async listJobs(): Promise<JobInfo[]> {
+    return this.get<JobInfo[]>('/api/jobs');
+  }
+
+  async fetchUserByPhone(phone: string): Promise<EnrichedReport> {
+    return this.post<EnrichedReport>('/api/user', { phone });
   }
 }

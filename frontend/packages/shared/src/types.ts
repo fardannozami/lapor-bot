@@ -109,3 +109,11 @@ export interface GlobalSummary {
   current_season: number;
   current_day: number;
 }
+
+export interface JobInfo {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  trait: string;
+}

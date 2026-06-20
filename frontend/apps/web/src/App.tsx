@@ -9,10 +9,11 @@ import { ProfileModal } from './components/ProfileModal';
 import { MotivationBanner } from './components/MotivationBanner';
 import { LoginPage } from './components/LoginPage';
 import { PersonalPage } from './components/PersonalPage';
+import { ProfileSetup } from './components/ProfileSetup';
 
 const PAGE_SIZE = 15;
 type Theme = 'light' | 'dark';
-type Page = 'dashboard' | 'login' | 'personal';
+type Page = 'dashboard' | 'login' | 'personal' | 'profile-setup';
 
 function getInitialTheme(): Theme {
   if (typeof document === 'undefined') return 'dark';
@@ -137,7 +138,8 @@ function App() {
           <LoginPage
             onLoginSuccess={(user) => {
               setPersonalUser(user);
-              setPage('personal');
+              const isPhoneLike = !user.name || /^[\d+]/.test(user.name);
+              setPage(isPhoneLike ? 'profile-setup' : 'personal');
             }}
             onBack={() => setPage('dashboard')}
           />
@@ -149,6 +151,20 @@ function App() {
             onLogout={() => {
               setPersonalUser(null);
               setPage('dashboard');
+            }}
+          />
+        )}
+
+        {page === 'profile-setup' && personalUser && (
+          <ProfileSetup
+            user={personalUser}
+            onComplete={(refreshedUser) => {
+              setPersonalUser(refreshedUser);
+              setPage('personal');
+            }}
+            onBack={() => {
+              setPersonalUser(null);
+              setPage('login');
             }}
           />
         )}

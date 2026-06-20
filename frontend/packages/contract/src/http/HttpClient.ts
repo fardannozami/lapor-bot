@@ -16,5 +16,20 @@ export class HttpClient {
     return response.json() as Promise<T>;
   }
 
-  // Add POST, PUT, DELETE as needed in the future
+  protected async post<T>(path: string, body: unknown): Promise<T> {
+    const response = await fetch(`${this.baseURL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Not found');
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json() as Promise<T>;
+  }
+
+  // Add PUT, DELETE as needed in the future
 }
