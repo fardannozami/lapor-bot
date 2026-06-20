@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Search,
   SlidersHorizontal,
@@ -136,6 +136,14 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
     Math.ceil(filteredAndSorted.length / PAGE_SIZE),
   );
   const safePage = Math.min(page, totalPages);
+  // Clamp page defensively whenever the result list shrinks (tab + filter change).
+  // Guarantees user always sees valid data range after any tab/filter interaction.
+  // This + key remount eliminates "berantakan" pagination edge states.
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(Math.max(1, totalPages));
+    }
+  }, [page, totalPages]);
   const visibleHunters = useMemo(() => {
     const start = (safePage - 1) * PAGE_SIZE;
     return filteredAndSorted.slice(start, start + PAGE_SIZE);
@@ -144,6 +152,18 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
 
   const goToPage = (nextPage: number) => {
     setPage(Math.min(Math.max(1, nextPage), totalPages));
+  };
+
+  // handleTabChange provides coherent tab switch for the public klasemen.
+  // We deliberately reset search + job filter + pagination so that switching
+  // metric (seasonal / lifetime / streak / week) shows the complete unfiltered
+  // dataset for the new sort criteria. This is the root cause of previous "berantakan" experience.
+  // The component key on the table container (see below) guarantees full React subtree unmount/remount.
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setSearch("");
+    setSelectedJob("all");
+    setPage(1);
   };
 
   const getRankBadge = (idx: number) => {
@@ -258,6 +278,133 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
     </div>
   );
 
+  // --- Tab specific pure row presenters (clean code separation) ---
+  // Each presenter returns the *exact* columns and values needed for its metric tab.
+  // Decouples column layout from filter/sort logic. Makes future extension trivial.
+  const renderSeasonalRow = (hunter: EnrichedReport, rank: number, rowClass: string) => (
+    <tr
+      key={hunter.user_id}
+      onClick={() => onSelectHunter(hunter)}
+      className={rowClass}
+    >
+      <td className="py-4 pl-4 text-center font-mono align-middle">
+        <div className="flex justify-center">{getRankBadge(rank)}</div>
+      </td>
+      {renderHunterCell(hunter)}
+      {renderJobCell(hunter)}
+      <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-white">
+        <span className="font-bold">
+          {hunter.rank_icon} {hunter.rank_name}
+        </span>
+      </td>
+      <td className="py-4 pl-4 text-center align-middle text-sm">
+        {renderStreak(hunter.streak)}
+      </td>
+      <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
+        <span className="font-bold">{hunter.seasonal_activity_count}</span>
+        <span className="text-[10px] text-gray-500"> hari / season ini</span>
+      </td>
+      <td className="py-4 pl-4 pr-4 align-middle">
+        <ProgressBar
+          progress={hunter.season_rank_progress}
+          valueLabel={`${hunter.seasonal_points} season pts`}
+          tone="gold"
+        />
+      </td>
+    </tr>
+  );
+
+  const renderLifetimeRow = (hunter: EnrichedReport, rank: number, rowClass: string) => (
+    <tr
+      key={hunter.user_id}
+      onClick={() => onSelectHunter(hunter)}
+      className={rowClass}
+    >
+      <td className="py-4 pl-4 text-center font-mono align-middle">
+        <div className="flex justify-center">{getRankBadge(rank)}</div>
+      </td>
+      {renderHunterCell(hunter)}
+      {renderJobCell(hunter)}
+      <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-white">
+        <span className="font-bold">
+          {hunter.level_icon} {hunter.level_name}
+        </span>
+      </td>
+      <td className="py-4 pl-4 text-center font-mono align-middle text-sm text-gray-300">
+        <span className="font-bold">Lv.{hunter.level}</span>
+      </td>
+      <td className="py-4 pl-4 align-middle">
+        <ProgressBar
+          progress={hunter.level_tier_progress}
+          valueLabel={`${hunter.total_points} lifetime XP`}
+          tone="blue"
+        />
+      </td>
+      <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
+        <span className="font-bold">{hunter.total_active_days}</span>
+        <span className="text-[10px] text-gray-500"> hari lifetime</span>
+      </td>
+      <td className="py-4 pl-4 text-center align-middle text-sm pr-4">
+        {renderStreak(hunter.max_streak)}
+      </td>
+    </tr>
+  );
+
+  const renderStreakRow = (hunter: EnrichedReport, rank: number, rowClass: string) => (
+    <tr
+      key={hunter.user_id}
+      onClick={() => onSelectHunter(hunter)}
+      className={rowClass}
+    >
+      <td className="py-4 pl-4 text-center font-mono align-middle">
+        <div className="flex justify-center">{getRankBadge(rank)}</div>
+      </td>
+      {renderHunterCell(hunter)}
+      {renderJobCell(hunter)}
+      <td className="py-4 pl-4 text-center align-middle text-sm">
+        {renderStreak(hunter.streak)}
+      </td>
+      <td className="py-4 pl-4 text-center align-middle text-sm">
+        {renderStreak(hunter.max_streak)}
+      </td>
+      <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
+        <span className="font-bold">{hunter.total_active_days}</span>
+        <span className="text-[10px] text-gray-500"> hari lifetime</span>
+      </td>
+      <td className="py-4 pl-4 text-center align-middle font-mono text-sm pr-4 text-gray-300">
+        {getStreakStatus(hunter)}
+      </td>
+    </tr>
+  );
+
+  const renderWeekRow = (hunter: EnrichedReport, rank: number, rowClass: string) => (
+    <tr
+      key={hunter.user_id}
+      onClick={() => onSelectHunter(hunter)}
+      className={rowClass}
+    >
+      <td className="py-4 pl-4 text-center font-mono align-middle">
+        <div className="flex justify-center">{getRankBadge(rank)}</div>
+      </td>
+      {renderHunterCell(hunter)}
+      {renderJobCell(hunter)}
+      <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
+        <span className="font-bold">{hunter.week_active_days}</span>
+        <span className="text-[10px] text-gray-500"> / 7 hari minggu ini</span>
+      </td>
+      <td className="py-4 pl-4 text-center align-middle">
+        {renderWeekDots(hunter)}
+      </td>
+      <td className="py-4 pl-4 text-center align-middle text-sm">
+        {renderStreak(hunter.streak)}
+      </td>
+      <td className="py-4 pl-4 text-right pr-4 font-mono font-bold align-middle text-system-gold">
+        {hunter.estimated_weekly_points}{" "}
+        <span className="text-[9px] text-gray-500">pts (est.)</span>
+      </td>
+    </tr>
+  );
+
   const renderRows = () =>
     visibleHunters.map((hunter, idx) => {
       const rank = pageStartRank + idx;
@@ -265,143 +412,17 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
         rank < 3 ? "bg-gradient-to-r from-gray-950/20 to-transparent" : ""
       }`;
 
-      if (activeTab === "seasonal") {
-        return (
-          <tr
-            key={hunter.user_id}
-            onClick={() => onSelectHunter(hunter)}
-            className={rowClass}
-          >
-            <td className="py-4 pl-4 text-center font-mono align-middle">
-              <div className="flex justify-center">{getRankBadge(rank)}</div>
-            </td>
-            {renderHunterCell(hunter)}
-            {renderJobCell(hunter)}
-            <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-white">
-              <span className="font-bold">
-                {hunter.rank_icon} {hunter.rank_name}
-              </span>
-            </td>
-            <td className="py-4 pl-4 text-center align-middle text-sm">
-              {renderStreak(hunter.streak)}
-            </td>
-            <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
-              <span className="font-bold">
-                {hunter.seasonal_activity_count}
-              </span>
-              <span className="text-[10px] text-gray-500">
-                {" "}
-                hari / season ini
-              </span>
-            </td>
-            <td className="py-4 pl-4 pr-4 align-middle">
-              <ProgressBar
-                progress={hunter.season_rank_progress}
-                valueLabel={`${hunter.seasonal_points} season pts`}
-                tone="gold"
-              />
-            </td>
-          </tr>
-        );
+      switch (activeTab) {
+        case "seasonal":
+          return renderSeasonalRow(hunter, rank, rowClass);
+        case "lifetime":
+          return renderLifetimeRow(hunter, rank, rowClass);
+        case "streak":
+          return renderStreakRow(hunter, rank, rowClass);
+        case "week":
+        default:
+          return renderWeekRow(hunter, rank, rowClass);
       }
-
-      if (activeTab === "lifetime") {
-        return (
-          <tr
-            key={hunter.user_id}
-            onClick={() => onSelectHunter(hunter)}
-            className={rowClass}
-          >
-            <td className="py-4 pl-4 text-center font-mono align-middle">
-              <div className="flex justify-center">{getRankBadge(rank)}</div>
-            </td>
-            {renderHunterCell(hunter)}
-            {renderJobCell(hunter)}
-            <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-white">
-              <span className="font-bold">
-                {hunter.level_icon} {hunter.level_name}
-              </span>
-            </td>
-            <td className="py-4 pl-4 text-center font-mono align-middle text-sm text-gray-300">
-              <span className="font-bold">Lv.{hunter.level}</span>
-            </td>
-            <td className="py-4 pl-4 align-middle">
-              <ProgressBar
-                progress={hunter.level_tier_progress}
-                valueLabel={`${hunter.total_points} lifetime XP`}
-                tone="blue"
-              />
-            </td>
-            <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
-              <span className="font-bold">{hunter.total_active_days}</span>
-              <span className="text-[10px] text-gray-500"> hari lifetime</span>
-            </td>
-            <td className="py-4 pl-4 text-center align-middle text-sm pr-4">
-              {renderStreak(hunter.max_streak)}
-            </td>
-          </tr>
-        );
-      }
-
-      if (activeTab === "streak") {
-        return (
-          <tr
-            key={hunter.user_id}
-            onClick={() => onSelectHunter(hunter)}
-            className={rowClass}
-          >
-            <td className="py-4 pl-4 text-center font-mono align-middle">
-              <div className="flex justify-center">{getRankBadge(rank)}</div>
-            </td>
-            {renderHunterCell(hunter)}
-            {renderJobCell(hunter)}
-            <td className="py-4 pl-4 text-center align-middle text-sm">
-              {renderStreak(hunter.streak)}
-            </td>
-            <td className="py-4 pl-4 text-center align-middle text-sm">
-              {renderStreak(hunter.max_streak)}
-            </td>
-            <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
-              <span className="font-bold">{hunter.total_active_days}</span>
-              <span className="text-[10px] text-gray-500"> hari lifetime</span>
-            </td>
-            <td className="py-4 pl-4 text-center align-middle font-mono text-sm pr-4 text-gray-300">
-              {getStreakStatus(hunter)}
-            </td>
-          </tr>
-        );
-      }
-
-      return (
-        <tr
-          key={hunter.user_id}
-          onClick={() => onSelectHunter(hunter)}
-          className={rowClass}
-        >
-          <td className="py-4 pl-4 text-center font-mono align-middle">
-            <div className="flex justify-center">{getRankBadge(rank)}</div>
-          </td>
-          {renderHunterCell(hunter)}
-          {renderJobCell(hunter)}
-          <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
-            <span className="font-bold">{hunter.week_active_days}</span>
-            <span className="text-[10px] text-gray-500">
-              {" "}
-              / 7 hari minggu ini
-            </span>
-          </td>
-          <td className="py-4 pl-4 text-center align-middle">
-            {renderWeekDots(hunter)}
-          </td>
-          <td className="py-4 pl-4 text-center align-middle text-sm">
-            {renderStreak(hunter.streak)}
-          </td>
-          <td className="py-4 pl-4 text-right pr-4 font-mono font-bold align-middle text-system-gold">
-            {hunter.week_active_days}{" "}
-            <span className="text-[9px] text-gray-500">hari aktif</span>
-          </td>
-        </tr>
-      );
     });
 
   const tableHeaders = {
@@ -440,7 +461,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
       "Hari Aktif Minggu Ini",
       "Activity Dots (7 hari)",
       "Streak (minggu)",
-      "Skor Aktif",
+      "Skor Aktif (est pts)",
     ],
   }[activeTab];
 
@@ -451,10 +472,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
         {/* Leaderboard Mode Tabs */}
         <div className="flex flex-wrap bg-gray-950/80 p-1.5 rounded-xl border border-gray-800/60 max-w-fit">
           <button
-            onClick={() => {
-              setActiveTab("seasonal");
-              setPage(1);
-            }}
+            onClick={() => handleTabChange("seasonal")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
               activeTab === "seasonal"
                 ? "bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue"
@@ -465,10 +483,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
             Season Rank
           </button>
           <button
-            onClick={() => {
-              setActiveTab("lifetime");
-              setPage(1);
-            }}
+            onClick={() => handleTabChange("lifetime")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
               activeTab === "lifetime"
                 ? "bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue"
@@ -479,10 +494,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
             Lifetime XP
           </button>
           <button
-            onClick={() => {
-              setActiveTab("streak");
-              setPage(1);
-            }}
+            onClick={() => handleTabChange("streak")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
               activeTab === "streak"
                 ? "bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue"
@@ -493,10 +505,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
             Streak Masters
           </button>
           <button
-            onClick={() => {
-              setActiveTab("week");
-              setPage(1);
-            }}
+            onClick={() => handleTabChange("week")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
               activeTab === "week"
                 ? "bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue"
@@ -556,8 +565,11 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
         </div>
       </div>
 
-      {/* Table Renders */}
-      <div className="overflow-x-auto">
+      {/* Table Renders - keyed by activeTab.
+          When user switches klasemen mode, the entire table subtree is recreated freshly.
+          Combined with explicit filter reset in handleTabChange, this eliminates carried over state,
+          stale pagination slices, mismatched column counts and "berantakan" UI during tab data switch. */}
+      <div className="overflow-x-auto" key={activeTab}>
         <table className="w-full min-w-[860px] border-collapse">
           <thead>
             <tr className="border-b border-gray-850 text-left text-gray-500 text-[10px] font-mono font-bold tracking-widest uppercase">
