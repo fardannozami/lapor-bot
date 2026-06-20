@@ -542,32 +542,57 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
+// AssemblePublicLeaderboard builds the EnrichedReport list for the public web leaderboard (klasemen publik).
+// All tab-specific sorting, filtering and pagination is intentionally client-side (React/TS) for low-latency metric switching.
+// Backend only guarantees canonical enrichment (week activity dots computed from activity_logs, RPG fields, masking).
+//
+// Clean Go: this assembler isolates data transformation and N queries from the HTTP handler.
+// Note (ponytail): the per-user GetUserActivityDates loop is N+1. Acceptable ceiling for current scale (<100 users);
+// upgrade path: pre-load activity by week range or pre-join + group.
+func (s *Server) AssemblePublicLeaderboard(ctx context.Context) ([]EnrichedReport, error) {
+	reports, err := s.repo.GetAllReports(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	today := domain.GetToday(now)
+	// Attribution-aware ISO week (derives from GetToday, matching the
+	// activity_date keys produced by logActivity/UpsertReportWithActivity).
+	// All entry points (main /lapor, /lapor sidequest via ExecuteSideQuest,
+	// and Strava auto-reports) use GetToday for the stored date.
+	// Using matching week start keeps week_active_days and week_activity
+	// dots consistent with what is actually logged (no cutoff <-> strict drift).
+	// Manual user counts and the week tab will now align.
+	weekStart := domain.GetStartOfISOWeek(now)
+
+	enriched := make([]EnrichedReport, 0, len(reports))
+	for _, rep := range reports {
+		dates, err := s.repo.GetUserActivityDates(ctx, rep.UserID)
+		if err != nil {
+			return nil, err
+		}
+		weekAct, weekDays := buildWeekActivity(dates, weekStart)
+		enriched = append(enriched, enrichReport(rep, today, weekAct, weekDays))
+	}
+
+	// Season sort is our canonical order (mirrors WA leaderboard ordering).
+	// Client re-sorts for its activeTab.
+	sortEnrichedReportsBySeason(enriched)
+	return enriched, nil
+}
+
 func (s *Server) HandleLeaderboard(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		s.writeJSON(w, http.StatusNoContent, nil)
 		return
 	}
 
-	reports, err := s.repo.GetAllReports(r.Context())
+	enriched, err := s.AssemblePublicLeaderboard(r.Context())
 	if err != nil {
 		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-
-	var enriched []EnrichedReport
-	now := time.Now()
-	today := domain.GetToday(now)
-	weekStart := domain.GetStartOfISOWeekStrict(now)
-	for _, rep := range reports {
-		activityDates, err := s.repo.GetUserActivityDates(r.Context(), rep.UserID)
-		if err != nil {
-			s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
-		weekActivity, weekActiveDays := buildWeekActivity(activityDates, weekStart)
-		enriched = append(enriched, enrichReport(rep, today, weekActivity, weekActiveDays))
-	}
-	sortEnrichedReportsBySeason(enriched)
 
 	s.writeJSON(w, http.StatusOK, enriched)
 }
