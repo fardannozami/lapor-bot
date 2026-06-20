@@ -47,6 +47,11 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api/summary", s.HandleSummary)
 	mux.HandleFunc("/api/motivation", s.HandleMotivation)
 	mux.HandleFunc("/api/user", s.HandleGetUser)
+	mux.HandleFunc("POST /api/user/name", s.HandleUpdateName)
+	mux.HandleFunc("POST /api/user/job", s.HandleSelectJob)
+	mux.HandleFunc("POST /api/user/goal", s.HandleSetGoal)
+	mux.HandleFunc("GET /api/jobs", s.HandleListJobs)
+	mux.HandleFunc("POST /api/user", s.HandleGetUserByPhone)
 	mux.HandleFunc("/", s.HandleStatic)
 }
 
@@ -668,6 +673,189 @@ func (s *Server) HandleGetUser(w http.ResponseWriter, r *http.Request) {
 
 	rawPhone := r.URL.Query().Get("phone")
 	normalized, err := phone.Normalize(rawPhone)
+	if err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
+		return
+	}
+
+	report, err := s.repo.GetReport(r.Context(), normalized)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if report == nil {
+		s.writeJSON(w, http.StatusNotFound, map[string]string{"error": "User tidak ditemukan"})
+		return
+	}
+
+	now := time.Now()
+	today := domain.GetToday(now)
+	weekStart := domain.GetStartOfISOWeekStrict(now)
+	activityDates, err := s.repo.GetUserActivityDates(r.Context(), report.UserID)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	weekActivity, weekActiveDays := buildWeekActivity(activityDates, weekStart)
+	enriched := enrichReportWithMasking(report, today, weekActivity, weekActiveDays, false)
+	dailyActivity, activeDaysInWindow, currentDailyStreak, longestDailyStreak := buildDailyActivity(activityDates, today, 35)
+	enriched.DailyActivity = dailyActivity
+	enriched.ActiveDaysInWindow = activeDaysInWindow
+	enriched.CurrentDailyStreak = currentDailyStreak
+	enriched.LongestDailyStreak = longestDailyStreak
+
+	goal, err := s.repo.GetActiveGoal(r.Context(), report.UserID, now)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if goal != nil {
+		activities, err := s.repo.GetGoalActivities(r.Context(), report.UserID, goal.StartAt, goal.EndAt)
+		if err != nil {
+			s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		enriched.ActiveGoal = buildPersonalGoal(goal, activities)
+	}
+
+	if strings.TrimSpace(report.JobClass) != "" {
+		questUC := usecase.NewDailyQuestUsecase(s.repo)
+		tasks, err := questUC.GetOrGenerateQuestList(r.Context(), report.UserID, report.JobClass, report.Level, now)
+		if err != nil {
+			s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		enriched.TodaySideQuests = tasks
+	}
+	s.writeJSON(w, http.StatusOK, enriched)
+}
+
+func (s *Server) HandleUpdateName(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.writeJSON(w, http.StatusNoContent, nil)
+		return
+	}
+
+	var body struct {
+		Phone string `json:"phone"`
+		Name  string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Body tidak valid"})
+		return
+	}
+
+	normalized, err := phone.Normalize(body.Phone)
+	if err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
+		return
+	}
+
+	msg, err := usecase.NewUpdateNameUsecase(s.repo).Execute(r.Context(), normalized, body.Name)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": msg})
+}
+
+func (s *Server) HandleSelectJob(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.writeJSON(w, http.StatusNoContent, nil)
+		return
+	}
+
+	var body struct {
+		Phone string `json:"phone"`
+		JobID string `json:"job_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Body tidak valid"})
+		return
+	}
+
+	normalized, err := phone.Normalize(body.Phone)
+	if err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
+		return
+	}
+
+	report, err := s.repo.GetReport(r.Context(), normalized)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	var reportName string
+	if report != nil {
+		reportName = report.Name
+	}
+
+	msg, err := usecase.NewJobUsecase(s.repo).Select(r.Context(), normalized, reportName, body.JobID)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": msg})
+}
+
+func (s *Server) HandleSetGoal(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.writeJSON(w, http.StatusNoContent, nil)
+		return
+	}
+
+	var body struct {
+		Phone      string `json:"phone"`
+		TargetDays string `json:"target_days"`
+		Activity   string `json:"activity"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Body tidak valid"})
+		return
+	}
+
+	normalized, err := phone.Normalize(body.Phone)
+	if err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
+		return
+	}
+
+	command := "goal set " + body.TargetDays + " " + body.Activity
+	msg, err := usecase.NewGoalUsecase(s.repo).Execute(r.Context(), normalized, "", command)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": msg})
+}
+
+func (s *Server) HandleListJobs(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.writeJSON(w, http.StatusNoContent, nil)
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, domain.AllJobClasses)
+}
+
+func (s *Server) HandleGetUserByPhone(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.writeJSON(w, http.StatusNoContent, nil)
+		return
+	}
+
+	var body struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Body tidak valid"})
+		return
+	}
+
+	normalized, err := phone.Normalize(body.Phone)
 	if err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
 		return
