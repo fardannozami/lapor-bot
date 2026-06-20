@@ -209,11 +209,10 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
             value={`${user.active_days_in_window ?? 0}/${dailyActivity.length || 35}`}
             tone="text-system-blue"
           />
-        </section>
-
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-6">
-            <section className={`glass rounded-3xl p-6 ${glowClass}`}>
+            {/* Daily Streak Map — improved looks + on-theme wording */}
+            <div className="glass rounded-3xl p-6">
               <div className="flex items-start justify-between gap-4 mb-5">
                 <div>
                   <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
@@ -221,8 +220,8 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
                     Daily Streak Map
                   </h3>
                   <p className="text-xs text-gray-500 font-mono mt-1 leading-relaxed">
-                    Mini GitHub-style heatmap: baseline harian pribadi, terpisah
-                    dari leaderboard mingguan.
+                    Peta konsistensi harian pribadi. Data hanya untuk melacak kebiasaan
+                    rutin kamu sendiri.
                   </p>
                 </div>
                 <div className="text-right shrink-0">
@@ -235,46 +234,67 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
                 </div>
               </div>
 
-              <div className="overflow-x-auto pb-1">
+              {/* Improved heatmap */}
+              <div className="overflow-x-auto pb-2">
                 <div
-                  className="flex gap-1 min-w-fit"
-                  aria-label="Kalender aktivitas harian"
+                  className="inline-flex gap-1.5 p-3 rounded-2xl bg-gray-950/70 border border-gray-800/60"
+                  aria-label="Peta aktivitas harian konsistensi pribadi"
                 >
                   {chunkWeeks(dailyActivity).map((week, weekIdx) => (
                     <div
                       key={`week-${weekIdx}`}
-                      className="grid grid-rows-7 gap-1"
+                      className="grid grid-rows-7 gap-[5px]"
                     >
-                      {week.map((day) => (
-                        <span
-                          key={day.date}
-                          className={`h-4 w-4 rounded-[4px] border transition-transform hover:scale-125 ${
-                            day.active
-                              ? "bg-system-green border-system-green/70 shadow-neon-purple"
-                              : "bg-gray-950 border-gray-800"
-                          }`}
-                          title={`${formatDate(day.date)} — ${day.active ? "aktif" : "belum aktif"}`}
-                        />
-                      ))}
+                      {week.map((day) => {
+                        const intensity =
+                          !day.active || day.count <= 0
+                            ? "empty"
+                            : day.count >= 3
+                              ? "high"
+                              : day.count === 2
+                                ? "mid"
+                                : "low";
+
+                        const cellClass =
+                          intensity === "high"
+                            ? "bg-system-green border-system-green shadow-[0_0_8px_rgb(16,185,129,0.65)]"
+                            : intensity === "mid"
+                              ? "bg-system-green/90 border-system-green/80 shadow-[0_0_4px_rgb(16,185,129,0.5)]"
+                              : intensity === "low"
+                                ? "bg-system-green border-system-green/70"
+                                : "bg-[#111418] border-gray-800/70";
+
+                        return (
+                          <span
+                            key={day.date}
+                            className={`h-[22px] w-[22px] rounded-[5px] border transition-all hover:scale-110 hover:brightness-110 ${cellClass}`}
+                          />
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[10px] text-gray-500 font-mono uppercase tracking-wider">
-                <span>
-                  {dailyActivity[0] ? formatDate(dailyActivity[0].date) : "—"} →{" "}
-                  {dailyActivity.at(-1)
-                    ? formatDate(dailyActivity.at(-1)!.date)
-                    : "—"}
-                </span>
-                <span className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded bg-gray-950 border border-gray-800" />{" "}
-                  Rest <span className="h-3 w-3 rounded bg-system-green" />{" "}
-                  Active
-                </span>
-              </div>
-            </section>
 
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-4 text-[10px] text-gray-500 font-mono uppercase tracking-wider">
+                <div className="text-gray-400">
+                  {dailyActivity[0] ? formatDate(dailyActivity[0].date) : "—"} →{" "}
+                  {dailyActivity.at(-1) ? formatDate(dailyActivity.at(-1)!.date) : "—"}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-3.5 w-3.5 rounded-[3px] bg-[#111418] border border-gray-800/70" />
+                    <span>Rest</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-3.5 w-3.5 rounded-[3px] bg-system-green border border-system-green/60" />
+                    <span>Active</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Weekly Goal (kept intact) */}
             <section className={`glass rounded-3xl p-6 ${glowClass}`}>
               <div className="flex items-start justify-between gap-4 mb-5">
                 <div>
@@ -359,6 +379,7 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
               )}
             </section>
 
+            {/* Side Quest Hari Ini (kept intact) */}
             <section className={`glass rounded-3xl p-6 ${glowClass}`}>
               <div className="flex items-start justify-between gap-4 mb-5">
                 <div>
@@ -367,11 +388,7 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
                     Side Quest Hari Ini
                   </h3>
                   <p className="text-xs text-gray-500 font-mono mt-1 leading-relaxed">
-                    Selesaikan via WhatsApp:{" "}
-                    <span className="text-gray-300">
-                      /lapor sidequest &lt;kegiatan&gt; &lt;jumlah&gt;
-                    </span>
-                    .
+                    Selesaikan via WhatsApp: <span className="text-gray-300">/lapor sidequest <kegiatan> <jumlah></span>.
                   </p>
                 </div>
                 <div className="text-right shrink-0">
@@ -381,8 +398,6 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
                   <div className="text-[10px] text-gray-500 font-mono uppercase">
                     Selesai
                   </div>
-                </div>
-              </div>
 
               {sideQuests.length === 0 ? (
                 <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-4 text-center">
@@ -439,6 +454,7 @@ export function PersonalPage({ user, onLogout }: PersonalPageProps) {
             </section>
           </div>
 
+          {/* Right aside — attributes and achievements post incoming */}
           <aside className="space-y-6">
             <section className={`glass rounded-3xl p-6 ${glowClass}`}>
               <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">

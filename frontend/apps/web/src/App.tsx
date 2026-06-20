@@ -70,7 +70,7 @@ function App() {
             </h1>
           </div>
           <p className="text-xs text-gray-500 font-mono mt-1 tracking-wider uppercase">
-            Sporty workout progress board — 15 athletes per page for a lighter dashboard
+            Healthy with sports consistency leaderboard — Where consistency becomes rank
           </p>
         </div>
 
