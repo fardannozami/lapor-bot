@@ -10,7 +10,8 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": ["API_TARGET"]
     }
   }
 }
