@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -810,6 +811,11 @@ func (s *Server) HandleSetGoal(w http.ResponseWriter, r *http.Request) {
 		Phone      string `json:"phone"`
 		TargetDays string `json:"target_days"`
 		Activity   string `json:"activity"`
+		Action     string `json:"action,omitempty"` // "reset"
+		// Optional custom start for web dashboard: either ISO start_at or date+hour
+		StartAt   string `json:"start_at,omitempty"`
+		StartDate string `json:"start_date,omitempty"` // YYYY-MM-DD
+		StartHour *int   `json:"start_hour,omitempty"` // 0-23
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Body tidak valid"})
@@ -822,14 +828,87 @@ func (s *Server) HandleSetGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	uc := usecase.NewGoalUsecase(s.repo)
+
+	// Reset support (web dashboard)
+	if strings.EqualFold(strings.TrimSpace(body.Action), "reset") || strings.EqualFold(strings.TrimSpace(body.TargetDays), "reset") {
+		msg, err := uc.Execute(r.Context(), normalized, "", "#goal reset")
+		if err != nil {
+			s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		s.writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": msg})
+		return
+	}
+
+	// If explicit start provided (from web), use SetWithStart; else legacy path (WA-style)
+	if body.StartAt != "" || body.StartDate != "" || body.StartHour != nil {
+		start, err := resolveGoalStart(body.StartAt, body.StartDate, body.StartHour)
+		if err != nil {
+			s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		td, err := strconv.Atoi(strings.TrimSpace(body.TargetDays))
+		if err != nil || td < 1 || td > 7 {
+			s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Target goal harus angka 1 sampai 7"})
+			return
+		}
+		act := strings.TrimSpace(body.Activity)
+		if act == "" {
+			act = "Olahraga"
+		}
+		msg, err := uc.SetWithStart(r.Context(), normalized, td, act, start)
+		if err != nil {
+			s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		s.writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": msg})
+		return
+	}
+
+	// Legacy path (ProfileSetup + WA commands) — keeps using server "now"
 	command := "goal set " + body.TargetDays + " " + body.Activity
-	msg, err := usecase.NewGoalUsecase(s.repo).Execute(r.Context(), normalized, "", command)
+	msg, err := uc.Execute(r.Context(), normalized, "", command)
 	if err != nil {
 		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 
 	s.writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": msg})
+}
+
+func resolveGoalStart(startAt, startDate string, startHour *int) (time.Time, error) {
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	if startAt != "" {
+		t, err := time.Parse(time.RFC3339, startAt)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("start_at tidak valid (gunakan RFC3339)")
+		}
+		// Normalize to date at chosen hour if hour present? Keep as provided but ensure WIB semantics
+		return t, nil
+	}
+	if startDate == "" {
+		// default to today at 00:00 WIB
+		now := time.Now().In(loc)
+		y, m, d := now.Date()
+		return time.Date(y, m, d, 0, 0, 0, 0, loc), nil
+	}
+	// parse YYYY-MM-DD
+	parts := strings.Split(startDate, "-")
+	if len(parts) != 3 {
+		return time.Time{}, fmt.Errorf("start_date harus format YYYY-MM-DD")
+	}
+	y, _ := strconv.Atoi(parts[0])
+	mi, _ := strconv.Atoi(parts[1])
+	d, _ := strconv.Atoi(parts[2])
+	hour := 0
+	if startHour != nil {
+		if *startHour < 0 || *startHour > 23 {
+			return time.Time{}, fmt.Errorf("start_hour harus 0-23")
+		}
+		hour = *startHour
+	}
+	return time.Date(y, time.Month(mi), d, hour, 0, 0, 0, loc), nil
 }
 
 func (s *Server) HandleListJobs(w http.ResponseWriter, r *http.Request) {

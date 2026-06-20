@@ -57,7 +57,28 @@ func (uc *GoalUsecase) set(ctx context.Context, userID string, args []string) (s
 	}
 
 	now := uc.now()
-	existing, err := uc.repo.GetActiveGoal(ctx, userID, now)
+	activity := strings.TrimSpace(strings.Join(args[1:], " "))
+	if activity == "" {
+		activity = "Olahraga"
+	}
+
+	return uc.setGoalWithStart(ctx, userID, targetDays, activity, now)
+}
+
+// SetWithStart allows setting a goal with a custom start time (used by web dashboard).
+// start time should already be normalized (e.g. desired midnight or chosen hour in the user's TZ).
+func (uc *GoalUsecase) SetWithStart(ctx context.Context, userID string, targetDays int, activity string, start time.Time) (string, error) {
+	if targetDays < 1 || targetDays > maxWeeklyGoalDays {
+		return "Target goal harus angka 1 sampai 7.", nil
+	}
+	if strings.TrimSpace(activity) == "" {
+		activity = "Olahraga"
+	}
+	return uc.setGoalWithStart(ctx, userID, targetDays, activity, start)
+}
+
+func (uc *GoalUsecase) setGoalWithStart(ctx context.Context, userID string, targetDays int, activity string, start time.Time) (string, error) {
+	existing, err := uc.repo.GetActiveGoal(ctx, userID, start)
 	if err != nil {
 		return "", err
 	}
@@ -65,18 +86,13 @@ func (uc *GoalUsecase) set(ctx context.Context, userID string, args []string) (s
 		return "Kamu masih punya goal aktif. Pakai #goal reset dulu kalau mau menggantinya. 🎯", nil
 	}
 
-	activity := strings.TrimSpace(strings.Join(args[1:], " "))
-	if activity == "" {
-		activity = "Olahraga"
-	}
-
 	goal := &domain.WeeklyGoal{
 		UserID:     userID,
 		TargetDays: targetDays,
 		Activity:   activity,
-		StartAt:    now,
-		EndAt:      now.AddDate(0, 0, goalWindowDays),
-		CreatedAt:  now,
+		StartAt:    start,
+		EndAt:      start.AddDate(0, 0, goalWindowDays),
+		CreatedAt:  start,
 	}
 	if err := uc.repo.SetGoal(ctx, goal); errors.Is(err, domain.ErrActiveGoalExists) {
 		return "Kamu masih punya goal aktif. Pakai #goal reset dulu kalau mau menggantinya. 🎯", nil
