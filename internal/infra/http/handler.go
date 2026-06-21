@@ -48,9 +48,9 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api/summary", s.HandleSummary)
 	mux.HandleFunc("/api/motivation", s.HandleMotivation)
 	mux.HandleFunc("/api/user", s.HandleGetUser)
-	mux.HandleFunc("POST /api/user/name", s.HandleUpdateName)
-	mux.HandleFunc("POST /api/user/job", s.HandleSelectJob)
-	mux.HandleFunc("POST /api/user/goal", s.HandleSetGoal)
+	mux.HandleFunc("PATCH /api/user/name", s.HandleUpdateName)
+	mux.HandleFunc("PATCH /api/user/job", s.HandleSelectJob)
+	mux.HandleFunc("PATCH /api/user/goal", s.HandleSetGoal)
 	mux.HandleFunc("GET /api/jobs", s.HandleListJobs)
 	mux.HandleFunc("POST /api/user", s.HandleGetUserByPhone)
 	mux.HandleFunc("/", s.HandleStatic)
@@ -782,19 +782,9 @@ func (s *Server) HandleSelectJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	report, err := s.repo.GetReport(r.Context(), normalized)
+	msg, err := usecase.NewJobUsecase(s.repo).Select(r.Context(), normalized, "", body.JobID)
 	if err != nil {
-		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-	var reportName string
-	if report != nil {
-		reportName = report.Name
-	}
-
-	msg, err := usecase.NewJobUsecase(s.repo).Select(r.Context(), normalized, reportName, body.JobID)
-	if err != nil {
-		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -917,7 +907,13 @@ func (s *Server) HandleListJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.writeJSON(w, http.StatusOK, domain.AllJobClasses)
+	jobs, err := s.repo.GetAllJobClasses(r.Context())
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, jobs)
 }
 
 func (s *Server) HandleGetUserByPhone(w http.ResponseWriter, r *http.Request) {

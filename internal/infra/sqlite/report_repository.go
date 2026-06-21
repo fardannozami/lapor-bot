@@ -379,6 +379,29 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 		return err
 	}
 
+	jobClassesQuery := `
+		CREATE TABLE IF NOT EXISTS job_classes (
+			id          TEXT PRIMARY KEY,
+			name        TEXT NOT NULL,
+			icon        TEXT NOT NULL DEFAULT '',
+			description TEXT NOT NULL DEFAULT '',
+			trait       TEXT NOT NULL DEFAULT '',
+			sort_order  INTEGER NOT NULL DEFAULT 0
+		);
+		INSERT OR IGNORE INTO job_classes (id, name, icon, description, trait, sort_order) VALUES
+		  ('fighter','Fighter','⚔️','Melee hunter yang mengandalkan disiplin, stamina, dan daya tahan.','cocok untuk yang suka latihan strength/functional',0),
+		  ('tank','Tanker','🛡️','Frontliner yang kuat bertahan dan konsisten menjaga formasi.','cocok untuk yang fokus konsistensi dan habit jangka panjang',1),
+		  ('assassin','Assassin','🗡️','Hunter cepat, gesit, dan tajam mengeksekusi sesi singkat tapi intens.','cocok untuk HIIT, sprint, atau workout cepat',2),
+		  ('mage','Mage','🔥','Damage dealer jarak jauh dengan energi eksplosif dan variasi latihan.','cocok untuk yang suka eksplor banyak jenis olahraga',3),
+		  ('ranger','Ranger','🏹','Hunter presisi yang unggul di endurance, pace, dan jarak.','cocok untuk lari, sepeda, jalan jauh, hiking',4),
+		  ('healer','Healer','💚','Support hunter yang menjaga recovery, mobilitas, dan kesehatan jangka panjang.','cocok untuk yoga, mobility, recovery, pola hidup sehat',5),
+		  ('necromancer','Necromancer','🌑','Hidden job yang bangkit dari kegagalan dan mengubah comeback jadi kekuatan.','cocok untuk comeback setelah absen dan bangun sistem baru',6);
+	`
+	_, err = r.db.ExecContext(ctx, jobClassesQuery)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1047,4 +1070,35 @@ func (r *ReportRepository) GetDailyQuest(ctx context.Context, userID, questDate 
 		return "", nil
 	}
 	return tasksJSON, err
+}
+
+func (r *ReportRepository) GetAllJobClasses(ctx context.Context) ([]domain.JobClass, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT id, name, icon, description, trait FROM job_classes ORDER BY sort_order`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var jobs []domain.JobClass
+	for rows.Next() {
+		var j domain.JobClass
+		if err := rows.Scan(&j.ID, &j.Name, &j.Icon, &j.Description, &j.Trait); err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, rows.Err()
+}
+
+func (r *ReportRepository) GetJobClass(ctx context.Context, id string) (*domain.JobClass, error) {
+	var j domain.JobClass
+	err := r.db.QueryRowContext(ctx, `SELECT id, name, icon, description, trait FROM job_classes WHERE id = ?`, id).
+		Scan(&j.ID, &j.Name, &j.Icon, &j.Description, &j.Trait)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &j, nil
 }

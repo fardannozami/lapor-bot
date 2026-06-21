@@ -170,4 +170,8 @@ type ReportRepository interface {
 	// Daily Quests
 	SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error
 	GetDailyQuest(ctx context.Context, userID, questDate string) (tasksJSON string, err error)
+
+	// Job Classes
+	GetAllJobClasses(ctx context.Context) ([]JobClass, error)
+	GetJobClass(ctx context.Context, id string) (*JobClass, error)
 }

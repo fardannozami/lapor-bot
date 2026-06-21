@@ -26,7 +26,7 @@ export class HttpReportRepository
 		phone: string,
 		name: string,
 	): Promise<{ success: boolean; message: string }> {
-		return this.post<{ success: boolean; message: string }>("/api/user/name", {
+		return this.patch<{ success: boolean; message: string }>("/api/user/name", {
 			phone,
 			name,
 		});
@@ -36,9 +36,9 @@ export class HttpReportRepository
 		phone: string,
 		jobId: string,
 	): Promise<{ success: boolean; message: string }> {
-		return this.post<{ success: boolean; message: string }>("/api/user/job", {
+		return this.patch<{ success: boolean; message: string }>("/api/user/job", {
 			phone,
-			jobId,
+			job_id: jobId,
 		});
 	}
 
@@ -55,7 +55,7 @@ export class HttpReportRepository
 			if (typeof start.startHour === "number")
 				payload.start_hour = start.startHour;
 		}
-		return this.post<{ success: boolean; message: string }>(
+		return this.patch<{ success: boolean; message: string }>(
 			"/api/user/goal",
 			payload,
 		);
@@ -64,7 +64,7 @@ export class HttpReportRepository
 	async resetGoal(
 		phone: string,
 	): Promise<{ success: boolean; message: string }> {
-		return this.post<{ success: boolean; message: string }>("/api/user/goal", {
+		return this.patch<{ success: boolean; message: string }>("/api/user/goal", {
 			phone,
 			action: "reset",
 		});
