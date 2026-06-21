@@ -23,11 +23,11 @@ type Rank struct {
 
 // JobClass represents a selectable RPG hunter job for a user profile.
 type JobClass struct {
-	ID          string
-	Name        string
-	Icon        string
-	Description string
-	Trait       string
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Icon        string `json:"icon"`
+	Description string `json:"description"`
+	Trait       string `json:"trait"`
 }
 
 // NumericLevelProgress represents persistent lifetime RPG level progress.

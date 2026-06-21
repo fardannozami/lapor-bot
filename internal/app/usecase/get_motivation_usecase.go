@@ -8,8 +8,8 @@ import (
 
 // recentWindow controls how many recently-shown quotes are remembered so the
 // random picker can avoid repeating the same quote within a short window.
-// With 300 quotes and a window of 30, the chance of an immediate repeat drops
-// from 1/300 to <10% even under heavy notification traffic.
+// With 345 quotes and a window of 30, the chance of an immediate repeat drops
+// from 1/345 to <10% even under heavy notification traffic.
 const recentWindow = 30
 
 var (
@@ -359,6 +359,33 @@ var (
 	"🪨 \"Disiplin sehat bukan rantai. Ia adalah pagar yang menjaga hidupmu tetap bebas.\" — Anonim",
 	"🌱 \"Hari tanpa gerak bukan kegagalan, tapi sinyal lembut untuk kembali menyiram akar.\" — Anonim",
 	"🫀 \"Detak jantungmu bekerja tanpa cuti. Beri dia alasan untuk terus kuat.\" — Anonim",
+
+	// === Round 4: Filosof & pemikir besar ===
+	"🏛️ \"Saat kau bangun di pagi hari, pikirkan betapa berharganya hak istimewa untuk hidup — bernapas, berpikir, menikmati, dan mencintai.\" — Marcus Aurelius",
+	"🏛️ \"Segala sesuatu yang kita dengar adalah opini, bukan fakta. Segala sesuatu yang kita lihat adalah perspektif, bukan kebenaran.\" — Marcus Aurelius",
+	"🏛️ \"Kita terlalu sering meremehkan sentuhan, senyuman, kata-kata baik, telinga yang mendengar, pujian tulus, atau kepedulian kecil — yang semuanya bisa mengubah hidup.\" — Leo Buscaglia",
+	"🏛️ \"Cara terbaik untuk menghormati tubuhmu adalah tidak pernah melewatkan kesempatan untuk bergerak.\" — Seneca",
+	"🏛️ \"Kesulitan memperkuat pikiran, seperti halnya kerja keras memperkuat tubuh.\" — Seneca",
+	"🏛️ \"Pria sejati bukan yang jatuh berkali-kali, melainkan yang bangkit berkali-kali.\" — Nelson Mandela",
+	"🏛️ \"Jangan pernah menyerah pada sesuatu yang tidak bisa kau hentikan memikirkannya setiap hari.\" — Winston Churchill",
+	"🏛️ \"Jika kau pikir petualangan itu berbahaya, coba rutinitas. Rutinitaslah yang membunuh.\" — Paulo Coelho",
+	"🏛️ \"Bukan berat beban yang meruntuhkanmu, tapi lamanya kau memegangnya. Tarik napas, letakkan, lanjutkan.\" — Epictetus",
+	"🏛️ \"Orang bijak tidak duduk menyesali kegagalan, tapi bangkit dengan antusiasme untuk memperbaiki.\" — Epictetus",
+	"🏛️ \"Setiap manusia adalah utusan bagi tubuhnya. Karena tubuhmu adalah kanvas, dan gerakanmu adalah kuas.\" — Rumi",
+	"🏛️ \"Kau tidak harus melihat seluruh anak tangga. Cukup langkahkan kaki ke anak tangga pertama.\" — Martin Luther King Jr.",
+	"🏛️ \"Tubuh mencapai apa yang diyakini pikiran. Ketahuilah satu hal: tak seorang pun yang berpikir besar bisa melakukan hal kecil.\" — Abraham Lincoln",
+	"🏛️ \"Hidup ini seperti mengendarai sepeda. Untuk menjaga keseimbangan, kau harus terus bergerak.\" — Albert Einstein",
+	"🏛️ \"Kau tidak pernah terlalu tua untuk menetapkan tujuan baru atau memimpikan mimpi baru.\" — C.S. Lewis",
+	"🏛️ \"Kekuatan tidak datang dari kapasitas fisik. Ia datang dari kemauan yang tidak terkalahkan.\" — Mahatma Gandhi",
+	"🏛️ \"Setiap langkah pertama terasa berat. Tapi 10.000 langkah yang mengikutinya dimulai dari situ.\" — Anonim",
+	"🏛️ \"Kau membangun tubuh baru setiap 7 tahun. Terserah kau: bangun yang lebih kuat, atau biarkan yang lama membusuk.\" — Anonim",
+	"🏛️ \"Langkah pertama keluar dari tempat tidur adalah latihan pertama hari ini. Hargai itu.\" — Anonim",
+	"🏛️ \"Saat kau merasa tidak punya tenaga, angkat tubuhmu. Energi datang setelah aksi, bukan sebelumnya.\" — Anonim",
+	"🏛️ \"Napas yang kau tarik dalam saat lelah adalah hadiah pertama yang tubuhmu berikan setelah latihan.\" — Anonim",
+	"🏛️ \"Tubuhmu bukan mesin yang kau paksa. Ia adalah sahabat yang kau ajak tumbuh bersama.\" — Anonim",
+	"🏛️ \"Keringatmu hari ini adalah bukti bahwa kau memilih berjuang, bukan menyerah.\" — Anonim",
+	"🏛️ \"Di usia tuamu nanti, kau akan lebih menyesali langkah yang tidak kau ambil daripada beban yang pernah kau angkat.\" — Anonim",
+	"🏛️ \"Bergeraklah seperti air: tidak perlu keras, tapi tidak pernah berhenti. Itu sudah cukup.\" — Pepatah Tiongkok",
 	}
 )
 
