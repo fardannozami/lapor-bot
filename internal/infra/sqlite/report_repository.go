@@ -767,6 +767,7 @@ func (r *ReportRepository) SetGoal(ctx context.Context, goal *domain.WeeklyGoal)
 		WHERE NOT EXISTS (
 			SELECT 1 FROM goals
 			WHERE user_id = ? AND start_at <= ? AND end_at > ?
+			AND COALESCE(completed_at, '') = ''
 		)
 	`
 	startAt := goal.StartAt.UTC().Format(time.RFC3339)

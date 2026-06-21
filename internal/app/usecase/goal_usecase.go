@@ -82,7 +82,8 @@ func (uc *GoalUsecase) setGoalWithStart(ctx context.Context, userID string, targ
 	if err != nil {
 		return "", err
 	}
-	if existing != nil {
+	// If there's an active (uncompleted) goal, reject
+	if existing != nil && existing.CompletedAt == nil {
 		return "Kamu masih punya goal aktif. Pakai #goal reset dulu kalau mau menggantinya. 🎯", nil
 	}
 
@@ -98,6 +99,10 @@ func (uc *GoalUsecase) setGoalWithStart(ctx context.Context, userID string, targ
 		return "Kamu masih punya goal aktif. Pakai #goal reset dulu kalau mau menggantinya. 🎯", nil
 	} else if err != nil {
 		return "", err
+	}
+	// If there was a completed goal, acknowledge it
+	if existing != nil && existing.CompletedAt != nil {
+		return fmt.Sprintf("🎯 Goal sebelumnya sudah tercapai! Sekarang set goal baru: %dx %s\n%s\n\nLaporkan aktivitas dengan #lapor. Laporan lebih dari 1x di hari yang sama tetap dihitung 1 untuk goal.", targetDays, activity, formatGoalPeriod(goal.StartAt, goal.EndAt)), nil
 	}
 
 	return fmt.Sprintf("🎯 Goal aktif diset: %dx %s\n%s\n\nLaporkan aktivitas dengan #lapor. Laporan lebih dari 1x di hari yang sama tetap dihitung 1 untuk goal.", targetDays, activity, formatGoalPeriod(goal.StartAt, goal.EndAt)), nil

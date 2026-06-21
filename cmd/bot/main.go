@@ -81,6 +81,26 @@ func main() {
 	// It will be initialized after the WhatsApp client connects.
 	var sender *queue.MessageSender
 
+	// Goal completion notifier — broadcasts to group when someone finishes their weekly goal.
+	reportUC.SetGoalNotifier(func(ctx context.Context, userID string, name string, activity string, targetDays int, totalCompleted int) {
+		if sender == nil || cfg.GroupID == "" {
+			return
+		}
+		targetJID, err := types.ParseJID(cfg.GroupID)
+		if err != nil {
+			return
+		}
+		sb := new(strings.Builder)
+		sb.WriteString(fmt.Sprintf("🎯 *GOAL MINGGUAN TERCAPAI!* 🎯\n\n"))
+		sb.WriteString(fmt.Sprintf("%s baru saja menyelesaikan goal mingguannya! 💪🔥\n", name))
+		sb.WriteString(fmt.Sprintf("Total goal terselesaikan: %d 🏆\n\n", totalCompleted))
+		sb.WriteString("Keren banget! Tetap semangat dan jaga konsistensinya! 👏\n")
+		sb.WriteString("Yuk yang lain cobain juga fitur goal mingguan di web dashboard! 🌐")
+		msgStr := sb.String()
+		msg := &waE2E.Message{Conversation: &msgStr}
+		_ = sender.SendHighPriority(ctx, targetJID, msg)
+	})
+
 	// 6. Register Message Handler
 	waService.SetMessageHandler(func(ctx context.Context, client *whatsmeow.Client, evt *events.Message) {
 		fmt.Printf("[DEBUG] Incoming message from Chat ID: %s\n", evt.Info.Chat.String())
