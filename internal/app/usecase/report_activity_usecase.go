@@ -13,9 +13,15 @@ import (
 
 const MaxDailyReports = 3
 
+// GoalCompletionNotifier is called when a user's weekly goal is completed.
+// userID and name identify the user; activity and targetDays describe the completed goal;
+// totalCompleted is the cumulative goals_completed count.
+type GoalCompletionNotifier func(ctx context.Context, userID string, name string, activity string, targetDays int, totalCompleted int)
+
 type ReportActivityUsecase struct {
-	repo  domain.ReportRepository
-	locks sync.Map
+	repo         domain.ReportRepository
+	goalNotifier GoalCompletionNotifier
+	locks        sync.Map
 }
 
 type reportActivityOptions struct {
@@ -27,6 +33,11 @@ type reportActivityOptions struct {
 
 func NewReportActivityUsecase(repo domain.ReportRepository) *ReportActivityUsecase {
 	return &ReportActivityUsecase{repo: repo}
+}
+
+// SetGoalNotifier sets a callback that fires when a user completes their weekly goal.
+func (uc *ReportActivityUsecase) SetGoalNotifier(fn GoalCompletionNotifier) {
+	uc.goalNotifier = fn
 }
 
 func (uc *ReportActivityUsecase) userLock(userID string) *sync.Mutex {
@@ -379,6 +390,13 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 
 	if goalCompleted {
 		response += "\n\n🎯 *Goal minggu ini tercapai!* Konsistensi harianmu sudah sesuai target. Mantap, champ! 🏆"
+		if uc.goalNotifier != nil {
+			goalsCompleted := 1
+			if report.GoalsCompleted > 0 {
+				goalsCompleted = report.GoalsCompleted + 1
+			}
+			uc.goalNotifier(ctx, userID, name, "", 0, goalsCompleted)
+		}
 	}
 
 	if leveledUp {
@@ -698,6 +716,13 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 
 	if goalCompleted {
 		response += "\n\n🎯 *Goal minggu ini tercapai!* Konsistensi harianmu sudah sesuai target. Mantap, champ! 🏆"
+		if uc.goalNotifier != nil {
+			goalsCompleted := 1
+			if report.GoalsCompleted > 0 {
+				goalsCompleted = report.GoalsCompleted + 1
+			}
+			uc.goalNotifier(ctx, userID, name, "", 0, goalsCompleted)
+		}
 	}
 
 	if leveledUp {

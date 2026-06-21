@@ -329,70 +329,101 @@ export function PersonalPage({
 
 				<div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
 					<div className="space-y-6">
-						{/* Daily Streak Map — improved looks + on-theme wording */}
+						{/* Streak Map — monthly view with day labels + weekly streak hero */}
 						<div className="glass rounded-3xl p-4 sm:p-6">
 							<div className="flex items-start justify-between gap-4 mb-5">
 								<div>
 									<h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
-										<Flame className="text-system-red" size={18} />
-										Daily Streak Map
+										<Flame className="text-system-orange" size={18} />
+										Streak Map
 									</h3>
 									<p className="text-xs text-gray-500 font-mono mt-1 leading-relaxed">
-										Peta konsistensi harian pribadi. Data hanya untuk melacak
-										kebiasaan rutin kamu sendiri.
+										<span className="text-system-green font-bold">{localUser.streak} minggu</span> berturut-turut. Harimu mendukung streak mingguanmu.
 									</p>
 								</div>
 								<div className="text-right shrink-0">
-									<div className="text-sm font-bold font-orbitron text-white">
-										{localUser.longest_daily_streak ?? 0} hari
+									<div className="text-2xl font-black font-orbitron text-system-green">
+										{localUser.streak}w
 									</div>
 									<div className="text-[10px] text-gray-500 font-mono uppercase">
-										Best Daily
+										Weekly Streak
+									</div>
+									<div className="mt-1 text-[10px] text-gray-600 font-mono">
+										Best: {localUser.longest_daily_streak ?? 0}d
 									</div>
 								</div>
 							</div>
 
-							{/* Improved heatmap */}
-							<div className="overflow-x-auto pb-2">
-								<div
-									className="inline-flex gap-1.5 p-3 rounded-2xl bg-gray-950/70 border border-gray-800/60"
-									aria-label="Peta aktivitas harian konsistensi pribadi"
-								>
-									{chunkWeeks(dailyActivity).map((week, weekIdx) => (
+							{/* Monthly calendar heatmap with day labels */}
+							{dailyActivity.length > 0 && (() => {
+								const DAY_LABELS = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
+								const startDate = new Date(dailyActivity[0].date + 'T00:00:00');
+								const startDay = startDate.getDay(); // 0=Sun
+								const rowLabels = Array.from({ length: 7 }, (_, i) => DAY_LABELS[(startDay + i) % 7]);
+								const weeks = chunkWeeks(dailyActivity);
+
+								return (
+									<div className="overflow-x-auto pb-2">
 										<div
-											key={`week-${weekIdx}`}
-											className="grid grid-rows-7 gap-[5px]"
+											className="inline-flex items-start gap-1.5 p-3 rounded-2xl bg-gray-950/70 border border-gray-800/60"
+											aria-label="Streak map — konsistensi mingguan"
 										>
-											{week.map((day) => {
-												const intensity =
-													!day.active || day.count <= 0
-														? "empty"
-														: day.count >= 3
-															? "high"
-															: day.count === 2
-																? "mid"
-																: "low";
+											{/* Day labels column */}
+											<div className="flex flex-col gap-[5px] pt-0 shrink-0">
+												{rowLabels.map((label, i) => (
+													<div
+														key={i}
+														className="h-[22px] w-[24px] flex items-center justify-center"
+													>
+														<span className="text-[10px] font-bold font-mono text-gray-500 uppercase">
+															{label}
+														</span>
+													</div>
+												))}
+											</div>
 
-												const cellClass =
-													intensity === "high"
-														? "bg-system-green border-system-green shadow-[0_0_8px_rgb(16,185,129,0.65)]"
-														: intensity === "mid"
-															? "bg-system-green/90 border-system-green/80 shadow-[0_0_4px_rgb(16,185,129,0.5)]"
-															: intensity === "low"
-																? "bg-system-green border-system-green/70"
-																: "bg-[#111418] border-gray-800/70";
-
+											{/* Week columns */}
+											{weeks.map((week, weekIdx) => {
+												const activeDays = week.filter(d => d.active).length;
 												return (
-													<span
-														key={day.date}
-														className={`h-[22px] w-[22px] rounded-[5px] border transition-all hover:scale-110 hover:brightness-110 ${cellClass}`}
-													/>
+													<div key={`week-${weekIdx}`} className="flex flex-col items-center gap-[3px]">
+														<div className="grid grid-rows-7 gap-[5px]">
+															{week.map((day) => {
+																const intensity =
+																	!day.active || day.count <= 0
+																		? "empty"
+																		: day.count >= 3
+																			? "high"
+																			: day.count === 2
+																				? "mid"
+																				: "low";
+																const cellClass =
+																	intensity === "high"
+																		? "bg-system-green border-system-green shadow-[0_0_8px_rgb(16,185,129,0.65)]"
+																		: intensity === "mid"
+																			? "bg-system-green/90 border-system-green/80 shadow-[0_0_4px_rgb(16,185,129,0.5)]"
+																			: intensity === "low"
+																				? "bg-system-green border-system-green/70"
+																				: "bg-[#111418] border-gray-800/70";
+																return (
+																	<span
+																		key={day.date}
+																		className={`h-[22px] w-[22px] rounded-[5px] border transition-all hover:scale-110 hover:brightness-110 ${cellClass}`}
+																	/>
+																);
+															})}
+														</div>
+														{/* Per-week active count */}
+														<span className={`text-[8px] font-mono leading-none ${activeDays > 0 ? 'text-system-green/60' : 'text-gray-700'}`}>
+															{activeDays}/7
+														</span>
+													</div>
 												);
 											})}
 										</div>
-									))}
-								</div>
-							</div>
+									</div>
+								);
+							})()}
 
 							<div className="mt-5 flex flex-wrap items-center justify-between gap-4 text-[10px] text-gray-500 font-mono uppercase tracking-wider">
 								<div className="text-gray-400">
@@ -414,7 +445,7 @@ export function PersonalPage({
 							</div>
 						</div>
 
-						{/* Weekly Goal (kept intact) */}
+						{/* Weekly Goal — atur, lacak, raih */}
 						<section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
 							<div className="flex items-start justify-between gap-4 mb-5">
 								<div>
@@ -423,16 +454,16 @@ export function PersonalPage({
 										Weekly Goal
 									</h3>
 									<p className="text-xs text-gray-500 font-mono mt-1">
-										Data dari #goal, khusus progress pribadi minggu ini.
+										Goal mingguan pribadi — atur target, lacak progress, raih streak.
 									</p>
 								</div>
 								{activeGoal && (
 									<div className="text-right shrink-0">
-										<div className="text-sm font-bold font-orbitron text-white">
-											{activeGoal.completed_days}/{activeGoal.target_days}
+										<div className={`text-sm font-bold font-orbitron ${activeGoal.is_completed ? 'text-system-gold' : 'text-white'}`}>
+											{activeGoal.is_completed ? '✅ Selesai' : `${activeGoal.completed_days}/${activeGoal.target_days}`}
 										</div>
 										<div className="text-[10px] text-gray-500 font-mono uppercase">
-											Selesai
+											{activeGoal.is_completed ? 'Goal Tercapai' : 'Progress'}
 										</div>
 									</div>
 								)}
@@ -440,43 +471,66 @@ export function PersonalPage({
 
 							{!activeGoal ? (
 								<div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-4 text-center">
-									<CalendarDays
-										className="mx-auto mb-2 text-gray-600"
-										size={22}
-									/>
+									<CalendarDays className="mx-auto mb-2 text-gray-600" size={22} />
 									<p className="text-sm text-gray-400 font-mono">
 										Belum ada goal aktif.
 									</p>
 									<p className="text-xs text-gray-600 font-mono mt-1">
-										Buat dari WhatsApp: #goal set 3 Olahraga
+										Atur goal mingguanmu dari halaman ini — klik "Atur Goal" di bawah.
 									</p>
 								</div>
 							) : (
 								<div>
-									<div className="mb-4 rounded-2xl border border-gray-800 bg-gray-950/50 p-4">
-										<div className="flex items-center justify-between gap-3 mb-2">
-											<p className="text-sm text-white font-bold font-mono">
-												{activeGoal.target_days}x {activeGoal.activity}
+									{/* Completed celebration banner */}
+									{activeGoal.is_completed && (
+										<div className="mb-4 rounded-2xl border border-system-gold/40 bg-system-gold/10 p-4 text-center">
+											<p className="text-lg font-bold font-orbitron text-system-gold">
+												🎉 GOAL TERCAPAI! 🎉
 											</p>
-											<p className="text-xs text-system-gold font-mono">
-												{activeGoal.percent}%
+											<p className="text-sm text-gray-300 font-mono mt-1">
+												{activeGoal.target_days}x {activeGoal.activity} berhasil kamu selesaikan!
+											</p>
+											<p className="text-xs text-gray-500 font-mono mt-2">
+												Konsisten itu kunci 💪 Sekarang kamu bisa set goal baru dan lanjutkan streak mingguanmu!
 											</p>
 										</div>
-										<div className="h-3 rounded-full bg-gray-900 border border-gray-800 overflow-hidden p-[2px]">
-											<div
-												className="h-full rounded-full bg-gradient-to-r from-system-gold to-system-green"
-												style={{ width: `${activeGoal.percent}%` }}
-											/>
+									)}
+
+									{/* Progress bar (hidden when completed — replaced by banner) */}
+									{!activeGoal.is_completed && (
+										<div className="mb-4 rounded-2xl border border-gray-800 bg-gray-950/50 p-4">
+											<div className="flex items-center justify-between gap-3 mb-2">
+												<p className="text-sm text-white font-bold font-mono">
+													{activeGoal.target_days}x {activeGoal.activity}
+												</p>
+												<p className="text-xs text-system-gold font-mono">
+													{activeGoal.percent}%
+												</p>
+											</div>
+											<div className="h-3 rounded-full bg-gray-900 border border-gray-800 overflow-hidden p-[2px]">
+												<div
+													className="h-full rounded-full bg-gradient-to-r from-system-gold to-system-green"
+													style={{ width: `${activeGoal.percent}%` }}
+												/>
+											</div>
+											<p className="mt-2 text-[10px] text-gray-500 font-mono uppercase">
+												Sisa {activeGoal.remaining_days} hari lagi untuk mencapai goal.
+											</p>
 										</div>
-										<p className="mt-2 text-[10px] text-gray-500 font-mono uppercase">
-											Sisa {activeGoal.remaining_days} hari untuk mencapai goal.
-										</p>
-									</div>
+									)}
+
+									{/* 7-day grid — hari dimulai dari tanggal start user */}
 									<div className="grid grid-cols-7 gap-1 sm:gap-2">
 										{activeGoal.days.map((day) => (
 											<div
 												key={day.date}
-												className={`rounded-xl border p-1 sm:p-2 text-center ${day.active ? "border-system-green/50 bg-system-green/10" : "border-gray-800 bg-gray-950/50"}`}
+												className={`rounded-xl border p-1 sm:p-2 text-center ${
+													day.active
+														? activeGoal.is_completed
+															? "border-system-gold/50 bg-system-gold/10"
+															: "border-system-green/50 bg-system-green/10"
+														: "border-gray-800 bg-gray-950/50"
+												}`}
 												title={day.activity}
 											>
 												<div className="text-[10px] text-gray-500 font-mono uppercase">
@@ -486,7 +540,7 @@ export function PersonalPage({
 													{day.active ? (
 														<CheckCircle2
 															size={16}
-															className="text-system-green"
+															className={activeGoal.is_completed ? "text-system-gold" : "text-system-green"}
 														/>
 													) : (
 														<Circle size={16} className="text-gray-700" />
@@ -498,40 +552,36 @@ export function PersonalPage({
 								</div>
 							)}
 
-							{/* Goal setter controls in Personal Dashboard */}
+							{/* Goal setter controls */}
 							<div className="mt-4 pt-4 border-t border-gray-800/60">
 								<div className="flex items-center gap-2 mb-2 flex-wrap">
 									<button
 										onClick={() => {
 											setShowGoalForm((v) => !v);
 											setGoalError(null);
-											// prefill from current if any
 											if (localUser.active_goal) {
 												setTargetDays(localUser.active_goal.target_days || 3);
-												setActivity(
-													localUser.active_goal.activity || "Olahraga",
-												);
+												setActivity(localUser.active_goal.activity || "Olahraga");
 											}
 										}}
 										className="text-xs px-3 py-1.5 rounded-xl border border-gray-700 text-gray-300 hover:text-white"
 									>
-										{showGoalForm ? "Tutup Form Goal" : "Atur / Ubah Goal"}
+										{showGoalForm
+											? "Tutup"
+											: localUser.active_goal?.is_completed
+												? "Set Goal Baru 🎯"
+												: "Atur / Ubah Goal"}
 									</button>
-									{localUser.active_goal && (
+									{localUser.active_goal && !localUser.active_goal.is_completed && (
 										<button
 											disabled={resetLoading}
 											onClick={async () => {
 												setResetLoading(true);
 												setGoalError(null);
 												try {
-													// prefer dedicated if present, else use action=reset
 													if ((repo as any).resetGoal) {
 														await (repo as any).resetGoal(phone);
 													} else {
-														await repo.setGoal(phone, 0, "", {
-															/* triggers reset via backend action */
-														} as any);
-														// send reset via post with action if supported
 														await fetch("/api/user/goal", {
 															method: "POST",
 															headers: { "Content-Type": "application/json" },
@@ -560,9 +610,7 @@ export function PersonalPage({
 											</label>
 											<select
 												value={targetDays}
-												onChange={(e) =>
-													setTargetDays(parseInt(e.target.value))
-												}
+												onChange={(e) => setTargetDays(parseInt(e.target.value))}
 												className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-sm font-mono"
 											>
 												{[1, 2, 3, 4, 5, 6, 7].map((d) => (
@@ -586,7 +634,7 @@ export function PersonalPage({
 										<div className="grid grid-cols-2 gap-3">
 											<div>
 												<label className="block text-[10px] text-gray-500 font-mono mb-1">
-													Mulai Tanggal (opsional)
+													Mulai Tanggal
 												</label>
 												<input
 													type="date"
@@ -597,18 +645,19 @@ export function PersonalPage({
 											</div>
 											<div>
 												<label className="block text-[10px] text-gray-500 font-mono mb-1">
-													Jam Mulai (0-23)
+													Jam Mulai
 												</label>
-												<input
-													type="number"
-													min={0}
-													max={23}
+												<select
 													value={startHour}
-													onChange={(e) =>
-														setStartHour(parseInt(e.target.value || "0"))
-													}
+													onChange={(e) => setStartHour(parseInt(e.target.value))}
 													className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-sm font-mono"
-												/>
+												>
+													{Array.from({ length: 24 }, (_, i) => (
+														<option key={i} value={i}>
+															{i.toString().padStart(2, '0')}:00
+														</option>
+													))}
+												</select>
 											</div>
 										</div>
 
@@ -625,9 +674,7 @@ export function PersonalPage({
 													try {
 														const startPayload: any = {};
 														if (startDate) startPayload.startDate = startDate;
-														if (startHour || startHour === 0)
-															startPayload.startHour = startHour;
-														// if user left startDate empty we can still pass hour-only (backend resolves to today)
+														if (startHour || startHour === 0) startPayload.startHour = startHour;
 														await repo.setGoal(
 															phone,
 															targetDays,
@@ -638,8 +685,7 @@ export function PersonalPage({
 														setShowGoalForm(false);
 													} catch (e: any) {
 														setGoalError(
-															e?.message ||
-																"Gagal menyimpan goal (mungkin sudah ada goal aktif)",
+															e?.message || "Gagal menyimpan goal (mungkin sudah ada goal aktif)",
 														);
 													} finally {
 														setGoalLoading(false);
@@ -657,8 +703,7 @@ export function PersonalPage({
 											</button>
 										</div>
 										<p className="text-[10px] text-gray-500">
-											Goal berlaku 7 hari dari tanggal+jam yang dipilih.
-											Kosongkan tanggal untuk mulai hari ini.
+											Goal berlaku 7 hari dari tanggal+jam yang dipilih. Kosongkan tanggal untuk mulai hari ini.
 										</p>
 									</div>
 								)}

@@ -88,6 +88,8 @@ export interface PersonalGoal {
   completed_days: number;
   remaining_days: number;
   percent: number;
+  is_completed: boolean;
+  completed_at?: string;
   days: GoalDay[];
 }
 

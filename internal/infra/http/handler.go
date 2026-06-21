@@ -226,6 +226,8 @@ type PersonalGoal struct {
 	CompletedDays int       `json:"completed_days"`
 	RemainingDays int       `json:"remaining_days"`
 	Percent       int       `json:"percent"`
+	IsCompleted   bool      `json:"is_completed"`
+	CompletedAt   string   `json:"completed_at,omitempty"`
 	Days          []GoalDay `json:"days"`
 }
 
@@ -371,7 +373,7 @@ func buildDailyActivity(activityDates []time.Time, today time.Time, days int) ([
 	return activity, activeDays, currentStreak, longestStreak
 }
 
-var profileDayLabels = []string{"Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"}
+var profileDayLabels = []string{"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"}
 
 func buildPersonalGoal(goal *domain.WeeklyGoal, activities []domain.GoalActivity) *PersonalGoal {
 	activityByDate := make(map[string]string, len(activities))
@@ -411,6 +413,12 @@ func buildPersonalGoal(goal *domain.WeeklyGoal, activities []domain.GoalActivity
 		percent = 100
 	}
 
+	isCompleted := goal.CompletedAt != nil
+	completedAtStr := ""
+	if isCompleted {
+		completedAtStr = goal.CompletedAt.Format(time.RFC3339)
+	}
+
 	return &PersonalGoal{
 		TargetDays:    goal.TargetDays,
 		Activity:      goal.Activity,
@@ -419,6 +427,8 @@ func buildPersonalGoal(goal *domain.WeeklyGoal, activities []domain.GoalActivity
 		CompletedDays: completedDays,
 		RemainingDays: remainingDays,
 		Percent:       percent,
+		IsCompleted:   isCompleted,
+		CompletedAt:   completedAtStr,
 		Days:          days,
 	}
 }
