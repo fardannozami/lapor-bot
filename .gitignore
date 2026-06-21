@@ -8,5 +8,6 @@ main.exe
 .serena
 .omo
 .pi
+.omp
 .commandcode
 node_modules

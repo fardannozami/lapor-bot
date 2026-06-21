@@ -17,14 +17,14 @@ import {
 	Edit2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useRepositories } from "@lapor-bot/shared";
+import { useRepositories, getJobColor } from "@lapor-bot/shared";
 import type {
 	DailyActivity,
 	EnrichedReport,
 	QuestTask,
 	JobInfo,
 } from "@lapor-bot/shared";
-
+import { JobPickerModal } from "./JobPickerModal";
 interface PersonalPageProps {
 	user: EnrichedReport;
 	onLogout: () => void;
@@ -112,7 +112,7 @@ export function PersonalPage({
 
 	const [jobs, setJobs] = useState<JobInfo[]>([]);
 	const [jobsLoading, setJobsLoading] = useState(false);
-	const [showJobPicker, setShowJobPicker] = useState(false);
+	const [showJobModal, setShowJobModal] = useState(false);
 	const [jobLoading, setJobLoading] = useState(false);
 	const [jobError, setJobError] = useState<string | null>(null);
 
@@ -147,26 +147,6 @@ export function PersonalPage({
 		}
 	};
 
-	const getJobColor = (jobId: string) => {
-		switch (jobId?.toLowerCase()) {
-			case "fighter":
-				return "text-system-red bg-system-red/10 border-system-red/30";
-			case "tank":
-				return "text-system-gold bg-system-gold/10 border-system-gold/30";
-			case "assassin":
-				return "text-system-purple bg-system-purple/10 border-system-purple/30";
-			case "mage":
-				return "text-red-400 bg-red-400/10 border-red-400/30";
-			case "ranger":
-				return "text-system-blue bg-system-blue/10 border-system-blue/30";
-			case "healer":
-				return "text-system-green bg-system-green/10 border-system-green/30";
-			case "necromancer":
-				return "text-gray-400 bg-gray-800/40 border-gray-600/30";
-			default:
-				return "text-gray-400 bg-gray-800/30 border-gray-700/30";
-		}
-	};
 
 	const glowClass = getRankGlow(localUser.rank_name);
 	const sideQuests = localUser.today_side_quests ?? [];
@@ -188,7 +168,7 @@ export function PersonalPage({
 	).length;
 
 	return (
-		<div className="min-h-[60vh] px-4 py-8">
+		<div className="min-h-[60vh] px-3 sm:px-4 py-6 sm:py-8 overflow-hidden">
 			<div className="max-w-6xl mx-auto">
 				<div className="flex items-center justify-between mb-6">
 					<button
@@ -209,12 +189,12 @@ export function PersonalPage({
 				</div>
 
 				<section
-					className={`relative overflow-hidden glass rounded-[2rem] p-6 md:p-8 mb-6 ${glowClass}`}
+					className={`relative overflow-hidden glass rounded-[2rem] p-4 sm:p-6 md:p-8 mb-6 ${glowClass}`}
 				>
 					<div className="absolute right-0 top-0 h-36 w-36 rounded-full bg-system-green/10 blur-3xl" />
 					<div className="relative grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
 						<div className="flex items-start gap-4">
-							<div className="w-16 h-16 rounded-3xl bg-gray-950 border border-gray-800 flex items-center justify-center text-3xl shrink-0 shadow-neon-purple">
+							<div className="w-12 h-12 sm:w-16 sm:h-16 rounded-3xl bg-gray-950 border border-gray-800 flex items-center justify-center text-3xl shrink-0 shadow-neon-purple">
 								{localUser.job_icon}
 							</div>
 							<div className="min-w-0">
@@ -222,7 +202,7 @@ export function PersonalPage({
 									Personal Hunter Profile
 								</p>
 								<div className="flex items-center gap-2">
-									<h2 className="mt-2 text-3xl md:text-4xl font-black font-orbitron text-white tracking-wide truncate">
+									<h2 className="mt-2 text-2xl sm:text-3xl md:text-4xl font-black font-orbitron text-white tracking-wide truncate">
 										{localUser.name}
 									</h2>
 									<button
@@ -350,7 +330,7 @@ export function PersonalPage({
 				<div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
 					<div className="space-y-6">
 						{/* Daily Streak Map — improved looks + on-theme wording */}
-						<div className="glass rounded-3xl p-6">
+						<div className="glass rounded-3xl p-4 sm:p-6">
 							<div className="flex items-start justify-between gap-4 mb-5">
 								<div>
 									<h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
@@ -435,7 +415,7 @@ export function PersonalPage({
 						</div>
 
 						{/* Weekly Goal (kept intact) */}
-						<section className={`glass rounded-3xl p-6 ${glowClass}`}>
+						<section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
 							<div className="flex items-start justify-between gap-4 mb-5">
 								<div>
 									<h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
@@ -492,11 +472,11 @@ export function PersonalPage({
 											Sisa {activeGoal.remaining_days} hari untuk mencapai goal.
 										</p>
 									</div>
-									<div className="grid grid-cols-7 gap-2">
+									<div className="grid grid-cols-7 gap-1 sm:gap-2">
 										{activeGoal.days.map((day) => (
 											<div
 												key={day.date}
-												className={`rounded-xl border p-2 text-center ${day.active ? "border-system-green/50 bg-system-green/10" : "border-gray-800 bg-gray-950/50"}`}
+												className={`rounded-xl border p-1 sm:p-2 text-center ${day.active ? "border-system-green/50 bg-system-green/10" : "border-gray-800 bg-gray-950/50"}`}
 												title={day.activity}
 											>
 												<div className="text-[10px] text-gray-500 font-mono uppercase">
@@ -520,7 +500,7 @@ export function PersonalPage({
 
 							{/* Goal setter controls in Personal Dashboard */}
 							<div className="mt-4 pt-4 border-t border-gray-800/60">
-								<div className="flex items-center gap-2 mb-2">
+								<div className="flex items-center gap-2 mb-2 flex-wrap">
 									<button
 										onClick={() => {
 											setShowGoalForm((v) => !v);
@@ -686,7 +666,7 @@ export function PersonalPage({
 						</section>
 
 						{/* Side Quest Hari Ini (kept intact) */}
-						<section className={`glass rounded-3xl p-6 ${glowClass}`}>
+						<section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
 							<div className="flex items-start justify-between gap-4 mb-5">
 								<div>
 									<h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
@@ -769,11 +749,11 @@ export function PersonalPage({
 					{/* Right aside — attributes and achievements post incoming */}
 					<aside className="space-y-6">
 						{/* Job Profile — same layout as public leaderboard click (ProfileModal) */}
-						<section className={`glass rounded-3xl p-6 ${glowClass}`}>
+						<section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
 							<h3 className="text-xs text-system-gold font-mono font-bold uppercase tracking-widest mb-3">
 								Job Profile
 							</h3>
-							<div className="flex items-center gap-3 mb-3">
+							<div className="flex flex-col sm:flex-row items-center gap-3 mb-3">
 								<span className="text-2xl">{localUser.job_icon}</span>
 								<span
 									className={`text-xs px-2.5 py-1 rounded-full border font-mono ${getJobColor(localUser.job_class)}`}
@@ -783,7 +763,7 @@ export function PersonalPage({
 								<button
 									onClick={async () => {
 										setJobError(null);
-										setShowJobPicker((v) => !v);
+										setShowJobModal(true);
 										if (jobs.length === 0) {
 											setJobsLoading(true);
 											try {
@@ -811,59 +791,9 @@ export function PersonalPage({
 								</div>
 							)}
 
-							{showJobPicker && (
-								<div className="mt-4">
-									{jobsLoading ? (
-										<div className="text-xs text-gray-400">Loading jobs...</div>
-									) : (
-										<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-											{jobs.map((j) => (
-												<button
-													key={j.id}
-													disabled={jobLoading}
-													onClick={async () => {
-														setJobLoading(true);
-														setJobError(null);
-														try {
-															await repo.selectJob(phone, j.id);
-															await refreshUser();
-															setShowJobPicker(false);
-														} catch (e: any) {
-															setJobError(
-																e?.message ||
-																	"Gagal memilih job (mungkin butuh >=50 poin)",
-															);
-														} finally {
-															setJobLoading(false);
-														}
-													}}
-													className="text-left p-3 rounded-xl border border-gray-800 bg-gray-950/50 hover:border-gray-700"
-												>
-													<div className="text-lg">{j.icon}</div>
-													<div className="text-sm font-bold">{j.name}</div>
-													<div className="text-[10px] text-gray-500">
-														{j.description}
-													</div>
-												</button>
-											))}
-										</div>
-									)}
-									{jobError && (
-										<p className="text-[10px] text-system-red mt-2">
-											{jobError}
-										</p>
-									)}
-									<button
-										onClick={() => setShowJobPicker(false)}
-										className="mt-2 text-xs text-gray-400"
-									>
-										Tutup
-									</button>
-								</div>
-							)}
 						</section>
 
-						<section className={`glass rounded-3xl p-6 ${glowClass}`}>
+						<section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
 							<h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">
 								<Activity className="text-system-blue" size={18} />
 								Attributes
@@ -931,7 +861,7 @@ export function PersonalPage({
 							</div>
 						</section>
 
-						<section className={`glass rounded-3xl p-6 ${glowClass}`}>
+						<section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
 							<h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">
 								<TrendingUp className="text-system-gold" size={18} />
 								Rank Baseline
@@ -986,7 +916,7 @@ export function PersonalPage({
 							</div>
 						</section>
 
-						<section className={`glass rounded-3xl p-6 ${glowClass}`}>
+						<section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
 							<h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">
 								<Award className="text-system-gold" size={18} />
 								Achievements
@@ -1019,6 +949,33 @@ export function PersonalPage({
 					</aside>
 				</div>
 			</div>
+
+		{showJobModal && (
+			<JobPickerModal
+				jobs={jobs}
+				loading={jobsLoading}
+				error={jobError}
+				currentJobId={localUser.job_class}
+				selecting={jobLoading}
+				onSelect={async (jobId: string) => {
+					setJobLoading(true);
+					setJobError(null);
+					try {
+						await repo.selectJob(phone, jobId);
+						await refreshUser();
+						setShowJobModal(false);
+					} catch (e: any) {
+						setJobError(e?.message || "Gagal memilih job (mungkin butuh >=50 poin)");
+					} finally {
+						setJobLoading(false);
+					}
+				}}
+				onClose={() => {
+					setShowJobModal(false);
+					setJobError(null);
+				}}
+			/>
+		)}
 		</div>
 	);
 }

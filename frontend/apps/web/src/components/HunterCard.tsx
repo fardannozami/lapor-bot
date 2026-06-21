@@ -1,6 +1,7 @@
 import React from 'react';
 import { Flame, Trophy, Activity, ArrowUpRight } from 'lucide-react';
 import type { EnrichedReport } from '@lapor-bot/shared';
+import { getJobColor } from '@lapor-bot/shared';
 
 interface HunterCardProps {
   hunter: EnrichedReport;
@@ -8,19 +9,6 @@ interface HunterCardProps {
 }
 
 export const HunterCard: React.FC<HunterCardProps> = ({ hunter, onClick }) => {
-  // Map job class ID to style colors
-  const getJobColor = (jobId: string) => {
-    switch (jobId?.toLowerCase()) {
-      case 'fighter': return 'text-system-red bg-system-red/10 border-system-red/30';
-      case 'tank': return 'text-system-gold bg-system-gold/10 border-system-gold/30';
-      case 'assassin': return 'text-system-purple bg-system-purple/10 border-system-purple/30';
-      case 'mage': return 'text-red-400 bg-red-400/10 border-red-400/30';
-      case 'ranger': return 'text-system-blue bg-system-blue/10 border-system-blue/30';
-      case 'healer': return 'text-system-green bg-system-green/10 border-system-green/30';
-      case 'necromancer': return 'text-gray-400 bg-gray-800/40 border-gray-600/30';
-      default: return 'text-gray-500 bg-gray-800/20 border-gray-700/20';
-    }
-  };
 
   const getRankGlow = (rankName: string) => {
     if (rankName.includes('S-Rank') || rankName.includes('Monarch')) return 'glass-glow-gold hover:shadow-neon-gold';

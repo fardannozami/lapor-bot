@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
@@ -17,26 +16,17 @@ func NewJobUsecase(repo domain.ReportRepository) *JobUsecase {
 	return &JobUsecase{repo: repo}
 }
 
-func (uc *JobUsecase) List() string {
-	sb := strings.Builder{}
-	sb.WriteString("🧭 *Daftar Hunter Jobs*\n")
-	sb.WriteString("Job bersifat role/profile permanen dan tidak reset saat season baru.\n")
-	sb.WriteString("Pilih dengan: `#job <id>`\n")
-	sb.WriteString("Contoh: `#job ranger`\n\n")
-
-	for _, job := range domain.AllJobClasses {
-		sb.WriteString(fmt.Sprintf("%s *%s* (`%s`)\n", job.Icon, job.Name, job.ID))
-		sb.WriteString(fmt.Sprintf("_%s — %s_\n", job.Description, job.Trait))
-	}
-
-	return sb.String()
+func (uc *JobUsecase) List(ctx context.Context) ([]domain.JobClass, error) {
+	return uc.repo.GetAllJobClasses(ctx)
 }
 
 func (uc *JobUsecase) Select(ctx context.Context, userID, name, jobID string) (string, error) {
-	jobID = strings.ToLower(strings.TrimSpace(jobID))
-	job, ok := domain.GetJobClass(jobID)
-	if !ok {
-		return fmt.Sprintf("Job `%s` tidak tersedia. Cek daftar job dengan #jobs.", jobID), nil
+	job, err := uc.repo.GetJobClass(ctx, jobID)
+	if err != nil {
+		return "", err
+	}
+	if job == nil {
+		return "", fmt.Errorf("Job '%s' tidak tersedia. Cek daftar job dengan #jobs.", jobID)
 	}
 
 	report, err := uc.repo.GetReport(ctx, userID)
@@ -50,7 +40,7 @@ func (uc *JobUsecase) Select(ctx context.Context, userID, name, jobID string) (s
 		points = report.TotalPoints
 	}
 	if points < MinPointsToSelectJob {
-		return fmt.Sprintf("🔒 *Pilihan Job Belum Terbuka!*\n\nKamu harus memiliki minimal %d poin (level up ke Fighter/Tier 2) untuk memilih job. Poinmu saat ini: %d.\nKumpulkan poin dengan melapor latihan menggunakan `#lapor`! 💪", MinPointsToSelectJob, points), nil
+		return "", fmt.Errorf("🔒 Pilihan Job Belum Terbuka!\n\nKamu harus memiliki minimal %d poin (level up ke Fighter/Tier 2) untuk memilih job. Poinmu saat ini: %d.\nKumpulkan poin dengan melapor latihan menggunakan #lapor! 💪", MinPointsToSelectJob, points)
 	}
 
 	if report == nil {
