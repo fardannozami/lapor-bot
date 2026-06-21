@@ -5,9 +5,9 @@ lapor-bot
 lapor-bot.log
 main.exe
 
-.serena
-.omo
-.pi
-.omp
-.commandcode
+.serena/
+.omo/
+.pi/
+.omp/
+.commandcode/
 node_modules
