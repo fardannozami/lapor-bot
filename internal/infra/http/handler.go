@@ -381,18 +381,31 @@ func buildPersonalGoal(goal *domain.WeeklyGoal, activities []domain.GoalActivity
 		activityByDate[activity.Date.Format(time.DateOnly)] = strings.TrimSpace(activity.Activity)
 	}
 
-	startDate := domain.GetToday(goal.StartAt.UTC())
-	endDate := domain.GetToday(goal.EndAt.Add(-time.Nanosecond).UTC())
+	// Compute the goal window in WIB (Asia/Jakarta) so the day boundaries
+	// match the user's local calendar. Goal activities are stored with UTC
+	// dates (via GetToday), so for each WIB day we derive the corresponding
+	// UTC date string by looking at the UTC date at WIB noon — this covers
+	// the vast majority of activity timestamps correctly.
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	startWIB := goal.StartAt.In(loc)
+
+	startDate := time.Date(startWIB.Year(), startWIB.Month(), startWIB.Day(), 0, 0, 0, 0, loc)
 	days := make([]GoalDay, 0, 7)
-	for date := startDate; !date.After(endDate); date = date.AddDate(0, 0, 1) {
-		activity, active := activityByDate[date.Format(time.DateOnly)]
-		if activity == "" {
-			activity = "—"
+	for i := 0; i < 7; i++ {
+		dateWIB := startDate.AddDate(0, 0, i)
+		// Use WIB-noon to derive the UTC date key — this matches GetToday's
+		// behaviour for all hours except 00:00-00:30 WIB (a tiny window).
+		noonUTC := dateWIB.Add(12 * time.Hour).UTC()
+		dateStr := noonUTC.Format(time.DateOnly)
+
+		dayActivity, active := activityByDate[dateStr]
+		if dayActivity == "" {
+			dayActivity = "—"
 		}
 		days = append(days, GoalDay{
-			Date:     date.Format(time.DateOnly),
-			DayLabel: profileDayLabels[date.Weekday()],
-			Activity: activity,
+			Date:     dateStr,
+			DayLabel: profileDayLabels[dateWIB.Weekday()],
+			Activity: dayActivity,
 			Active:   active,
 		})
 	}

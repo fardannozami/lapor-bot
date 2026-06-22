@@ -138,12 +138,18 @@ export function PersonalPage({
 	}, [user]);
 
 	const refreshUser = async () => {
-		try {
-			const refreshed = await repo.fetchUserByPhone(phone);
-			setLocalUser(refreshed);
-			if (onUserRefresh) onUserRefresh(refreshed);
-		} catch {
-			// ignore; parent will still have old snapshot
+		// Retry once on failure to handle transient network / DB-timing issues.
+		for (let attempt = 0; attempt < 2; attempt++) {
+			try {
+				const refreshed = await repo.fetchUserByPhone(phone);
+				setLocalUser(refreshed);
+				if (onUserRefresh) onUserRefresh(refreshed);
+				return;
+			} catch {
+				if (attempt === 1) throw; // both attempts failed
+				// brief backoff before retry
+				await new Promise((r) => setTimeout(r, 300));
+			}
 		}
 	};
 
@@ -681,7 +687,17 @@ export function PersonalPage({
 															activity || "Olahraga",
 															startPayload,
 														);
-														await refreshUser();
+														// Goal saved — refresh to pick up active_goal.
+														// If refresh fails the goal was still saved,
+														// so show a retry hint instead of a hard error.
+														try {
+															await refreshUser();
+														} catch {
+															setGoalError(
+																"Goal tersimpan, tapi gagal refresh data. Tutup form dan refresh halaman.",
+															);
+															return;
+														}
 														setShowGoalForm(false);
 													} catch (e: any) {
 														setGoalError(
