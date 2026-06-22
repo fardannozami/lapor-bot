@@ -19,6 +19,24 @@ interface LeaderboardTableProps {
 type TabType = "seasonal" | "lifetime" | "streak" | "week";
 const PAGE_SIZE = 15;
 
+const JOB_FILTER_OPTIONS = [
+  { id: "all", name: "All Jobs" },
+  { id: "fighter", name: "Fighter ⚔️" },
+  { id: "tank", name: "Tanker 🛡️" },
+  { id: "assassin", name: "Assassin 🗡️" },
+  { id: "mage", name: "Mage 🔥" },
+  { id: "ranger", name: "Ranger 🏹" },
+  { id: "healer", name: "Healer 💚" },
+  { id: "necromancer", name: "Necromancer 🌑" },
+] as const;
+
+const LEADERBOARD_TABS: { id: TabType; label: string; icon: typeof Trophy }[] = [
+  { id: "seasonal", label: "Season Rank", icon: Trophy },
+  { id: "lifetime", label: "Lifetime XP", icon: Award },
+  { id: "streak", label: "Streak Masters", icon: Flame },
+  { id: "week", label: "Minggu Ini", icon: CalendarDays },
+];
+
 const ProgressBar: React.FC<{
   progress: TierProgress;
   valueLabel: string;
@@ -62,17 +80,6 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
   const [selectedJob, setSelectedJob] = useState("all");
   const [activeTab, setActiveTab] = useState<TabType>("seasonal");
   const [page, setPage] = useState(1);
-
-  const jobsList = [
-    { id: "all", name: "All Jobs" },
-    { id: "fighter", name: "Fighter ⚔️" },
-    { id: "tank", name: "Tanker 🛡️" },
-    { id: "assassin", name: "Assassin 🗡️" },
-    { id: "mage", name: "Mage 🔥" },
-    { id: "ranger", name: "Ranger 🏹" },
-    { id: "healer", name: "Healer 💚" },
-    { id: "necromancer", name: "Necromancer 🌑" },
-  ];
 
   // Process data based on active tab, search, and job filters
   const filteredAndSorted = useMemo(() => {
@@ -451,50 +458,24 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
       <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between mb-6 border-b border-gray-850 pb-5">
         {/* Leaderboard Mode Tabs */}
         <div className="flex flex-wrap bg-gray-950/80 p-1.5 rounded-xl border border-gray-800/60 max-w-fit">
-          <button
-            onClick={() => handleTabChange("seasonal")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
-              activeTab === "seasonal"
-                ? "bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            <Trophy size={14} />
-            Season Rank
-          </button>
-          <button
-            onClick={() => handleTabChange("lifetime")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
-              activeTab === "lifetime"
-                ? "bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            <Award size={14} />
-            Lifetime XP
-          </button>
-          <button
-            onClick={() => handleTabChange("streak")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
-              activeTab === "streak"
-                ? "bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            <Flame size={14} />
-            Streak Masters
-          </button>
-          <button
-            onClick={() => handleTabChange("week")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
-              activeTab === "week"
-                ? "bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            <CalendarDays size={14} />
-            Minggu Ini
-          </button>
+          {LEADERBOARD_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
+                  active
+                    ? "bg-gradient-to-r from-system-purple to-system-blue text-white shadow-neon-blue"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                <Icon size={14} />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Filter Inputs */}
@@ -531,7 +512,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
               }}
               className="w-full sm:w-44 pl-10 pr-8 py-2 bg-gray-950/70 border border-gray-800 focus:border-system-blue focus:shadow-neon-blue rounded-xl text-xs text-white font-mono transition-all outline-none appearance-none cursor-pointer"
             >
-              {jobsList.map((job) => (
+              {JOB_FILTER_OPTIONS.map((job) => (
                 <option
                   key={job.id}
                   value={job.id}

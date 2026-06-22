@@ -67,6 +67,20 @@ const (
 	AttrVit AttributeType = "VIT"
 )
 
+// MinAttributeValue is the floor for any displayed attribute.
+// A hunter starts at 1 (not 0) so the dashboard always shows a positive baseline.
+const MinAttributeValue = 1
+
+// ClampedAttribute returns v bounded below by MinAttributeValue.
+// Use this whenever an attribute is displayed or serialized for the UI
+// so that the "start from 1" invariant is enforced in a single place.
+func ClampedAttribute(v int) int {
+	if v < MinAttributeValue {
+		return MinAttributeValue
+	}
+	return v
+}
+
 // DetermineAttributes parses an activity text to find matching RPG attributes.
 func DetermineAttributes(text string) []AttributeType {
 	text = strings.ToLower(text)

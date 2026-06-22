@@ -6,18 +6,20 @@
   --color-dark-card: #102018;
   --color-dark-border: #23402e;
   --color-dark-input: #14251b;
-  
+
   --color-system-blue: #2dd4bf;
-  --color-system-purple: #22c55e;
+  --color-system-purple: #a855f7;
   --color-system-red: #f97316;
   --color-system-gold: #eab308;
   --color-system-green: #22c55e;
-  
+
+  --color-gray-850: #1a1f2e;
+
   --font-orbitron: "Orbitron", sans-serif;
   --font-inter: "Rajdhani", sans-serif;
 
   --shadow-neon-blue: 0 0 15px rgba(45, 212, 191, 0.35);
-  --shadow-neon-purple: 0 0 15px rgba(34, 197, 94, 0.35);
+  --shadow-neon-purple: 0 0 15px rgba(168, 85, 247, 0.35);
   --shadow-neon-red: 0 0 15px rgba(249, 115, 22, 0.35);
   --shadow-neon-gold: 0 0 15px rgba(234, 179, 8, 0.35);
 }
@@ -96,23 +98,41 @@
 }
 
 .glass-glow-blue {
-  border: 1px solid rgba(0, 240, 255, 0.2);
-  box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+  border-color: color-mix(in srgb, var(--color-system-blue) 25%, transparent);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--color-system-blue) 10%, transparent);
 }
 
 .glass-glow-purple {
-  border: 1px solid rgba(168, 85, 247, 0.2);
-  box-shadow: 0 0 15px rgba(168, 85, 247, 0.1);
+  border-color: color-mix(in srgb, var(--color-system-purple) 25%, transparent);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--color-system-purple) 10%, transparent);
 }
 
 .glass-glow-red {
-  border: 1px solid rgba(255, 59, 48, 0.2);
-  box-shadow: 0 0 15px rgba(255, 59, 48, 0.1);
+  border-color: color-mix(in srgb, var(--color-system-red) 25%, transparent);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--color-system-red) 10%, transparent);
 }
 
 .glass-glow-gold {
-  border: 1px solid rgba(234, 179, 8, 0.2);
-  box-shadow: 0 0 15px rgba(234, 179, 8, 0.1);
+  border-color: color-mix(in srgb, var(--color-system-gold) 25%, transparent);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--color-system-gold) 10%, transparent);
+}
+
+/* Keyboard accessibility: visible focus ring for interactive elements. */
+:focus-visible {
+  outline: 2px solid var(--color-system-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respect reduced-motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Theme bridge for existing Tailwind utility-heavy components. */
