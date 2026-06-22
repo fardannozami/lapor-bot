@@ -149,8 +149,8 @@ func TestDailyQuestViewAndComplete(t *testing.T) {
 	if repo.upsertedReport.TotalSideQuests != 1 || repo.upsertedReport.SeasonalSideQuests != 1 {
 		t.Errorf("expected side quest counters to increase, got lifetime=%d season=%d", repo.upsertedReport.TotalSideQuests, repo.upsertedReport.SeasonalSideQuests)
 	}
-	if repo.upsertedReport.TotalPoints != 203 {
-		t.Errorf("expected side quest (easy) to add 3 points, got total=%d (expected 203)", repo.upsertedReport.TotalPoints)
+	if repo.upsertedReport.TotalPoints != 202 {
+		t.Errorf("expected side quest (easy) to add 2 points, got total=%d (expected 202)", repo.upsertedReport.TotalPoints)
 	}
 }
 

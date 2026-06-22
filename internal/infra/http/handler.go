@@ -227,7 +227,7 @@ type PersonalGoal struct {
 	RemainingDays int       `json:"remaining_days"`
 	Percent       int       `json:"percent"`
 	IsCompleted   bool      `json:"is_completed"`
-	CompletedAt   string   `json:"completed_at,omitempty"`
+	CompletedAt   string    `json:"completed_at,omitempty"`
 	Days          []GoalDay `json:"days"`
 }
 
@@ -446,19 +446,22 @@ func buildPersonalGoal(goal *domain.WeeklyGoal, activities []domain.GoalActivity
 	}
 }
 
-func totalActiveDays(r *domain.Report) int {
-	return r.CenturionCycles*100 + r.ActivityCount
-}
-
 func sortEnrichedReportsBySeason(reports []EnrichedReport) {
 	sort.Slice(reports, func(i, j int) bool {
-		if reports[i].SeasonalPoints == reports[j].SeasonalPoints {
-			if reports[i].SeasonalActivityCount == reports[j].SeasonalActivityCount {
-				return reports[i].Name < reports[j].Name
-			}
-			return reports[i].SeasonalActivityCount > reports[j].SeasonalActivityCount
+		a, b := reports[i], reports[j]
+		if a.SeasonalPoints != b.SeasonalPoints {
+			return a.SeasonalPoints > b.SeasonalPoints
 		}
-		return reports[i].SeasonalPoints > reports[j].SeasonalPoints
+		if a.SeasonalActivityCount != b.SeasonalActivityCount {
+			return a.SeasonalActivityCount > b.SeasonalActivityCount
+		}
+		if a.Streak != b.Streak {
+			return a.Streak > b.Streak
+		}
+		if a.TotalActiveDays != b.TotalActiveDays {
+			return a.TotalActiveDays > b.TotalActiveDays
+		}
+		return a.Name < b.Name
 	})
 }
 
@@ -524,7 +527,7 @@ func enrichReportWithMasking(r *domain.Report, today time.Time, weekActivity []b
 		JobTrait:              jobTrait,
 		Streak:                r.Streak,
 		ActivityCount:         r.ActivityCount,
-		TotalActiveDays:       totalActiveDays(r),
+		TotalActiveDays:       r.TotalActiveDays(),
 		LastReportDate:        r.LastReportDate.Format(time.RFC3339),
 		MaxStreak:             r.MaxStreak,
 		TotalPoints:           r.TotalPoints,
@@ -657,7 +660,7 @@ func (s *Server) HandleSummary(w http.ResponseWriter, r *http.Request) {
 			activeStreakCount++
 		}
 
-		totalWorkoutsLogged += totalActiveDays(rep)
+		totalWorkoutsLogged += rep.TotalActiveDays()
 
 		jc := rep.JobClass
 		if jc == "" {
@@ -744,7 +747,8 @@ func (s *Server) HandleGetUser(w http.ResponseWriter, r *http.Request) {
 
 	if strings.TrimSpace(report.JobClass) != "" {
 		questUC := usecase.NewDailyQuestUsecase(s.repo)
-		tasks, err := questUC.GetOrGenerateQuestList(r.Context(), report.UserID, report.JobClass, report.Level, now)
+		currentLevel := domain.NumericLevelFromTotalPoints(report.TotalPoints)
+		tasks, err := questUC.GetOrGenerateQuestList(r.Context(), report.UserID, report.JobClass, currentLevel, now)
 		if err != nil {
 			s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
@@ -1001,7 +1005,8 @@ func (s *Server) HandleGetUserByPhone(w http.ResponseWriter, r *http.Request) {
 
 	if strings.TrimSpace(report.JobClass) != "" {
 		questUC := usecase.NewDailyQuestUsecase(s.repo)
-		tasks, err := questUC.GetOrGenerateQuestList(r.Context(), report.UserID, report.JobClass, report.Level, now)
+		currentLevel := domain.NumericLevelFromTotalPoints(report.TotalPoints)
+		tasks, err := questUC.GetOrGenerateQuestList(r.Context(), report.UserID, report.JobClass, currentLevel, now)
 		if err != nil {
 			s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return

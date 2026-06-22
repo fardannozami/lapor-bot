@@ -11,7 +11,16 @@ import (
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
 )
 
-const MaxDailyReports = 3
+const (
+	MaxDailyRegularReports = 3
+	MaxDailySideQuests     = 3
+	MaxDailyReports        = MaxDailyRegularReports
+)
+
+type typedActivityRepository interface {
+	UpsertReportWithActivityKind(ctx context.Context, report *domain.Report, activityDate time.Time, kind string) error
+	GetDailyActivityCountByKind(ctx context.Context, userID string, date time.Time, kind string) (int, error)
+}
 
 // GoalCompletionNotifier is called when a user's weekly goal is completed.
 // userID and name identify the user; activity and targetDays describe the completed goal;
@@ -83,23 +92,41 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	}
 	today := domain.GetToday(now)
 	isSideQuest := opts.sideQuestCount > 0
-
-	var dailyCount int
-	if report != nil && domain.GetToday(report.LastReportDate).Equal(today) {
-		dailyCount, err = uc.repo.GetDailyActivityCount(ctx, userID, today)
-		if err != nil {
-			return "", err
-		}
+	activityKind := domain.ActivityKindRegularReport
+	if isSideQuest {
+		activityKind = domain.ActivityKindSideQuest
 	}
 
-	if dailyCount >= MaxDailyReports {
-		msg := fmt.Sprintf("%s sudah laporan %dx hari ini, ayo jangan curang! 😉\n\nBatas harian adalah %d laporan: laporan pertama untuk progres utama, laporan ke-2 dan ke-3 hanya bonus ½ XP. Kalau tadi salah input, pakai /cancel untuk hapus laporan terakhir atau /cancel-all untuk hapus semua laporan hari ini. 🙏", report.Name, MaxDailyReports, MaxDailyReports)
+	var dailyCount int
+	dailyCount, err = uc.getDailyActivityCount(ctx, userID, today, activityKind)
+	if err != nil {
+		return "", err
+	}
+
+	dailyLimit := MaxDailyRegularReports
+	if isSideQuest {
+		dailyLimit = MaxDailySideQuests
+	}
+	if dailyCount >= dailyLimit {
+		label := "laporan utama"
+		if isSideQuest {
+			label = "side quest"
+		}
+		displayName := name
+		if report != nil {
+			displayName = report.Name
+		}
+		msg := fmt.Sprintf("%s sudah mencapai batas %s %dx hari ini. Batas laporan utama dan side quest terpisah: masing-masing %d kali per hari.", displayName, label, dailyLimit, MaxDailyRegularReports)
+		if !isSideQuest {
+			msg += " Kalau tadi salah input, pakai /cancel untuk hapus laporan terakhir atau /cancel-all untuk hapus semua laporan hari ini."
+		}
+		msg += " 🙏"
 		msg += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
 		return msg, nil
 	}
 
-	isRepeatReport := dailyCount > 0
-	isFullReport := !isRepeatReport
+	isRepeatReport := !isSideQuest && dailyCount > 0
+	isFullReport := !isSideQuest && !isRepeatReport
 
 	streakFreezeUsed := false
 
@@ -114,7 +141,14 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		lastReport := report.LastReportDate
 		lastReportDate := domain.GetToday(lastReport)
 
-		if lastReportDate.Equal(today) {
+		if isSideQuest {
+			if shouldUpdateStoredName {
+				if err := uc.repo.UpsertReport(ctx, report); err != nil {
+					return "", err
+				}
+			}
+			name = report.Name
+		} else if lastReportDate.Equal(today) {
 			if shouldUpdateStoredName {
 				if err := uc.repo.UpsertReport(ctx, report); err != nil {
 					return "", err
@@ -184,6 +218,8 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		report.MaxStreak = 1
 	}
 	oldNumericLevel := domain.NumericLevelFromTotalPoints(report.TotalPoints)
+	oldLifetimeTier := domain.GetLevel(report.TotalPoints)
+	oldSeasonRank := domain.GetSeasonRank(report.SeasonalPoints)
 
 	newRecord := false
 	if isFullReport && report.Streak > report.MaxStreak {
@@ -298,13 +334,20 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 
 	report.Level = domain.NumericLevelFromTotalPoints(report.TotalPoints)
 	leveledUp := report.Level > oldNumericLevel
+	newLifetimeTier := domain.GetLevel(report.TotalPoints)
+	newSeasonRank := domain.GetSeasonRank(report.SeasonalPoints)
+	lifetimeTierUp := newLifetimeTier.Tier > oldLifetimeTier.Tier
+	seasonRankUp := newSeasonRank.Tier > oldSeasonRank.Tier
 
-	if err := uc.repo.UpsertReportWithActivity(ctx, report, today); err != nil {
+	if err := uc.upsertReportWithActivity(ctx, report, today, activityKind); err != nil {
 		return "", err
 	}
-	goalCompleted, err := NewGoalUsecase(uc.repo).RecordActivity(ctx, userID, now, goalActivityTextWithFallback(workout, opts.activityText))
-	if err != nil {
-		return "", err
+	goalCompleted := false
+	if !isSideQuest {
+		goalCompleted, err = NewGoalUsecase(uc.repo).RecordActivity(ctx, userID, now, goalActivityTextWithFallback(workout, opts.activityText))
+		if err != nil {
+			return "", err
+		}
 	}
 
 	isComeback := isFullReport && report.InactiveDays > 3 && report.Streak == 1
@@ -350,7 +393,7 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		}
 
 		if isSideQuest {
-			response = fmt.Sprintf("Side quest diterima, %s%s menyelesaikan %d side quest. Tetap dihitung untuk streak, stats, leaderboard, dan goal. 🔥\n%s",
+			response = fmt.Sprintf("Side quest diterima, %s%s menyelesaikan %d side quest. Ini bonus terpisah dari 3 slot laporan utama harian. 🔥\n%s",
 				cyclePrefix, name, opts.sideQuestCount, expBreakdown)
 		} else if isRepeatReport {
 			response = fmt.Sprintf("Laporan diterima (laporan ke-%d hari ini), %s%s sudah berkeringat %d hari. Lanjutkan 🔥 (streak %d minggu)\n%s",
@@ -401,6 +444,12 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 
 	if leveledUp {
 		response += fmt.Sprintf("\n\n⚔️ *LEVEL UP!* Lv.%d → Lv.%d", oldNumericLevel, report.Level)
+	}
+	if lifetimeTierUp {
+		response += fmt.Sprintf("\n🎖️ *TIER LIFETIME UP!* %s %s → %s %s", oldLifetimeTier.Name, oldLifetimeTier.Icon, newLifetimeTier.Name, newLifetimeTier.Icon)
+	}
+	if seasonRankUp {
+		response += fmt.Sprintf("\n🏹 *RANK SEASON UP!* %s %s → %s %s", oldSeasonRank.Name, oldSeasonRank.Icon, newSeasonRank.Name, newSeasonRank.Icon)
 	}
 
 	if len(newAchievements)+len(comebackAchievements) > 0 {
@@ -757,6 +806,20 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	response += fmt.Sprintf("\n\n%s", formatCurrentAttributes(report))
 
 	return response, nil
+}
+
+func (uc *ReportActivityUsecase) getDailyActivityCount(ctx context.Context, userID string, date time.Time, kind string) (int, error) {
+	if repo, ok := uc.repo.(typedActivityRepository); ok {
+		return repo.GetDailyActivityCountByKind(ctx, userID, date, kind)
+	}
+	return uc.repo.GetDailyActivityCount(ctx, userID, date)
+}
+
+func (uc *ReportActivityUsecase) upsertReportWithActivity(ctx context.Context, report *domain.Report, activityDate time.Time, kind string) error {
+	if repo, ok := uc.repo.(typedActivityRepository); ok {
+		return repo.UpsertReportWithActivityKind(ctx, report, activityDate, kind)
+	}
+	return uc.repo.UpsertReportWithActivity(ctx, report, activityDate)
 }
 
 func reportName(storedName, incomingName string) string {

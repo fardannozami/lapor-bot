@@ -11,9 +11,10 @@ import (
 
 type mockRepo struct {
 	domain.ReportRepository
-	reports        map[string]*domain.Report
-	activityCounts []domain.ActivityLeaderboardEntry
-	dailyCounts    map[string]int
+	reports            map[string]*domain.Report
+	activityCounts     []domain.ActivityLeaderboardEntry
+	dailyCounts        map[string]int
+	activityKindCounts map[string]map[string]int
 }
 
 func (m *mockRepo) GetReport(ctx context.Context, userID string) (*domain.Report, error) {
@@ -26,12 +27,23 @@ func (m *mockRepo) UpsertReport(ctx context.Context, report *domain.Report) erro
 }
 
 func (m *mockRepo) UpsertReportWithActivity(ctx context.Context, report *domain.Report, activityDate time.Time) error {
+	return m.UpsertReportWithActivityKind(ctx, report, activityDate, domain.ActivityKindRegularReport)
+}
+
+func (m *mockRepo) UpsertReportWithActivityKind(ctx context.Context, report *domain.Report, activityDate time.Time, kind string) error {
 	m.reports[report.UserID] = report
 	key := report.UserID + "|" + activityDate.Format(time.DateOnly)
 	if m.dailyCounts == nil {
 		m.dailyCounts = make(map[string]int)
 	}
 	m.dailyCounts[key]++
+	if m.activityKindCounts == nil {
+		m.activityKindCounts = make(map[string]map[string]int)
+	}
+	if m.activityKindCounts[key] == nil {
+		m.activityKindCounts[key] = make(map[string]int)
+	}
+	m.activityKindCounts[key][kind]++
 	return nil
 }
 
@@ -102,6 +114,17 @@ func (m *mockRepo) GetDailyActivityCount(ctx context.Context, userID string, dat
 		return 0, nil
 	}
 	return m.dailyCounts[key], nil
+}
+
+func (m *mockRepo) GetDailyActivityCountByKind(ctx context.Context, userID string, date time.Time, kind string) (int, error) {
+	key := userID + "|" + date.Format(time.DateOnly)
+	if m.activityKindCounts != nil && m.activityKindCounts[key] != nil {
+		return m.activityKindCounts[key][kind], nil
+	}
+	if kind == domain.ActivityKindRegularReport {
+		return m.GetDailyActivityCount(ctx, userID, date)
+	}
+	return 0, nil
 }
 
 func (m *mockRepo) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
@@ -287,6 +310,68 @@ func TestStreak_SameDay_SecondReport(t *testing.T) {
 	}
 }
 
+func TestReportLimit_IsSeparateFromSideQuestLimit(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	now := time.Now()
+	todayKey := "user1|" + domain.GetToday(now).Format(time.DateOnly)
+	repo.reports["user1"] = &domain.Report{
+		UserID:         "user1",
+		Name:           "Diana",
+		Streak:         7,
+		ActivityCount:  15,
+		LastReportDate: now,
+	}
+	repo.dailyCounts[todayKey] = 3
+	repo.activityKindCounts = map[string]map[string]int{
+		todayKey: {
+			domain.ActivityKindSideQuest: 3,
+		},
+	}
+
+	msg, err := uc.Execute(ctx, "user1", "Diana", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !containsSubstring(msg, "Laporan diterima") {
+		t.Fatalf("regular report should still be accepted after 3 side quests, got %q", msg)
+	}
+	if repo.activityKindCounts[todayKey][domain.ActivityKindRegularReport] != 1 {
+		t.Fatalf("regular report should use the regular-report slot after side quests")
+	}
+}
+
+func TestReportActivity_AnnouncesLifetimeTierAndSeasonRankUp(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	now := time.Now()
+	repo.reports["user1"] = &domain.Report{
+		UserID:                "user1",
+		Name:                  "Diana",
+		Streak:                1,
+		ActivityCount:         15,
+		SeasonalActivityCount: 5,
+		TotalPoints:           1149,
+		SeasonalPoints:        149,
+		LastReportDate:        now,
+	}
+
+	msg, err := uc.Execute(ctx, "user1", "Diana", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !containsSubstring(msg, "TIER LIFETIME UP") || !containsSubstring(msg, "E-Tier Hunter") || !containsSubstring(msg, "D-Tier Hunter") {
+		t.Fatalf("expected lifetime tier-up announcement, got %q", msg)
+	}
+	if !containsSubstring(msg, "RANK SEASON UP") || !containsSubstring(msg, "Warrior") || !containsSubstring(msg, "Elite") {
+		t.Fatalf("expected season rank-up announcement, got %q", msg)
+	}
+}
+
 func TestStreak_SameDay_MaxReportsReached(t *testing.T) {
 	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
@@ -309,7 +394,7 @@ func TestStreak_SameDay_MaxReportsReached(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if !containsSubstring(msg, "sudah laporan 3x hari ini") {
+	if !containsSubstring(msg, "batas laporan utama 3x hari ini") {
 		t.Errorf("Expected max limit message, got '%s'", msg)
 	}
 }
@@ -554,6 +639,8 @@ func TestCenturion_PrestigeTransition(t *testing.T) {
 
 	// Fast-forward the report object's date to "yesterday" so the next Execute() call increments the streak
 	repo.reports["user1"].LastReportDate = time.Now().AddDate(0, 0, -7)
+	repo.dailyCounts = make(map[string]int)
+	repo.activityKindCounts = make(map[string]map[string]int)
 
 	msg, _ = uc.Execute(ctx, "user1", "Centurion-to-be", nil)
 	r = repo.reports["user1"]

@@ -13,7 +13,7 @@ type Level struct {
 	MinPoints int
 }
 
-// Rank represents a season-scoped Solo-Leveling-inspired rank.
+// Rank represents a season-scoped competitive rank.
 type Rank struct {
 	Tier      int
 	Name      string
@@ -85,30 +85,30 @@ func NumericLevelFromTotalPoints(totalPoints int) int {
 }
 
 // AllLevels defines lifetime progression tiers in ascending order.
-// Lifetime points never reset, so upper tiers are intentionally long-term goals
-// across many seasons instead of single-season finish lines.
+// Lifetime points never reset, so S-tier is intentionally a long-term journey
+// across many seasons instead of a single-season finish line.
 var AllLevels = []Level{
-	{Tier: 1, Name: "Newbie", Icon: "🌱", MinPoints: 0},
-	{Tier: 2, Name: "Fighter", Icon: "💪", MinPoints: 50},
-	{Tier: 3, Name: "Warrior", Icon: "⚔️", MinPoints: 200},
-	{Tier: 4, Name: "Champion", Icon: "🏆", MinPoints: 500},
-	{Tier: 5, Name: "Legend", Icon: "👑", MinPoints: 1000},
-	{Tier: 6, Name: "Immortal", Icon: "🔱", MinPoints: 2500},
-	{Tier: 7, Name: "Titan", Icon: "⭐", MinPoints: 5000},
-	{Tier: 8, Name: "God", Icon: "⚡", MinPoints: 10000},
-	{Tier: 9, Name: "Cosmic", Icon: "🌌", MinPoints: 20000},
+	{Tier: 1, Name: "E-Tier Hunter", Icon: "🟫", MinPoints: 0},
+	{Tier: 2, Name: "D-Tier Hunter", Icon: "🟩", MinPoints: 1150},
+	{Tier: 3, Name: "C-Tier Hunter", Icon: "🟦", MinPoints: 4675},
+	{Tier: 4, Name: "B-Tier Hunter", Icon: "🟪", MinPoints: 11825},
+	{Tier: 5, Name: "A-Tier Hunter", Icon: "🟥", MinPoints: 23850},
+	{Tier: 6, Name: "S-Tier Hunter", Icon: "🟨", MinPoints: 42000},
 }
 
-// AllSeasonRanks defines rank titles for the current season only.
-// Level remains lifetime; rank resets with seasonal points.
+// AllSeasonRanks defines Mobile-Legends-inspired rank titles for the current
+// season only. Level remains lifetime; rank resets with seasonal points.
 var AllSeasonRanks = []Rank{
-	{Tier: 1, Name: "E-Rank Hunter", Icon: "🟫", MinPoints: 0},
-	{Tier: 2, Name: "D-Rank Hunter", Icon: "🟩", MinPoints: 100},
-	{Tier: 3, Name: "C-Rank Hunter", Icon: "🟦", MinPoints: 250},
-	{Tier: 4, Name: "B-Rank Hunter", Icon: "🟪", MinPoints: 450},
-	{Tier: 5, Name: "A-Rank Hunter", Icon: "🟥", MinPoints: 700},
-	{Tier: 6, Name: "S-Rank Hunter", Icon: "🟨", MinPoints: 1000},
-	{Tier: 7, Name: "Monarch", Icon: "👑", MinPoints: 1500},
+	{Tier: 1, Name: "Warrior", Icon: "🛡️", MinPoints: 0},
+	{Tier: 2, Name: "Elite", Icon: "⚔️", MinPoints: 150},
+	{Tier: 3, Name: "Master", Icon: "🏹", MinPoints: 350},
+	{Tier: 4, Name: "Grandmaster", Icon: "🔥", MinPoints: 650},
+	{Tier: 5, Name: "Epic", Icon: "💎", MinPoints: 900},
+	{Tier: 6, Name: "Legend", Icon: "👑", MinPoints: 1250},
+	{Tier: 7, Name: "Mythic", Icon: "🌙", MinPoints: 1700},
+	{Tier: 8, Name: "Mythical Honor", Icon: "🐉", MinPoints: 2350},
+	{Tier: 9, Name: "Mythical Glory", Icon: "✨", MinPoints: 3200},
+	{Tier: 10, Name: "Mythical Immortal", Icon: "🌟", MinPoints: 4500},
 }
 
 // AllJobClasses defines jobs inspired by Solo Leveling hunter roles and common

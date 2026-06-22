@@ -171,12 +171,12 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 		return "🔒 Side quest tersedia untuk profil yang sudah punya job. Untuk sementara, cek progres dan info profil di web: https://lapor-bot.web.id/", nil
 	}
 	today := domain.GetToday(now)
-	dailyCount, err := u.repo.GetDailyActivityCount(ctx, userID, today)
+	dailyCount, err := getDailySideQuestCount(ctx, u.repo, userID, today)
 	if err != nil {
 		return "", err
 	}
-	if dailyCount >= MaxDailyReports {
-		return fmt.Sprintf("Batas laporan harian sudah penuh (%dx). Side quest belum diterima agar progres quest tidak kepisah dari stats. Kalau salah input, pakai /cancel dulu lalu lapor ulang. 🙏", MaxDailyReports), nil
+	if dailyCount >= MaxDailySideQuests {
+		return fmt.Sprintf("Batas side quest harian sudah penuh (%dx). Kamu tetap masih punya slot laporan utama terpisah sampai %dx hari ini. 🙏", MaxDailySideQuests, MaxDailyRegularReports), nil
 	}
 
 	tasks, err := u.GetOrGenerateQuestList(ctx, userID, report.JobClass, report.Level, now)
@@ -239,6 +239,13 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 		}
 		return "Gagal membaca laporan side quest. Contoh: `/lapor sidequest jalan 4000` atau `/lapor sidequest sepeda 5 km`", nil
 	}
+	if dailyCount+len(completedTasks) > MaxDailySideQuests {
+		remaining := MaxDailySideQuests - dailyCount
+		if remaining < 0 {
+			remaining = 0
+		}
+		return fmt.Sprintf("Kamu hanya punya sisa %d slot side quest hari ini. Side quest dan laporan utama punya limit terpisah: masing-masing %d kali per hari. 🙏", remaining, MaxDailySideQuests), nil
+	}
 
 	// Save updated tasks list
 	bytes, err := json.Marshal(tasks)
@@ -289,20 +296,27 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 // based on its difficulty. These multipliers are computed behind the scenes;
 // the user-facing notification does not show the raw multiplier values.
 //
-//	Easy:   3 pts (0.3 × 10 base)
-//	Medium: 4 pts (0.4 × 10 base)
+//	Easy:   2 pts
+//	Medium: 3 pts
 //	Hard:   5 pts (0.5 × 10 base)
 func sideQuestPoints(difficulty string) int {
 	switch strings.ToLower(strings.TrimSpace(difficulty)) {
 	case "easy":
-		return 3
+		return 2
 	case "medium":
-		return 4
+		return 3
 	case "hard":
 		return 5
 	default:
 		return 5
 	}
+}
+
+func getDailySideQuestCount(ctx context.Context, repo domain.ReportRepository, userID string, date time.Time) (int, error) {
+	if typedRepo, ok := repo.(typedActivityRepository); ok {
+		return typedRepo.GetDailyActivityCountByKind(ctx, userID, date, domain.ActivityKindSideQuest)
+	}
+	return repo.GetDailyActivityCount(ctx, userID, date)
 }
 
 func parseLineFloat(line string) (string, float64) {
