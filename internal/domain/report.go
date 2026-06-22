@@ -111,6 +111,11 @@ func DetermineAttributes(text string) []AttributeType {
 // For example, if offset is 30m, 00:29 AM is still considered "yesterday".
 const ReportCutoffOffset = 30 * time.Minute
 
+const (
+	ActivityKindRegularReport = "regular_report"
+	ActivityKindSideQuest     = "sidequest"
+)
+
 // GetToday returns the normalized "today" (midnight) based on the cutoff offset.
 func GetToday(t time.Time) time.Time {
 	// Shift time back by offset then truncate to date

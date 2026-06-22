@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -27,15 +26,7 @@ func (u *WeeklyHunterRanksAnnouncementUsecase) Execute(ctx context.Context, now 
 	seasonNumber, _ := GetCurrentSessionInfo(now)
 	nextReset := GetNextResetTime(now)
 
-	sort.Slice(reports, func(i, j int) bool {
-		if reports[i].SeasonalPoints == reports[j].SeasonalPoints {
-			if reports[i].SeasonalActivityCount == reports[j].SeasonalActivityCount {
-				return reports[i].Name < reports[j].Name
-			}
-			return reports[i].SeasonalActivityCount > reports[j].SeasonalActivityCount
-		}
-		return reports[i].SeasonalPoints > reports[j].SeasonalPoints
-	})
+	domain.SortReports(reports, domain.SortBySeasonRank)
 
 	var sb strings.Builder
 	sb.WriteString("📢 *PENGUMUMAN MINGGUAN: RANK & JOB HUNTER* 🏹\n")
@@ -44,7 +35,7 @@ func (u *WeeklyHunterRanksAnnouncementUsecase) Execute(ctx context.Context, now 
 
 	rank := 1
 	for _, r := range reports {
-		if r.SeasonalPoints == 0 && r.SeasonalActivityCount == 0 {
+		if !domain.HasSeasonActivity(r) {
 			continue
 		}
 

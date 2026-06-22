@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"sort"
 	"strings"
 	"time"
 
@@ -19,26 +18,6 @@ func NewGetLeaderboardUsecase(repo domain.ReportRepository) *GetLeaderboardUseca
 	return &GetLeaderboardUsecase{repo: repo}
 }
 
-func sortReportsBySeason(reports []*domain.Report) {
-	sort.Slice(reports, func(i, j int) bool {
-		if reports[i].SeasonalPoints == reports[j].SeasonalPoints {
-			if reports[i].SeasonalActivityCount == reports[j].SeasonalActivityCount {
-				return reports[i].Name < reports[j].Name
-			}
-			return reports[i].SeasonalActivityCount > reports[j].SeasonalActivityCount
-		}
-		return reports[i].SeasonalPoints > reports[j].SeasonalPoints
-	})
-}
-
-func hasSeasonActivity(report *domain.Report) bool {
-	return report.SeasonalPoints > 0 || report.SeasonalActivityCount > 0
-}
-
-func totalActiveDays(report *domain.Report) int {
-	return report.CenturionCycles*100 + report.ActivityCount
-}
-
 func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	reports, err := uc.repo.GetAllReports(ctx)
 	if err != nil {
@@ -48,53 +27,30 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	now := time.Now()
 	displayDate := domain.GetToday(now)
 
-	// Session-aware start date (auto-cycles every 4 months)
 	_, sessionStart := GetCurrentSessionInfo(now)
 	startDate := time.Date(sessionStart.Year(), sessionStart.Month(), sessionStart.Day(), 0, 0, 0, 0, time.UTC)
-
 	challengeDay := int(displayDate.Sub(startDate).Hours()/24) + 1
 
-	// Logic for "Keep the streak" vs "Lose the streak":
-	// Keep streak: Reported Today OR Reported Yesterday (still have time to report today).
-	// Lose streak: Last report < Yesterday.
-	// New submission: Reported Today AND Streak == 1 (and maybe created today?).
+	domain.SortReports(reports, domain.SortBySeasonRank)
 
-	sortReportsBySeason(reports)
+	activeCount, lostCount := countStreakStatus(reports, now)
 
-	// Count active vs lost for recap
-	activeCount := 0
-	lostCount := 0
-	currentWeekStart := domain.GetStartOfISOWeek(now)
-	for _, r := range reports {
-		lastWeekStart := domain.GetStartOfISOWeek(r.LastReportDate)
-		weeksSinceLastReport := int(math.Round(currentWeekStart.Sub(lastWeekStart).Hours() / (24 * 7)))
-
-		// Active if reported this week or last week (still has chance to continue streak)
-		if weeksSinceLastReport <= 1 {
-			activeCount++
-		} else {
-			lostCount++
-		}
-	}
-
-	// Header
 	sb := strings.Builder{}
 	dateStr := displayDate.Format("02-01-2006")
 	seasonNumber, _ := GetCurrentSessionInfo(now)
 	sb.WriteString(fmt.Sprintf("Season %d Hidup Sehat SWE Growth – Day %d (%s)\n\n", seasonNumber, challengeDay, dateStr))
 
-	// Recap
 	sb.WriteString(fmt.Sprintf("Recap day %d:\n", challengeDay))
 	sb.WriteString(fmt.Sprintf("%d peoples keep the streak 🔥\n", activeCount))
 	sb.WriteString(fmt.Sprintf("%d lose the streak 💔\n", lostCount))
 	sb.WriteString("\nUpdate klasemen season sementara:\n")
 
+	currentWeekStart := domain.GetStartOfISOWeek(now)
 	rank := 1
 	for _, r := range reports {
-		if !hasSeasonActivity(r) {
+		if !domain.HasSeasonActivity(r) {
 			continue
 		}
-		// Active if reported this week or last week
 		lastWeekStart := domain.GetStartOfISOWeek(r.LastReportDate)
 		weeksSinceLastReport := int(math.Round(currentWeekStart.Sub(lastWeekStart).Hours() / (24 * 7)))
 
@@ -104,9 +60,9 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 		}
 
 		if weeksSinceLastReport <= 1 {
-			sb.WriteString(fmt.Sprintf("%d. %s%s — %d pts (%d hari season, %d hari lifetime, %d minggu streak 🔥)\n", rank, cyclePrefix, r.Name, r.SeasonalPoints, r.SeasonalActivityCount, totalActiveDays(r), r.Streak))
+			sb.WriteString(fmt.Sprintf("%d. %s%s — %d pts (%d hari season, %d hari lifetime, %d minggu streak 🔥)\n", rank, cyclePrefix, r.Name, r.SeasonalPoints, r.SeasonalActivityCount, r.TotalActiveDays(), r.Streak))
 		} else {
-			sb.WriteString(fmt.Sprintf("%d. %s%s — %d pts (%d hari season, %d hari lifetime, 💔)\n", rank, cyclePrefix, r.Name, r.SeasonalPoints, r.SeasonalActivityCount, totalActiveDays(r)))
+			sb.WriteString(fmt.Sprintf("%d. %s%s — %d pts (%d hari season, %d hari lifetime, 💔)\n", rank, cyclePrefix, r.Name, r.SeasonalPoints, r.SeasonalActivityCount, r.TotalActiveDays()))
 		}
 		rank++
 	}
@@ -120,7 +76,6 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	return sb.String(), nil
 }
 
-// ExecuteSeasonal returns a leaderboard ranked by seasonal points.
 func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, error) {
 	reports, err := uc.repo.GetAllReports(ctx)
 	if err != nil {
@@ -128,45 +83,28 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 	}
 
 	now := time.Now()
-	seasonNumber, sessionStart := GetCurrentSessionInfo(now)
-	_ = sessionStart
+	seasonNumber, _ := GetCurrentSessionInfo(now)
 
-	sortReportsBySeason(reports)
+	domain.SortReports(reports, domain.SortBySeasonRank)
+	active := domain.FilterReports(reports, domain.HasSeasonActivity)
 
 	sb := strings.Builder{}
 	sb.WriteString(fmt.Sprintf("🏆 *Season %d Leaderboard*\n\n", seasonNumber))
 
-	if len(reports) == 0 {
+	if len(active) == 0 {
 		sb.WriteString("Belum ada yang aktif di season ini.\n")
 		sb.WriteString("Jadilah yang pertama dengan /lapor! 💪")
 		return sb.String(), nil
 	}
 
-	activeInSeason := 0
-	for _, r := range reports {
-		if hasSeasonActivity(r) {
-			activeInSeason++
-		}
-	}
+	sb.WriteString(fmt.Sprintf("Peserta aktif: %d\n\n", len(active)))
 
-	sb.WriteString(fmt.Sprintf("Peserta aktif: %d\n\n", activeInSeason))
-
-	rank := 1
-	for _, r := range reports {
-		if !hasSeasonActivity(r) {
-			continue
-		}
+	for rank, r := range active {
 		cyclePrefix := ""
 		if r.CenturionCycles > 0 {
 			cyclePrefix = fmt.Sprintf("[S1-C%d] ", r.CenturionCycles+1)
 		}
-		sb.WriteString(fmt.Sprintf("%d. %s%s — %d pts (%d hari)\n", rank, cyclePrefix, r.Name, r.SeasonalPoints, r.SeasonalActivityCount))
-		rank++
-	}
-	if rank == 1 {
-		sb.WriteString("Belum ada yang aktif di season ini.\n")
-		sb.WriteString("Jadilah yang pertama dengan /lapor! 💪")
-		return sb.String(), nil
+		sb.WriteString(fmt.Sprintf("%d. %s%s — %d pts (%d hari)\n", rank+1, cyclePrefix, r.Name, r.SeasonalPoints, r.SeasonalActivityCount))
 	}
 
 	sb.WriteString("\nSeasonal ranking dihitung dari poin yang diraih di season ini.\n")
@@ -175,7 +113,6 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 	return sb.String(), nil
 }
 
-// ExecuteRanks returns a concise season ranking for the #ranks command.
 func (uc *GetLeaderboardUsecase) ExecuteRanks(ctx context.Context) (string, error) {
 	reports, err := uc.repo.GetAllReports(ctx)
 	if err != nil {
@@ -186,46 +123,252 @@ func (uc *GetLeaderboardUsecase) ExecuteRanks(ctx context.Context) (string, erro
 	seasonNumber, _ := GetCurrentSessionInfo(now)
 	nextReset := GetNextResetTime(now)
 
-	sortReportsBySeason(reports)
+	domain.SortReports(reports, domain.SortBySeasonRank)
+	active := domain.FilterReports(reports, domain.HasSeasonActivity)
 
 	sb := strings.Builder{}
 	sb.WriteString(fmt.Sprintf("🏹 *Season %d Ranks*\n", seasonNumber))
 	sb.WriteString(fmt.Sprintf("Reset badge/rank: %s\n", nextReset.Format("02-01-2006")))
 	sb.WriteString("Level & EXP lifetime tetap aman.\n\n")
 
-	rank := 1
-	for _, r := range reports {
-		if !hasSeasonActivity(r) {
-			continue
-		}
+	if len(active) == 0 {
+		sb.WriteString("Belum ada hunter aktif season ini. Mulai dengan /lapor 💪")
+		return sb.String(), nil
+	}
 
-		badges := 0
-		if r.SeasonalAchievements != "" {
-			badges = len(strings.Split(r.SeasonalAchievements, ","))
-		}
+	maxRank := 10
+	if len(active) < maxRank {
+		maxRank = len(active)
+	}
 
+	for rank := 0; rank < maxRank; rank++ {
+		r := active[rank]
+		badges := countBadges(r.SeasonalAchievements)
 		sb.WriteString(fmt.Sprintf(
 			"%d. %s — %s | %d pts | %d hari | %d badge\n",
-			rank,
+			rank+1,
 			r.Name,
 			domain.FormatSeasonRank(r.SeasonalPoints),
 			r.SeasonalPoints,
 			r.SeasonalActivityCount,
 			badges,
 		))
-
-		rank++
-		if rank > 10 {
-			break
-		}
-	}
-
-	if rank == 1 {
-		sb.WriteString("Belum ada hunter aktif season ini. Mulai dengan /lapor 💪")
-		return sb.String(), nil
 	}
 
 	sb.WriteString("\nRank dihitung dari seasonal points. Badge season ikut menambah poin, lalu reset saat season baru.")
 
 	return sb.String(), nil
+}
+
+// ExecuteLifetime returns a leaderboard ranked by lifetime total points (XP).
+// Lifetime points never reset across seasons.
+func (uc *GetLeaderboardUsecase) ExecuteLifetime(ctx context.Context) (string, error) {
+	reports, err := uc.repo.GetAllReports(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	seasonNumber, _ := GetCurrentSessionInfo(time.Now())
+
+	domain.SortReports(reports, domain.SortByLifetimeXP)
+	active := domain.FilterReports(reports, domain.HasAnyActivity)
+
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("⭐ *Lifetime XP Leaderboard*\n"))
+	sb.WriteString(fmt.Sprintf("Season %d — total EXP sejak bergabung\n\n", seasonNumber))
+
+	if len(active) == 0 {
+		sb.WriteString("Belum ada hunter. Mulai dengan /lapor! 💪")
+		return sb.String(), nil
+	}
+
+	maxRank := 10
+	if len(active) < maxRank {
+		maxRank = len(active)
+	}
+
+	for rank := 0; rank < maxRank; rank++ {
+		r := active[rank]
+		xpProg := domain.GetNumericLevelProgress(r.TotalPoints)
+		sb.WriteString(fmt.Sprintf(
+			"%d. %s — Lv.%d (%d EXP, %d hari lifetime, %d minggu streak max 🔥)\n",
+			rank+1,
+			r.Name,
+			xpProg.Level,
+			r.TotalPoints,
+			r.TotalActiveDays(),
+			r.MaxStreak,
+		))
+	}
+
+	sb.WriteString("\nLifetime EXP tidak pernah reset. Terus berkeringat untuk naik level! 💪")
+
+	return sb.String(), nil
+}
+
+// ExecuteStreakMasters returns a leaderboard ranked by streak.
+// streakType must be "weekly" or "daily" — each produces its own ranking.
+func (uc *GetLeaderboardUsecase) ExecuteStreakMasters(ctx context.Context, streakType string) (string, error) {
+	reports, err := uc.repo.GetAllReports(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	seasonNumber, _ := GetCurrentSessionInfo(time.Now())
+
+	var key domain.LeaderboardSortKey
+	var title, icon, metricLabel string
+
+	switch strings.ToLower(streakType) {
+	case "daily":
+		key = domain.SortByDailyStreak
+		title = "Streak Masters — Daily"
+		icon = "📅"
+		metricLabel = "hari beruntun"
+	case "weekly", "":
+		key = domain.SortByWeeklyStreak
+		title = "Streak Masters — Weekly"
+		icon = "🔥"
+		metricLabel = "minggu beruntun"
+	default:
+		return "", fmt.Errorf("invalid streak type %q: expected daily or weekly", streakType)
+	}
+
+	domain.SortReports(reports, key)
+	active := domain.FilterReports(reports, domain.HasStreakActivity)
+
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("%s *%s*\n", icon, title))
+	sb.WriteString(fmt.Sprintf("Season %d\n\n", seasonNumber))
+
+	if len(active) == 0 {
+		sb.WriteString("Belum ada hunter dengan streak. Mulai dengan /lapor! 💪")
+		return sb.String(), nil
+	}
+
+	maxRank := 10
+	if len(active) < maxRank {
+		maxRank = len(active)
+	}
+
+	for rank := 0; rank < maxRank; rank++ {
+		r := active[rank]
+		sb.WriteString(formatStreakEntry(rank+1, r, strings.ToLower(streakType), metricLabel))
+	}
+
+	sb.WriteString("\nStreak dihitung dari konsistensi laporan. Jangan sampai putus! 🔥")
+
+	return sb.String(), nil
+}
+
+// ExecuteAttribute returns a leaderboard ranked by attribute values.
+// attrType must be "overall", "str", "sta", "agi", or "vit".
+func (uc *GetLeaderboardUsecase) ExecuteAttribute(ctx context.Context, attrType string) (string, error) {
+	reports, err := uc.repo.GetAllReports(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	seasonNumber, _ := GetCurrentSessionInfo(time.Now())
+
+	key, label, icon, err := resolveAttributeSortKey(attrType)
+	if err != nil {
+		return "", err
+	}
+
+	domain.SortReports(reports, key)
+	active := domain.FilterReports(reports, domain.HasAttributeActivity)
+
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("%s *Attribute Leaderboard — %s*\n", icon, label))
+	sb.WriteString(fmt.Sprintf("Season %d\n\n", seasonNumber))
+
+	if len(active) == 0 {
+		sb.WriteString("Belum ada hunter dengan attribute. Laporkan aktivitas untuk naikin attribute! 💪")
+		return sb.String(), nil
+	}
+
+	maxRank := 10
+	if len(active) < maxRank {
+		maxRank = len(active)
+	}
+
+	attrEnum := domain.AttrStr
+	switch key {
+	case domain.SortByAttributeOverall:
+		attrEnum = ""
+	case domain.SortByAttributeSTA:
+		attrEnum = domain.AttrSta
+	case domain.SortByAttributeAGI:
+		attrEnum = domain.AttrAgi
+	case domain.SortByAttributeVIT:
+		attrEnum = domain.AttrVit
+	}
+
+	for rank := 0; rank < maxRank; rank++ {
+		r := active[rank]
+		val := r.AttributeValue(attrEnum)
+		sb.WriteString(fmt.Sprintf(
+			"%d. %s — %d %s pts (STR %d | STA %d | AGI %d | VIT %d)\n",
+			rank+1,
+			r.Name,
+			val,
+			label,
+			domain.ClampedAttribute(r.Str),
+			domain.ClampedAttribute(r.Sta),
+			domain.ClampedAttribute(r.Agi),
+			domain.ClampedAttribute(r.Vit),
+		))
+	}
+
+	sb.WriteString("\nAttribute naik dari laporan aktivitas. Variasikan latihanmu! ⚔️")
+
+	return sb.String(), nil
+}
+
+func countStreakStatus(reports []*domain.Report, now time.Time) (active, lost int) {
+	currentWeekStart := domain.GetStartOfISOWeek(now)
+	for _, r := range reports {
+		lastWeekStart := domain.GetStartOfISOWeek(r.LastReportDate)
+		weeksSinceLastReport := int(math.Round(currentWeekStart.Sub(lastWeekStart).Hours() / (24 * 7)))
+		if weeksSinceLastReport <= 1 {
+			active++
+		} else {
+			lost++
+		}
+	}
+	return
+}
+
+func countBadges(achievements string) int {
+	if achievements == "" {
+		return 0
+	}
+	return len(strings.Split(achievements, ","))
+}
+
+func formatStreakEntry(rank int, r *domain.Report, streakType, metricLabel string) string {
+	switch streakType {
+	case "daily":
+		return fmt.Sprintf("%d. %s — %d %s (max %d hari, %d pts)\n", rank, r.Name, r.ActivityCount, metricLabel, r.TotalActiveDays(), r.TotalPoints)
+	default:
+		return fmt.Sprintf("%d. %s — %d %s (max %d minggu, %d pts)\n", rank, r.Name, r.Streak, metricLabel, r.MaxStreak, r.SeasonalPoints)
+	}
+}
+
+func resolveAttributeSortKey(attrType string) (key domain.LeaderboardSortKey, label, icon string, err error) {
+	switch strings.ToLower(attrType) {
+	case "overall", "":
+		return domain.SortByAttributeOverall, "Overall", "🌟", nil
+	case "str":
+		return domain.SortByAttributeSTR, "STR", "💪", nil
+	case "sta":
+		return domain.SortByAttributeSTA, "STA", "🏃", nil
+	case "agi":
+		return domain.SortByAttributeAGI, "AGI", "⚡", nil
+	case "vit":
+		return domain.SortByAttributeVIT, "VIT", "💚", nil
+	default:
+		return "", "", "", fmt.Errorf("invalid attribute type %q: expected overall, str, sta, agi, or vit", attrType)
+	}
 }

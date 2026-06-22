@@ -109,18 +109,36 @@ func (r *ReportRepository) UpsertReport(ctx context.Context, report *domain.Repo
 }
 
 func logActivity(ctx context.Context, execer execContexter, userID string, activityDate time.Time) error {
+	return logActivityKind(ctx, execer, userID, activityDate, domain.ActivityKindRegularReport)
+}
+
+func logActivityKind(ctx context.Context, execer execContexter, userID string, activityDate time.Time, kind string) error {
+	regularIncrement := 0
+	sideQuestIncrement := 0
+	if kind == domain.ActivityKindSideQuest {
+		sideQuestIncrement = 1
+	} else {
+		regularIncrement = 1
+	}
+
 	query := `
-		INSERT INTO activity_logs (user_id, activity_date, created_at, report_count)
-		VALUES (?, ?, ?, 1)
+		INSERT INTO activity_logs (user_id, activity_date, created_at, report_count, regular_report_count, sidequest_count)
+		VALUES (?, ?, ?, 1, ?, ?)
 		ON CONFLICT(user_id, activity_date) DO UPDATE SET
 			report_count = report_count + 1,
+			regular_report_count = COALESCE(regular_report_count, 0) + excluded.regular_report_count,
+			sidequest_count = COALESCE(sidequest_count, 0) + excluded.sidequest_count,
 			created_at = excluded.created_at
 	`
-	_, err := execer.ExecContext(ctx, query, userID, activityDate.Format(time.DateOnly), time.Now().UTC().Format(time.RFC3339))
+	_, err := execer.ExecContext(ctx, query, userID, activityDate.Format(time.DateOnly), time.Now().UTC().Format(time.RFC3339), regularIncrement, sideQuestIncrement)
 	return err
 }
 
 func (r *ReportRepository) UpsertReportWithActivity(ctx context.Context, report *domain.Report, activityDate time.Time) error {
+	return r.UpsertReportWithActivityKind(ctx, report, activityDate, domain.ActivityKindRegularReport)
+}
+
+func (r *ReportRepository) UpsertReportWithActivityKind(ctx context.Context, report *domain.Report, activityDate time.Time, kind string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -130,7 +148,7 @@ func (r *ReportRepository) UpsertReportWithActivity(ctx context.Context, report 
 		_ = tx.Rollback()
 		return err
 	}
-	if err := logActivity(ctx, tx, report.UserID, activityDate); err != nil {
+	if err := logActivityKind(ctx, tx, report.UserID, activityDate, kind); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
@@ -244,6 +262,8 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 			activity_date TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			report_count INTEGER NOT NULL DEFAULT 1,
+			regular_report_count INTEGER NOT NULL DEFAULT 0,
+			sidequest_count INTEGER NOT NULL DEFAULT 0,
 			activity_text TEXT DEFAULT '',
 			PRIMARY KEY (user_id, activity_date),
 			FOREIGN KEY (user_id) REFERENCES user_reports(user_id) ON DELETE CASCADE
@@ -300,6 +320,8 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN agi INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN vit INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN report_count INTEGER NOT NULL DEFAULT 1")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN regular_report_count INTEGER NOT NULL DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN sidequest_count INTEGER NOT NULL DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN activity_text TEXT DEFAULT ''")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE strava_accounts ADD COLUMN name TEXT")
 
@@ -758,6 +780,30 @@ func (r *ReportRepository) GetDailyActivityCount(ctx context.Context, userID str
 		return 0, err
 	}
 	return count, nil
+}
+
+func (r *ReportRepository) GetDailyActivityCountByKind(ctx context.Context, userID string, date time.Time, kind string) (int, error) {
+	column := "regular_report_count"
+	if kind == domain.ActivityKindSideQuest {
+		column = "sidequest_count"
+	}
+
+	query := `SELECT COALESCE(report_count, 1), COALESCE(regular_report_count, 0), COALESCE(sidequest_count, 0) FROM activity_logs WHERE user_id = ? AND activity_date = ?`
+	var totalCount, regularCount, sideQuestCount int
+	err := r.db.QueryRowContext(ctx, query, userID, date.Format(time.DateOnly)).Scan(&totalCount, &regularCount, &sideQuestCount)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	if column == "sidequest_count" {
+		return sideQuestCount, nil
+	}
+	if regularCount == 0 && sideQuestCount == 0 && totalCount > 0 {
+		return totalCount, nil
+	}
+	return regularCount, nil
 }
 
 func (r *ReportRepository) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
