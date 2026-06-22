@@ -17,7 +17,7 @@ import {
 	Edit2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useRepositories, getJobColor } from "@lapor-bot/shared";
+import { useRepositories, getJobColor, clampAttribute, attributeBarWidth } from "@lapor-bot/shared";
 import type {
 	DailyActivity,
 	EnrichedReport,
@@ -138,19 +138,23 @@ export function PersonalPage({
 	}, [user]);
 
 	const refreshUser = async () => {
-		// Retry once on failure to handle transient network / DB-timing issues.
-		for (let attempt = 0; attempt < 2; attempt++) {
+		const MAX_ATTEMPTS = 2;
+		let lastError: unknown = null;
+
+		for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
 			try {
 				const refreshed = await repo.fetchUserByPhone(phone);
 				setLocalUser(refreshed);
-				if (onUserRefresh) onUserRefresh(refreshed);
+				onUserRefresh?.(refreshed);
 				return;
-			} catch {
-				if (attempt === 1) throw; // both attempts failed
-				// brief backoff before retry
-				await new Promise((r) => setTimeout(r, 300));
+			} catch (err) {
+				lastError = err;
+				if (attempt < MAX_ATTEMPTS - 1) {
+					await new Promise((r) => setTimeout(r, 300));
+				}
 			}
 		}
+		throw lastError;
 	};
 
 
@@ -340,7 +344,7 @@ export function PersonalPage({
 							<div className="flex items-start justify-between gap-4 mb-5">
 								<div>
 									<h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
-										<Flame className="text-system-orange" size={18} />
+										<Flame className="text-system-red" size={18} />
 										Streak Map
 									</h3>
 									<p className="text-xs text-gray-500 font-mono mt-1 leading-relaxed">
@@ -865,33 +869,33 @@ export function PersonalPage({
 										icon: Swords,
 										label: "STR",
 										hint: "Strength / Gym",
-										value: localUser.str,
+										value: clampAttribute(localUser.str),
 										color: "text-system-red",
 									},
 									{
 										icon: Zap,
 										label: "STA",
 										hint: "Stamina / Run",
-										value: localUser.sta,
+										value: clampAttribute(localUser.sta),
 										color: "text-system-blue",
 									},
 									{
 										icon: Shield,
 										label: "AGI",
 										hint: "Agility / Sport",
-										value: localUser.agi,
+										value: clampAttribute(localUser.agi),
 										color: "text-system-purple",
 									},
 									{
 										icon: Heart,
 										label: "VIT",
 										hint: "Vitality / Recovery",
-										value: localUser.vit,
+										value: clampAttribute(localUser.vit),
 										color: "text-system-green",
 									},
 								].map((stat) => {
 									const Icon = stat.icon;
-									const width = Math.min(100, Math.max(8, stat.value * 8));
+									const width = attributeBarWidth(stat.value);
 									return (
 										<div key={stat.label}>
 											<div className="flex items-center justify-between gap-3 mb-1.5">

@@ -1,0 +1,10 @@
+[   27249ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5180/node_modules/.vite/deps/react-dom_client.js?v=846f05e4:14336
+[   27313ms] [ERROR] Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ http://localhost:5180/api/summary:0
+[   27315ms] [ERROR] Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ http://localhost:5180/api/leaderboard:0
+[   28318ms] [ERROR] Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ http://localhost:5180/api/summary:0
+[   28318ms] [ERROR] Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ http://localhost:5180/api/leaderboard:0
+[   29357ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5180/@vite/client:992
+[   30320ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5180/api/summary:0
+[   30321ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5180/api/leaderboard:0
+[   34323ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5180/api/summary:0
+[   34323ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5180/api/leaderboard:0

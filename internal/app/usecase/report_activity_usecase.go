@@ -811,21 +811,10 @@ func (uc *ReportActivityUsecase) getNextComebackTarget(report *domain.Report) *d
 }
 
 func formatCurrentAttributes(report *domain.Report) string {
-	str := report.Str
-	if str < 1 {
-		str = 1
-	}
-	sta := report.Sta
-	if sta < 1 {
-		sta = 1
-	}
-	agi := report.Agi
-	if agi < 1 {
-		agi = 1
-	}
-	vit := report.Vit
-	if vit < 1 {
-		vit = 1
-	}
-	return fmt.Sprintf("🛡️ Stats: STR %d | STA %d | AGI %d | VIT %d", str, sta, agi, vit)
+	return fmt.Sprintf("🛡️ Stats: STR %d | STA %d | AGI %d | VIT %d",
+		domain.ClampedAttribute(report.Str),
+		domain.ClampedAttribute(report.Sta),
+		domain.ClampedAttribute(report.Agi),
+		domain.ClampedAttribute(report.Vit),
+	)
 }

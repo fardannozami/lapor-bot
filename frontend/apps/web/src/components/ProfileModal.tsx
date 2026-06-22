@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Award, Shield, Heart, Zap, Swords, Flame, Trophy, Compass } from 'lucide-react';
 import type { EnrichedReport } from '@lapor-bot/shared';
-import { getJobColor } from '@lapor-bot/shared';
+import { getJobColor, clampAttribute } from '@lapor-bot/shared';
 interface ProfileModalProps {
   hunter: EnrichedReport | null;
   onClose: () => void;
@@ -97,38 +97,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
                 Hunter Attributes
               </h3>
               <div className="space-y-3">
-                {/* STR */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-system-red">
-                    <Swords size={16} />
-                    <span className="text-xs font-mono font-semibold">STR (Strength/Gym)</span>
+                {[
+                  { icon: Swords, label: 'STR (Strength/Gym)', value: clampAttribute(hunter.str), color: 'text-system-red' },
+                  { icon: Zap, label: 'STA (Stamina/Run)', value: clampAttribute(hunter.sta), color: 'text-system-blue' },
+                  { icon: Shield, label: 'AGI (Agility/Sport)', value: clampAttribute(hunter.agi), color: 'text-system-purple' },
+                  { icon: Heart, label: 'VIT (Vitality/Yoga)', value: clampAttribute(hunter.vit), color: 'text-system-green' },
+                ].map(({ icon: Icon, label, value, color }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <div className={`flex items-center gap-2 ${color}`}>
+                      <Icon size={16} />
+                      <span className="text-xs font-mono font-semibold">{label}</span>
+                    </div>
+                    <span className="text-sm font-bold font-orbitron text-white">{value}</span>
                   </div>
-                  <span className="text-sm font-bold font-orbitron text-white">{hunter.str}</span>
-                </div>
-                {/* STA */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-system-blue">
-                    <Zap size={16} />
-                    <span className="text-xs font-mono font-semibold">STA (Stamina/Run)</span>
-                  </div>
-                  <span className="text-sm font-bold font-orbitron text-white">{hunter.sta}</span>
-                </div>
-                {/* AGI */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-system-purple">
-                    <Shield size={16} />
-                    <span className="text-xs font-mono font-semibold">AGI (Agility/Sport)</span>
-                  </div>
-                  <span className="text-sm font-bold font-orbitron text-white">{hunter.agi}</span>
-                </div>
-                {/* VIT */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-system-green">
-                    <Heart size={16} />
-                    <span className="text-xs font-mono font-semibold">VIT (Vitality/Yoga)</span>
-                  </div>
-                  <span className="text-sm font-bold font-orbitron text-white">{hunter.vit}</span>
-                </div>
+                ))}
               </div>
             </div>
 
