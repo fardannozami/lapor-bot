@@ -19,7 +19,9 @@ Hello AI Agents! If you are working in this directory, please adhere to the foll
 - Linting and Formatting are handled globally. Run `npm run lint` and `npm run format`. Ensure any generated code adheres to this by running the formatter afterwards.
 
 ## 4. Cross-Platform Considerations (Web & Mobile)
-- When building UI components in `packages/ui`, ensure they are compatible with the target platforms. If a component is specific to Web or Mobile, name it accordingly or keep it within its respective app folder.
+- **MANDATORY ARCHITECTURAL RULE**: Every new feature implementation across the backend, Android, iOS, and web platforms MUST consistently utilize the `packages/` directory for view logic and API calls.
+- You MUST NOT place any business logic, API calls, or view components in the `apps/` directory. The `apps/` folder should only contain build configuration, routing/bootstrap files, and thin wrappers that render components from `packages/`.
+- If a component is specific to Web or Mobile, it still belongs in `packages/` (e.g., in a platform-specific subdirectory like `packages/ui/src/web` or its own dedicated UI package), NOT in the app folder.
 - Use `packages/design-system` for tokens like colors, spacing, and typography to maintain visual consistency across all apps.
 - `packages/contract` contains API schemas and endpoints. Ensure both the web and mobile apps utilize these shared contracts when interacting with the backend.
 
