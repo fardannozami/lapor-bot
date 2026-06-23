@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"strings"
@@ -15,11 +17,18 @@ const (
 	MaxDailyRegularReports = 3
 	MaxDailySideQuests     = 3
 	MaxDailyReports        = MaxDailyRegularReports
+	ReportEventLedgerYear  = 2026
+	ReportEventLedgerMonth = time.June
+	ReportEventLedgerDay   = 24
 )
 
 type typedActivityRepository interface {
 	UpsertReportWithActivityKind(ctx context.Context, report *domain.Report, activityDate time.Time, kind string) error
 	GetDailyActivityCountByKind(ctx context.Context, userID string, date time.Time, kind string) (int, error)
+}
+
+type eventActivityRepository interface {
+	UpsertReportWithActivityEvent(ctx context.Context, report *domain.Report, event domain.ReportActivityEvent) error
 }
 
 // GoalCompletionNotifier is called when a user's weekly goal is completed.
@@ -338,8 +347,17 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	newSeasonRank := domain.GetSeasonRank(report.SeasonalPoints)
 	lifetimeTierUp := newLifetimeTier.Tier > oldLifetimeTier.Tier
 	seasonRankUp := newSeasonRank.Tier > oldSeasonRank.Tier
+	totalPointsGained := reportPoints + pointsGained
 
-	if err := uc.upsertReportWithActivity(ctx, report, today, activityKind); err != nil {
+	if err := uc.upsertReportWithActivity(ctx, report, reportActivityEventInput{
+		activityDate:        today,
+		kind:                activityKind,
+		occurredAt:          now,
+		pointsDelta:         totalPointsGained,
+		regularCountDelta:   boolToInt(!isSideQuest),
+		sideQuestCountDelta: opts.sideQuestCount,
+		activityText:        goalActivityTextWithFallback(workout, opts.activityText),
+	}); err != nil {
 		return "", err
 	}
 	goalCompleted := false
@@ -470,7 +488,6 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 
 	response += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
 
-	totalPointsGained := reportPoints + pointsGained
 	if totalPointsGained > 0 {
 		response += fmt.Sprintf("\n\n💰 Total: +%d points (Lifetime: %d | Season: %d)", totalPointsGained, report.TotalPoints, report.SeasonalPoints)
 	}
@@ -685,8 +702,17 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 
 	report.Level = domain.NumericLevelFromTotalPoints(report.TotalPoints)
 	leveledUp := report.Level > oldNumericLevel
+	totalPointsGained := reportPoints + pointsGained
 
-	if err := uc.repo.UpsertReportWithActivity(ctx, report, yesterday); err != nil {
+	if err := uc.upsertReportWithActivity(ctx, report, reportActivityEventInput{
+		activityDate:        yesterday,
+		kind:                domain.ActivityKindRegularReport,
+		occurredAt:          now,
+		pointsDelta:         totalPointsGained,
+		regularCountDelta:   1,
+		sideQuestCountDelta: 0,
+		activityText:        goalActivityTextWithFallback(workout, activityText),
+	}); err != nil {
 		return "", err
 	}
 	goalCompleted, err := NewGoalUsecase(uc.repo).RecordActivity(ctx, userID, yesterday, goalActivityText(workout))
@@ -796,7 +822,6 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 
 	response += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
 
-	totalPointsGained := reportPoints + pointsGained
 	if totalPointsGained > 0 {
 		response += fmt.Sprintf("\n\n💰 Total: +%d points (Lifetime: %d | Season: %d)", totalPointsGained, report.TotalPoints, report.SeasonalPoints)
 	}
@@ -815,11 +840,70 @@ func (uc *ReportActivityUsecase) getDailyActivityCount(ctx context.Context, user
 	return uc.repo.GetDailyActivityCount(ctx, userID, date)
 }
 
-func (uc *ReportActivityUsecase) upsertReportWithActivity(ctx context.Context, report *domain.Report, activityDate time.Time, kind string) error {
-	if repo, ok := uc.repo.(typedActivityRepository); ok {
-		return repo.UpsertReportWithActivityKind(ctx, report, activityDate, kind)
+type reportActivityEventInput struct {
+	activityDate        time.Time
+	kind                string
+	occurredAt          time.Time
+	pointsDelta         int
+	regularCountDelta   int
+	sideQuestCountDelta int
+	activityText        string
+}
+
+func (uc *ReportActivityUsecase) upsertReportWithActivity(ctx context.Context, report *domain.Report, input reportActivityEventInput) error {
+	if repo, ok := uc.repo.(eventActivityRepository); ok && ReportEventLedgerEnabled(input.occurredAt) {
+		seasonNumber, _ := GetCurrentSessionInfo(input.occurredAt)
+		event := domain.ReportActivityEvent{
+			EventID:             reportActivityEventID(report.UserID, input.kind, input.activityDate, input.occurredAt, input.pointsDelta, input.regularCountDelta, input.sideQuestCountDelta),
+			UserID:              report.UserID,
+			SeasonNumber:        seasonNumber,
+			Kind:                input.kind,
+			ActivityDate:        input.activityDate,
+			OccurredAt:          input.occurredAt,
+			PointsDelta:         input.pointsDelta,
+			RegularCountDelta:   input.regularCountDelta,
+			SideQuestCountDelta: input.sideQuestCountDelta,
+			RuleVersion:         1,
+			Source:              "whatsapp",
+			ActivityText:        input.activityText,
+			MetadataJSON:        "{}",
+		}
+		return repo.UpsertReportWithActivityEvent(ctx, report, event)
 	}
-	return uc.repo.UpsertReportWithActivity(ctx, report, activityDate)
+	if repo, ok := uc.repo.(typedActivityRepository); ok {
+		return repo.UpsertReportWithActivityKind(ctx, report, input.activityDate, input.kind)
+	}
+	return uc.repo.UpsertReportWithActivity(ctx, report, input.activityDate)
+}
+
+// ReportEventLedgerEnabled gates the Season 2 ledger/projection dual-write.
+// Schema can be deployed earlier, but event capture starts on the configured
+// date in WIB so we avoid partial-day data.
+func ReportEventLedgerEnabled(now time.Time) bool {
+	loc := time.FixedZone("WIB", 7*3600)
+	start := time.Date(ReportEventLedgerYear, ReportEventLedgerMonth, ReportEventLedgerDay, 0, 0, 0, 0, loc)
+	return !now.In(loc).Before(start)
+}
+
+func reportActivityEventID(userID, kind string, activityDate, occurredAt time.Time, pointsDelta, regularCountDelta, sideQuestCountDelta int) string {
+	seed := fmt.Sprintf("%s|%s|%s|%s|%d|%d|%d",
+		userID,
+		kind,
+		activityDate.Format(time.DateOnly),
+		occurredAt.UTC().Format(time.RFC3339Nano),
+		pointsDelta,
+		regularCountDelta,
+		sideQuestCountDelta,
+	)
+	sum := sha256.Sum256([]byte(seed))
+	return hex.EncodeToString(sum[:])
+}
+
+func boolToInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func reportName(storedName, incomingName string) string {

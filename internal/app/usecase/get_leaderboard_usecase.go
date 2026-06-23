@@ -243,6 +243,9 @@ func (uc *GetLeaderboardUsecase) ExecuteStreakMasters(ctx context.Context, strea
 	if normalizedType == "daily" {
 		return uc.executeDailyStreakMasters(ctx, reports, seasonNumber, title, icon, metricLabel)
 	}
+	if normalizedType == "weekly" || normalizedType == "" {
+		return uc.executeWeeklyStreakMasters(ctx, reports, seasonNumber, title, icon, metricLabel)
+	}
 
 	domain.SortReports(reports, key)
 	active := domain.FilterReports(reports, domain.HasStreakActivity)
@@ -343,6 +346,76 @@ type dailyStreakEntry struct {
 	longest int
 }
 
+type weeklyStreakEntry struct {
+	report       *domain.Report
+	dailyCurrent int
+}
+
+func (uc *GetLeaderboardUsecase) executeWeeklyStreakMasters(ctx context.Context, reports []*domain.Report, seasonNumber int, title, icon, metricLabel string) (string, error) {
+	today := domain.GetToday(time.Now())
+	entries := make([]weeklyStreakEntry, 0, len(reports))
+	for _, report := range reports {
+		if !domain.HasStreakActivity(report) {
+			continue
+		}
+		dates, err := uc.repo.GetUserActivityDates(ctx, report.UserID)
+		if err != nil {
+			return "", err
+		}
+		current, _ := calculateDailyStreaks(dates, today)
+		entries = append(entries, weeklyStreakEntry{report: report, dailyCurrent: current})
+	}
+
+	sort.SliceStable(entries, func(i, j int) bool {
+		a, b := entries[i], entries[j]
+		if a.report.Streak != b.report.Streak {
+			return a.report.Streak > b.report.Streak
+		}
+		if a.dailyCurrent != b.dailyCurrent {
+			return a.dailyCurrent > b.dailyCurrent
+		}
+		if a.report.SeasonalPoints != b.report.SeasonalPoints {
+			return a.report.SeasonalPoints > b.report.SeasonalPoints
+		}
+		if a.report.MaxStreak != b.report.MaxStreak {
+			return a.report.MaxStreak > b.report.MaxStreak
+		}
+		return domain.CompareReports(a.report, b.report, domain.SortByWeeklyStreak)
+	})
+
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("%s *%s*\n", icon, title))
+	sb.WriteString(fmt.Sprintf("Season %d\n\n", seasonNumber))
+
+	if len(entries) == 0 {
+		sb.WriteString("Belum ada hunter dengan streak. Mulai dengan /lapor! 💪")
+		return sb.String(), nil
+	}
+
+	maxRank := 10
+	if len(entries) < maxRank {
+		maxRank = len(entries)
+	}
+
+	for rank := 0; rank < maxRank; rank++ {
+		entry := entries[rank]
+		sb.WriteString(fmt.Sprintf(
+			"%d. %s — %d %s (current %d hari, %d pts, max %d minggu)\n",
+			rank+1,
+			entry.report.Name,
+			entry.report.Streak,
+			metricLabel,
+			entry.dailyCurrent,
+			entry.report.SeasonalPoints,
+			entry.report.MaxStreak,
+		))
+	}
+
+	sb.WriteString("\nPeringkat: streak mingguan → current streak harian → poin season. Jangan sampai putus! 🔥")
+
+	return sb.String(), nil
+}
+
 func (uc *GetLeaderboardUsecase) executeDailyStreakMasters(ctx context.Context, reports []*domain.Report, seasonNumber int, title, icon, metricLabel string) (string, error) {
 	today := domain.GetToday(time.Now())
 	entries := make([]dailyStreakEntry, 0, len(reports))
@@ -404,9 +477,13 @@ func (uc *GetLeaderboardUsecase) executeDailyStreakMasters(ctx context.Context, 
 }
 
 func calculateDailyStreaks(activityDates []time.Time, today time.Time) (int, int) {
+	sort.Slice(activityDates, func(i, j int) bool {
+		return activityDates[i].Before(activityDates[j])
+	})
+
 	activeDates := make(map[string]bool, len(activityDates))
 	for _, date := range activityDates {
-		activeDates[domain.GetToday(date).Format(time.DateOnly)] = true
+		activeDates[date.Format(time.DateOnly)] = true
 	}
 
 	current := 0
@@ -418,7 +495,7 @@ func calculateDailyStreaks(activityDates []time.Time, today time.Time) (int, int
 	running := 0
 	var previous time.Time
 	for _, date := range activityDates {
-		day := domain.GetToday(date)
+		day := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 		if !previous.IsZero() && day.Equal(previous) {
 			continue
 		}

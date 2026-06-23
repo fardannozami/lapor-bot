@@ -116,6 +116,25 @@ const (
 	ActivityKindSideQuest     = "sidequest"
 )
 
+// ReportActivityEvent is the immutable fact written for every accepted /lapor
+// or /lapor sidequest command. Aggregates can change shape over time, but this
+// event preserves the awarded deltas for Season 2+ leaderboard rebuilds.
+type ReportActivityEvent struct {
+	EventID             string
+	UserID              string
+	SeasonNumber        int
+	Kind                string
+	ActivityDate        time.Time
+	OccurredAt          time.Time
+	PointsDelta         int
+	RegularCountDelta   int
+	SideQuestCountDelta int
+	RuleVersion         int
+	Source              string
+	ActivityText        string
+	MetadataJSON        string
+}
+
 // GetToday returns the normalized "today" (midnight) based on the cutoff offset.
 func GetToday(t time.Time) time.Time {
 	// Shift time back by offset then truncate to date
