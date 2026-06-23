@@ -131,6 +131,8 @@ export type LeaderboardTab =
 
 export type AttributeTab = "overall" | "str" | "sta" | "agi" | "vit";
 
+export type StreakTab = "weekly" | "daily";
+
 export type LeaderboardSortKey =
   | "season_rank"
   | "lifetime_xp"

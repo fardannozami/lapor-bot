@@ -1,6 +1,19 @@
 import React, { useCallback } from "react";
-import { Search, SlidersHorizontal, Flame, Trophy, Award, CalendarDays, Swords } from "lucide-react";
-import type { EnrichedReport, LeaderboardTab, AttributeTab } from "@lapor-bot/shared";
+import {
+  Search,
+  SlidersHorizontal,
+  Flame,
+  Trophy,
+  Award,
+  CalendarDays,
+  Swords,
+} from "lucide-react";
+import type {
+  EnrichedReport,
+  LeaderboardTab,
+  AttributeTab,
+  StreakTab,
+} from "@lapor-bot/shared";
 
 import { SeasonalRow } from "./leaderboard/rows/SeasonalRow";
 import { LifetimeRow } from "./leaderboard/rows/LifetimeRow";
@@ -25,7 +38,11 @@ const JOB_FILTER_OPTIONS = [
   { id: "necromancer", name: "Necromancer 🌑" },
 ] as const;
 
-const LEADERBOARD_TABS: { id: LeaderboardTab; label: string; icon: typeof Trophy }[] = [
+const LEADERBOARD_TABS: {
+  id: LeaderboardTab;
+  label: string;
+  icon: typeof Trophy;
+}[] = [
   { id: "seasonal", label: "Season Rank", icon: Trophy },
   { id: "lifetime", label: "Lifetime XP", icon: Award },
   { id: "streak", label: "Streak Masters", icon: Flame },
@@ -41,50 +58,178 @@ const ATTRIBUTE_SUB_TABS: { id: AttributeTab; label: string }[] = [
   { id: "vit", label: "VIT" },
 ];
 
+const STREAK_SUB_TABS: { id: StreakTab; label: string }[] = [
+  { id: "weekly", label: "Mingguan" },
+  { id: "daily", label: "Harian" },
+];
+
 const TABLE_HEADERS: Record<LeaderboardTab, string[]> = {
-  seasonal: ["Rank", "Hunter", "Job", "Season Rank", "Streak", "Active Days", "Best Season Streak", "Freezes", "Season Points + Progress"],
-  lifetime: ["Rank", "Hunter", "Job", "Level Tier", "Level", "XP Progress", "Lifetime Days", "Best Streak", "Quests Done"],
-  streak: ["Rank", "Hunter", "Job", "Current Streak", "Best Streak", "Comeback", "Centurion", "Status"],
-  week: ["Rank", "Hunter", "Job", "Active Days", "Week Dots", "Streak", "Est. Points"],
-  attributes: ["Rank", "Hunter", "Job", "Attribute", "STR", "STA", "AGI", "VIT", "Level"],
+  seasonal: [
+    "Rank",
+    "Hunter",
+    "Job",
+    "Season Rank",
+    "Streak",
+    "Active Days",
+    "Best Season Streak",
+    "Freezes",
+    "Season Points + Progress",
+  ],
+  lifetime: [
+    "Rank",
+    "Hunter",
+    "Job",
+    "Level Tier",
+    "Level",
+    "XP Progress",
+    "Lifetime Days",
+    "Best Streak",
+    "Quests Done",
+  ],
+  streak: [
+    "Rank",
+    "Hunter",
+    "Job",
+    "Current Streak",
+    "Best Streak",
+    "Lifetime Days",
+    "Comeback",
+    "Centurion",
+    "Status",
+  ],
+  week: [
+    "Rank",
+    "Hunter",
+    "Job",
+    "Active Days",
+    "Week Dots",
+    "Streak",
+    "Est. Points",
+  ],
+  attributes: [
+    "Rank",
+    "Hunter",
+    "Job",
+    "Attribute",
+    "STR",
+    "STA",
+    "AGI",
+    "VIT",
+    "Level",
+  ],
 };
 
 const rowClass = (rank: number) =>
   `group transition-all hover:bg-gray-800/20 cursor-pointer ${rank < 3 ? "bg-gradient-to-r from-gray-950/20 to-transparent" : ""}`;
 
-export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onSelectHunter }) => {
+export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
+  hunters,
+  onSelectHunter,
+}) => {
   const {
-    search, setSearch,
-    selectedJob, setSelectedJob,
-    activeTab, setActiveTab,
-    attributeTab, setAttributeTab,
-    safePage, totalPages, pageStartRank, totalCount,
-    visibleHunters, goToPage,
+    search,
+    setSearch,
+    selectedJob,
+    setSelectedJob,
+    activeTab,
+    setActiveTab,
+    attributeTab,
+    setAttributeTab,
+    streakTab,
+    setStreakTab,
+    safePage,
+    totalPages,
+    pageStartRank,
+    totalCount,
+    visibleHunters,
+    goToPage,
   } = useLeaderboardData(hunters);
 
-  const handleTabChange = useCallback((tab: LeaderboardTab) => {
-    setActiveTab(tab);
-    setSearch("");
-    setSelectedJob("all");
-    goToPage(1);
-  }, [setActiveTab, setSearch, setSelectedJob, goToPage]);
+  const handleTabChange = useCallback(
+    (tab: LeaderboardTab) => {
+      setActiveTab(tab);
+      setSearch("");
+      setSelectedJob("all");
+      goToPage(1);
+    },
+    [setActiveTab, setSearch, setSelectedJob, goToPage],
+  );
 
-  const handleAttributeSubTabChange = useCallback((sub: AttributeTab) => {
-    setAttributeTab(sub);
-    goToPage(1);
-  }, [setAttributeTab, goToPage]);
+  const handleAttributeSubTabChange = useCallback(
+    (sub: AttributeTab) => {
+      setAttributeTab(sub);
+      goToPage(1);
+    },
+    [setAttributeTab, goToPage],
+  );
+
+  const handleStreakSubTabChange = useCallback(
+    (sub: StreakTab) => {
+      setStreakTab(sub);
+      goToPage(1);
+    },
+    [setStreakTab, goToPage],
+  );
 
   const renderRows = () =>
     visibleHunters.map((hunter, idx) => {
       const rank = pageStartRank + idx;
       const rc = rowClass(rank);
       switch (activeTab) {
-        case "seasonal": return <SeasonalRow key={hunter.user_id} hunter={hunter} rank={rank} rowClass={rc} onSelectHunter={onSelectHunter} />;
-        case "lifetime": return <LifetimeRow key={hunter.user_id} hunter={hunter} rank={rank} rowClass={rc} onSelectHunter={onSelectHunter} />;
-        case "streak": return <StreakRow key={hunter.user_id} hunter={hunter} rank={rank} rowClass={rc} onSelectHunter={onSelectHunter} />;
-        case "week": return <WeekRow key={hunter.user_id} hunter={hunter} rank={rank} rowClass={rc} onSelectHunter={onSelectHunter} />;
-        case "attributes": return <AttributeRow key={hunter.user_id} hunter={hunter} rank={rank} rowClass={rc} attributeTab={attributeTab} onSelectHunter={onSelectHunter} />;
-        default: return null;
+        case "seasonal":
+          return (
+            <SeasonalRow
+              key={hunter.user_id}
+              hunter={hunter}
+              rank={rank}
+              rowClass={rc}
+              onSelectHunter={onSelectHunter}
+            />
+          );
+        case "lifetime":
+          return (
+            <LifetimeRow
+              key={hunter.user_id}
+              hunter={hunter}
+              rank={rank}
+              rowClass={rc}
+              onSelectHunter={onSelectHunter}
+            />
+          );
+        case "streak":
+          return (
+            <StreakRow
+              key={hunter.user_id}
+              hunter={hunter}
+              rank={rank}
+              rowClass={rc}
+              streakTab={streakTab}
+              onSelectHunter={onSelectHunter}
+            />
+          );
+        case "week":
+          return (
+            <WeekRow
+              key={hunter.user_id}
+              hunter={hunter}
+              rank={rank}
+              rowClass={rc}
+              onSelectHunter={onSelectHunter}
+            />
+          );
+        case "attributes":
+          return (
+            <AttributeRow
+              key={hunter.user_id}
+              hunter={hunter}
+              rank={rank}
+              rowClass={rc}
+              attributeTab={attributeTab}
+              onSelectHunter={onSelectHunter}
+            />
+          );
+        default:
+          return null;
       }
     });
 
@@ -116,7 +261,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
 
         <div className="flex gap-2 items-center">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+            />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -125,7 +273,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
             />
           </div>
           <div className="relative">
-            <SlidersHorizontal size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <SlidersHorizontal
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+            />
             <select
               value={selectedJob}
               onChange={(e) => setSelectedJob(e.target.value)}
@@ -162,6 +313,27 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
         </div>
       )}
 
+      {activeTab === "streak" && (
+        <div className="flex flex-wrap gap-1.5 mb-4 p-1.5 bg-gray-950/60 rounded-xl border border-gray-800/40 max-w-fit">
+          {STREAK_SUB_TABS.map((sub) => {
+            const active = streakTab === sub.id;
+            return (
+              <button
+                key={sub.id}
+                onClick={() => handleStreakSubTabChange(sub.id)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold font-mono tracking-wider transition-all uppercase ${
+                  active
+                    ? "bg-gradient-to-r from-system-gold to-system-red text-white"
+                    : "text-gray-400 hover:text-white hover:bg-gray-800/60"
+                }`}
+              >
+                {sub.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -170,7 +342,11 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
                 <th
                   key={`${activeTab}-${i}`}
                   className={`py-3 px-4 text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 ${
-                    i === 0 ? "text-center" : i === 1 ? "text-left" : "text-center"
+                    i === 0
+                      ? "text-center"
+                      : i === 1
+                        ? "text-left"
+                        : "text-center"
                   }`}
                 >
                   {header}
@@ -193,7 +369,9 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ hunters, onS
       {totalPages > 1 && (
         <nav className="flex items-center justify-between mt-6 pt-4 border-t border-gray-800/60">
           <p className="text-xs font-mono text-gray-500">
-            Menampilkan {pageStartRank + 1}–{Math.min(pageStartRank + visibleHunters.length, totalCount)} dari {totalCount} hunters
+            Menampilkan {pageStartRank + 1}–
+            {Math.min(pageStartRank + visibleHunters.length, totalCount)} dari{" "}
+            {totalCount} hunters
           </p>
           <div className="flex items-center gap-2">
             <button

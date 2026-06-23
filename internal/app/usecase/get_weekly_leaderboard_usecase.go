@@ -26,9 +26,9 @@ func NewGetWeeklyLeaderboardUsecase(repo domain.ReportRepository) *GetWeeklyLead
 // so the leaderboard can apply the full tie-break chain:
 // laporan duluan (activity count) → streak → poin.
 type weeklyEntry struct {
-	Name          string
-	ActivityCount int
-	Streak        int
+	Name           string
+	ActivityCount  int
+	Streak         int
 	SeasonalPoints int
 }
 
@@ -46,10 +46,11 @@ func (uc *GetWeeklyLeaderboardUsecase) Execute(ctx context.Context) (string, err
 	if err != nil {
 		return "", err
 	}
+	reports = domain.DedupReportsByUserID(reports, domain.SortByWeeklyActivity)
 
 	enriched := enrichWeeklyEntries(entries, reports)
 
-	sort.Slice(enriched, func(i, j int) bool {
+	sort.SliceStable(enriched, func(i, j int) bool {
 		if enriched[i].ActivityCount != enriched[j].ActivityCount {
 			return enriched[i].ActivityCount > enriched[j].ActivityCount
 		}
