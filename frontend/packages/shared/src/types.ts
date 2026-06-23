@@ -119,3 +119,26 @@ export interface JobInfo {
   description: string;
   trait: string;
 }
+
+// Mirror of backend LeaderboardSortKey in internal/domain/leaderboard_comparator.go.
+// Changing these values breaks the FE↔BE sort contract.
+export type LeaderboardTab =
+  | "seasonal"
+  | "lifetime"
+  | "streak"
+  | "week"
+  | "attributes";
+
+export type AttributeTab = "overall" | "str" | "sta" | "agi" | "vit";
+
+export type LeaderboardSortKey =
+  | "season_rank"
+  | "lifetime_xp"
+  | "weekly_streak"
+  | "daily_streak"
+  | "weekly_activity"
+  | "attribute_overall"
+  | "attribute_str"
+  | "attribute_sta"
+  | "attribute_agi"
+  | "attribute_vit";
