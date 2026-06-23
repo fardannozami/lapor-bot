@@ -25,6 +25,10 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Monorepo Architecture Rules
+
+**CRITICAL**: This is a Turborepo project. All view logic, UI components, and API calls for the mobile app MUST be placed in `../../packages/` (e.g., `packages/ui` or `packages/shared`), NOT inside this `apps/mobile/` directory. This directory is strictly for Expo configuration, routing, and thin entry wrappers.
+
 ## Get a fresh project
 
 When you're ready, run:

@@ -11,6 +11,10 @@ Currently, two official plugins are available:
 
 The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
+## Monorepo Architecture Rules
+
+**CRITICAL**: This is a Turborepo project. All view logic, UI components, and API calls for the web app MUST be placed in `../../packages/` (e.g., `packages/ui` or `packages/shared`), NOT inside this `apps/web/` directory. This directory is strictly for build configuration, routing, and thin entry wrappers.
+
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
