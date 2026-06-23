@@ -63,9 +63,9 @@ func TestWeeklyHunterRanksAnnouncement(t *testing.T) {
 	// Verify header and contents
 	for _, expected := range []string{
 		"PENGUMUMAN MINGGUAN: RANK & JOB HUNTER",
-		"1. Alice — C-Rank Hunter 🟦 (Ranger 🏹) | 300 pts | 15 hari",
-		"2. Bob — D-Rank Hunter 🟩 (Tanker 🛡️) | 120 pts | 6 hari",
-		"3. Charlie — E-Rank Hunter 🟫 (Belum memilih job) | 50 pts | 2 hari",
+		"1. Alice — Elite ⚔️ (Ranger 🏹) | 300 pts | 15 hari",
+		"2. Bob — Warrior 🛡️ (Tanker 🛡️) | 120 pts | 6 hari",
+		"3. Charlie — Warrior 🛡️ (Belum memilih job) | 50 pts | 2 hari",
 	} {
 		if !strings.Contains(msg, expected) {
 			t.Errorf("expected output to contain %q, but it didn't. Got:\n%s", expected, msg)

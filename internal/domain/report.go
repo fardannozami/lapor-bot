@@ -67,6 +67,20 @@ const (
 	AttrVit AttributeType = "VIT"
 )
 
+// MinAttributeValue is the floor for any displayed attribute.
+// A hunter starts at 1 (not 0) so the dashboard always shows a positive baseline.
+const MinAttributeValue = 1
+
+// ClampedAttribute returns v bounded below by MinAttributeValue.
+// Use this whenever an attribute is displayed or serialized for the UI
+// so that the "start from 1" invariant is enforced in a single place.
+func ClampedAttribute(v int) int {
+	if v < MinAttributeValue {
+		return MinAttributeValue
+	}
+	return v
+}
+
 // DetermineAttributes parses an activity text to find matching RPG attributes.
 func DetermineAttributes(text string) []AttributeType {
 	text = strings.ToLower(text)
@@ -96,6 +110,11 @@ func DetermineAttributes(text string) []AttributeType {
 // ReportCutoffOffset is the spare time allowed for late-night reporting.
 // For example, if offset is 30m, 00:29 AM is still considered "yesterday".
 const ReportCutoffOffset = 30 * time.Minute
+
+const (
+	ActivityKindRegularReport = "regular_report"
+	ActivityKindSideQuest     = "sidequest"
+)
 
 // GetToday returns the normalized "today" (midnight) based on the cutoff offset.
 func GetToday(t time.Time) time.Time {

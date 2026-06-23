@@ -1,17 +1,17 @@
 export const colors = {
   dark: {
-    bg: "#090D16",
-    card: "#111827",
-    border: "#1F2937",
-    input: "#1F2937",
+    bg: "#07130c",
+    card: "#102018",
+    border: "#23402e",
+    input: "#14251b",
   },
   system: {
-    blue: "#00F0FF",
-    purple: "#A855F7",
-    red: "#FF3B30",
-    gold: "#EAB308",
-    green: "#10B981",
-  }
+    blue: "#2dd4bf",
+    purple: "#a855f7",
+    red: "#f97316",
+    gold: "#eab308",
+    green: "#22c55e",
+  },
 };
 
 export const typography = {

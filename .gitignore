@@ -5,9 +5,25 @@ lapor-bot
 lapor-bot.log
 main.exe
 
+# IDE & agent tools
 .serena/
 .omo/
 .pi/
 .omp/
 .commandcode/
 node_modules
+
+# Build artifacts
+frontend/dist/
+frontend/apps/web/dist/
+
+# Playwright MCP debug artifacts
+.playwright-mcp/
+
+# Turbo build cache
+frontend/.turbo/
+
+# Root-level screenshots/artifacts
+/*.png
+/*.jpg
+/*.jpeg
