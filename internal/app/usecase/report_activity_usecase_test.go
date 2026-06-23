@@ -15,6 +15,7 @@ type mockRepo struct {
 	activityCounts     []domain.ActivityLeaderboardEntry
 	dailyCounts        map[string]int
 	activityKindCounts map[string]map[string]int
+	activityDates      map[string][]time.Time
 }
 
 func (m *mockRepo) GetReport(ctx context.Context, userID string) (*domain.Report, error) {
@@ -93,7 +94,7 @@ func (m *mockRepo) GetStravaAccountByUserID(ctx context.Context, userID string) 
 }
 
 func (m *mockRepo) GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error) {
-	return nil, nil
+	return m.activityDates[userID], nil
 }
 
 func (m *mockRepo) DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error {
@@ -704,6 +705,65 @@ func TestLeaderboard_UsesSeasonSortingAndDisplaysTotalActiveDays(t *testing.T) {
 	}
 	if !containsSubstring(result, "101 hari lifetime") {
 		t.Errorf("Leaderboard should display centurion-aware lifetime days, got: %s", result)
+	}
+}
+
+func TestStreakMastersWeekly_TiesByCurrentDailyStreakBeforePoints(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewGetLeaderboardUsecase(repo)
+	ctx := context.Background()
+	today := domain.GetToday(time.Now())
+
+	repo.reports["steady"] = &domain.Report{
+		UserID:         "steady",
+		Name:           "Steady",
+		Streak:         4,
+		MaxStreak:      4,
+		SeasonalPoints: 200,
+	}
+	repo.activityDates["steady"] = []time.Time{today}
+
+	repo.reports["current"] = &domain.Report{
+		UserID:         "current",
+		Name:           "Current",
+		Streak:         4,
+		MaxStreak:      4,
+		SeasonalPoints: 100,
+	}
+	repo.activityDates["current"] = []time.Time{today.AddDate(0, 0, -1), today}
+
+	result, err := uc.ExecuteStreakMasters(ctx, "weekly")
+	if err != nil {
+		t.Fatalf("ExecuteStreakMasters() error = %v", err)
+	}
+
+	posSteady := indexOf(result, "Steady")
+	posCurrent := indexOf(result, "Current")
+	if posCurrent < 0 || posSteady < 0 {
+		t.Fatalf("expected both hunters in result, got %q", result)
+	}
+	if posCurrent > posSteady {
+		t.Fatalf("expected current daily streak to beat points tie-breaker, got %q", result)
+	}
+	if !containsSubstring(result, "current 2 hari") {
+		t.Fatalf("expected weekly streak output to show current daily streak, got %q", result)
+	}
+}
+
+func TestReportEventLedgerEnabled_StartsOnConfiguredDayInWIB(t *testing.T) {
+	loc := time.FixedZone("WIB", 7*3600)
+
+	before := time.Date(2026, time.June, 23, 23, 59, 59, 0, loc)
+	if usecase.ReportEventLedgerEnabled(before) {
+		t.Fatalf("ledger should be disabled before 24 Jun 2026 WIB")
+	}
+
+	start := time.Date(2026, time.June, 24, 0, 0, 0, 0, loc)
+	if !usecase.ReportEventLedgerEnabled(start) {
+		t.Fatalf("ledger should be enabled starting 24 Jun 2026 WIB")
 	}
 }
 
