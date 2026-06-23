@@ -10,7 +10,10 @@
   "dependencies": {
     "@lapor-bot/contract": "*",
     "@lapor-bot/design-system": "*",
-    "@lapor-bot/shared": "*"
+    "@lapor-bot/shared": "*",
+    "lucide-react-native": "^0.473.0",
+    "nativewind": "^4.1.23",
+    "tailwindcss": "^3.4.17"
   },
   "peerDependencies": {
     "react": "*",

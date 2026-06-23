@@ -33,3 +33,11 @@ Hello AI Agents! If you are working in this directory, please adhere to the foll
 - Do not commit code that breaks the `npm run lint` check or the build pipeline.
 
 Follow these rules closely to maintain a scalable and healthy workspace!
+
+## 7. Current Project Context & Features (June 2026)
+Recently added features and architectural focus:
+- **Goals Tracking & Profile Setup**: Implemented personal and weekly goals, activity tracking, and a new profile setup flow for users.
+- **Personal Page & Leaderboard**: Enhanced UI/UX for activity tracking (daily streak map, heatmap), and refined leaderboard with seasonal and lifetime metrics.
+- **Mobile App Setup**: Added Expo mobile app structure in `apps/mobile` and configured environment variables (`EXPO_PUBLIC_API_URL`) to connect with the remote backend API.
+- **Clean Architecture Abstraction**: Abstracted web logic into shared modules (`packages/contract`, `packages/design-system`, `packages/shared`) for better reusability between web and mobile.
+- **Dev Proxy Support**: Added `API_TARGET` support for local frontend development proxy.

@@ -66,3 +66,11 @@ npm run format
 ## Adding New Packages or Apps
 
 When adding a new package or app to this monorepo, ensure you update the `package.json` inside the new folder to appropriately link any internal dependencies using `"workspace:*"` or the specific package name.
+
+## Current Project Context & Features (June 2026)
+Recently added features and architectural focus:
+- **Goals Tracking & Profile Setup**: Implemented personal and weekly goals, activity tracking, and a new profile setup flow for users.
+- **Personal Page & Leaderboard**: Enhanced UI/UX for activity tracking (daily streak map, heatmap), and refined leaderboard with seasonal and lifetime metrics.
+- **Mobile App Setup**: Added Expo mobile app structure in `apps/mobile` and configured environment variables (`EXPO_PUBLIC_API_URL`) to connect with the remote backend API.
+- **Clean Architecture Abstraction**: Abstracted web logic into shared modules (`packages/contract`, `packages/design-system`, `packages/shared`) for better reusability between web and mobile.
+- **Dev Proxy Support**: Added `API_TARGET` support for local frontend development proxy.

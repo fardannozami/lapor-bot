@@ -75,3 +75,6 @@ export default defineConfig([
   },
 ])
 ```
+
+## Current Project Context (June 2026)
+Recent updates include: Goals tracking, profile setup, refined leaderboard metrics, new daily streak heatmaps, and clean architecture shared modules.
