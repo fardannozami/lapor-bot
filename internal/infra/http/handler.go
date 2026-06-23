@@ -2,6 +2,8 @@ package http
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -241,16 +243,16 @@ type GlobalSummary struct {
 	CurrentDay          int            `json:"current_day"`
 }
 
-// maskPhone hides all but the last 2 digits of a phone number so the public
-// leaderboard cannot be used to reconstruct real numbers.
-// ponytail: fixed-width mask (9 stars + 2 suffix) — no information about
-// prefix length leaks; ceiling: 2-digit suffix means 100 candidates per masked
-// value, acceptable for a public gamification dashboard.
+// maskPhone returns a stable, non-reversible public identifier. The hash keeps
+// React keys and leaderboard tie-breakers unique without exposing the real
+// phone number; the two-digit suffix is only a familiar visual hint.
 func maskPhone(phone string) string {
+	sum := sha256.Sum256([]byte(phone))
+	digest := hex.EncodeToString(sum[:])[:10]
 	if len(phone) <= 2 {
-		return "*********"
+		return "hunter-" + digest
 	}
-	return "*********" + phone[len(phone)-2:]
+	return "hunter-" + digest + "-" + phone[len(phone)-2:]
 }
 
 func buildTierProgress(value, currentMin int, nextMin int, nextName, nextIcon string, isMax bool) TierProgress {
@@ -373,6 +375,11 @@ func buildDailyActivity(activityDates []time.Time, today time.Time, days int) ([
 	return activity, activeDays, currentStreak, longestStreak
 }
 
+func buildDailyStreaks(activityDates []time.Time, today time.Time) (int, int) {
+	_, _, currentStreak, longestStreak := buildDailyActivity(activityDates, today, 1)
+	return currentStreak, longestStreak
+}
+
 var profileDayLabels = []string{"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"}
 
 func buildPersonalGoal(goal *domain.WeeklyGoal, activities []domain.GoalActivity) *PersonalGoal {
@@ -447,7 +454,7 @@ func buildPersonalGoal(goal *domain.WeeklyGoal, activities []domain.GoalActivity
 }
 
 func sortEnrichedReportsBySeason(reports []EnrichedReport) {
-	sort.Slice(reports, func(i, j int) bool {
+	sort.SliceStable(reports, func(i, j int) bool {
 		a, b := reports[i], reports[j]
 		if a.SeasonalPoints != b.SeasonalPoints {
 			return a.SeasonalPoints > b.SeasonalPoints
@@ -461,7 +468,10 @@ func sortEnrichedReportsBySeason(reports []EnrichedReport) {
 		if a.TotalActiveDays != b.TotalActiveDays {
 			return a.TotalActiveDays > b.TotalActiveDays
 		}
-		return a.Name < b.Name
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		return a.UserID < b.UserID
 	})
 }
 
@@ -586,6 +596,7 @@ func (s *Server) AssemblePublicLeaderboard(ctx context.Context) ([]EnrichedRepor
 	if err != nil {
 		return nil, err
 	}
+	reports = domain.DedupReportsByUserID(reports, domain.SortBySeasonRank)
 
 	now := time.Now()
 	today := domain.GetToday(now)
@@ -605,7 +616,9 @@ func (s *Server) AssemblePublicLeaderboard(ctx context.Context) ([]EnrichedRepor
 			return nil, err
 		}
 		weekAct, weekDays := buildWeekActivity(dates, weekStart)
-		enriched = append(enriched, enrichReport(rep, today, weekAct, weekDays))
+		row := enrichReport(rep, today, weekAct, weekDays)
+		row.CurrentDailyStreak, row.LongestDailyStreak = buildDailyStreaks(dates, today)
+		enriched = append(enriched, row)
 	}
 
 	// Season sort is our canonical order (mirrors WA leaderboard ordering).

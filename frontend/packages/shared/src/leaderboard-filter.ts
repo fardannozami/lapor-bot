@@ -1,4 +1,5 @@
 import type { EnrichedReport } from "./types";
+import { currentDailyStreak, longestDailyStreak } from "./leaderboard-sort";
 
 /**
  * Filter helpers — mirror domain.HasSeasonActivity / HasAnyActivity /
@@ -20,7 +21,12 @@ export function hasAnyActivity(h: EnrichedReport): boolean {
 
 /** User has a meaningful streak (current or historical best). */
 export function hasStreakActivity(h: EnrichedReport): boolean {
-  return h.streak > 0 || h.max_streak > 0;
+  return (
+    h.streak > 0 ||
+    h.max_streak > 0 ||
+    currentDailyStreak(h) > 0 ||
+    longestDailyStreak(h) > 0
+  );
 }
 
 /** User has at least one attribute above the minimum baseline (1). */

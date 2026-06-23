@@ -1,8 +1,8 @@
-export * from './types';
-export * from './domain/repositories';
-export * from './providers/RepositoryProvider';
-export * from './hooks/useReports';
-export * from './hooks/useAuth';
+export * from "./types";
+export * from "./domain/repositories";
+export * from "./providers/RepositoryProvider";
+export * from "./hooks/useReports";
+export * from "./hooks/useAuth";
 
 export { getJobColor, getJobBadgeClass } from "./job-utils";
 export { ATTRIBUTE_MIN, clampAttribute, attributeBarWidth } from "./attributes";
@@ -20,6 +20,8 @@ export {
   hasStreakActivity,
   hasAttributeActivity,
   totalActiveDays,
+  currentDailyStreak,
+  longestDailyStreak,
   attributeAverage,
   attributeValueByKey,
 } from "./leaderboard-sort";

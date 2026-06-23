@@ -3,6 +3,7 @@ import type {
   EnrichedReport,
   LeaderboardTab,
   AttributeTab,
+  StreakTab,
   LeaderboardSortKey,
 } from "@lapor-bot/shared";
 import {
@@ -11,6 +12,7 @@ import {
   hasAnyActivity,
   hasStreakActivity,
   hasAttributeActivity,
+  currentDailyStreak,
   ATTRIBUTE_TAB_TO_SORT_KEY,
 } from "@lapor-bot/shared";
 
@@ -41,6 +43,8 @@ export interface LeaderboardData {
   setActiveTab: (tab: LeaderboardTab) => void;
   attributeTab: AttributeTab;
   setAttributeTab: (tab: AttributeTab) => void;
+  streakTab: StreakTab;
+  setStreakTab: (tab: StreakTab) => void;
   safePage: number;
   totalPages: number;
   pageStartRank: number;
@@ -54,6 +58,7 @@ export function useLeaderboardData(hunters: EnrichedReport[]): LeaderboardData {
   const [selectedJob, setSelectedJob] = useState("all");
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("seasonal");
   const [attributeTab, setAttributeTab] = useState<AttributeTab>("overall");
+  const [streakTab, setStreakTab] = useState<StreakTab>("weekly");
   const [page, setPage] = useState(1);
 
   const filteredAndSorted = useMemo(() => {
@@ -66,19 +71,23 @@ export function useLeaderboardData(hunters: EnrichedReport[]): LeaderboardData {
     const matchesJob = (h: EnrichedReport) =>
       jobFilter === "all" || h.job_class?.toLowerCase() === jobFilter;
 
-    const passesTabFilter = TAB_FILTER[activeTab];
+    const sortKey =
+      activeTab === "attributes"
+        ? ATTRIBUTE_TAB_TO_SORT_KEY[attributeTab]
+        : activeTab === "streak" && streakTab === "daily"
+          ? "daily_streak"
+          : TAB_SORT_KEY[activeTab];
 
+    const passesTabFilter =
+      activeTab === "streak" && streakTab === "daily"
+        ? (h: EnrichedReport) => currentDailyStreak(h) > 0
+        : TAB_FILTER[activeTab];
     const filtered = hunters.filter(
       (h) => passesTabFilter(h) && matchesSearch(h) && matchesJob(h),
     );
 
-    const sortKey =
-      activeTab === "attributes"
-        ? ATTRIBUTE_TAB_TO_SORT_KEY[attributeTab]
-        : TAB_SORT_KEY[activeTab];
-
     return sortLeaderboard(filtered, sortKey);
-  }, [hunters, activeTab, attributeTab, search, selectedJob]);
+  }, [hunters, activeTab, attributeTab, streakTab, search, selectedJob]);
 
   const totalPages = Math.max(
     1,
@@ -103,6 +112,8 @@ export function useLeaderboardData(hunters: EnrichedReport[]): LeaderboardData {
     setActiveTab,
     attributeTab,
     setAttributeTab,
+    streakTab,
+    setStreakTab,
     safePage,
     totalPages,
     totalCount: filteredAndSorted.length,

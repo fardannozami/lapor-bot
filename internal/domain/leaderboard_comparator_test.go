@@ -6,6 +6,7 @@ import (
 
 func makeReport(name string, seasonalPoints, seasonalActivity, streak, totalPoints, maxStreak, activityCount, centurionCycles, str, sta, agi, vit int) *Report {
 	return &Report{
+		UserID:                name,
 		Name:                  name,
 		SeasonalPoints:        seasonalPoints,
 		SeasonalActivityCount: seasonalActivity,
@@ -203,6 +204,37 @@ func TestSortReports_SortsInPlace(t *testing.T) {
 	}
 }
 
+func TestDedupReportsByUserID_KeepsBestReportForSortKey(t *testing.T) {
+	reports := []*Report{
+		{UserID: "u1", Name: "Alice", SeasonalPoints: 10, SeasonalActivityCount: 1},
+		{UserID: "u2", Name: "Bob", SeasonalPoints: 20, SeasonalActivityCount: 1},
+		{UserID: "u1", Name: "Alice", SeasonalPoints: 30, SeasonalActivityCount: 2},
+	}
+
+	got := DedupReportsByUserID(reports, SortBySeasonRank)
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 reports after dedupe, got %d", len(got))
+	}
+	if got[0].UserID != "u1" || got[0].SeasonalPoints != 30 {
+		t.Fatalf("expected best u1 row kept in original user order, got %+v", got[0])
+	}
+	if got[1].UserID != "u2" {
+		t.Fatalf("expected u2 second, got %+v", got[1])
+	}
+}
+
+func TestCompareReports_NameTieBreaksByUserID(t *testing.T) {
+	a := makeReport("Same", 100, 1, 1, 100, 1, 1, 0, 1, 1, 1, 1)
+	b := makeReport("Same", 100, 1, 1, 100, 1, 1, 0, 1, 1, 1, 1)
+	a.UserID = "1"
+	b.UserID = "2"
+
+	if !CompareReports(a, b, SortBySeasonRank) {
+		t.Errorf("with equal name and metrics, lower user_id should rank first")
+	}
+}
+
 func TestHasSeasonActivity(t *testing.T) {
 	tests := []struct {
 		name string
@@ -307,9 +339,9 @@ func TestReport_TotalActiveDays(t *testing.T) {
 
 func TestReport_AttributeAverage(t *testing.T) {
 	tests := []struct {
-		name      string
+		name               string
 		str, sta, agi, vit int
-		want      int
+		want               int
 	}{
 		{"all zero clamps to 1", 0, 0, 0, 0, 1},
 		{"all ten", 10, 10, 10, 10, 10},
