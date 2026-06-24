@@ -20,7 +20,7 @@ var helpSections = []struct {
 	{
 		emoji:   "❌",
 		title:   "Membatalkan Laporan",
-		content: "*/cancel* atau *#cancel* — Batalkan laporan terakhir hari ini jika kamu salah input. Kalau hari ini ada 2-3 laporan, hanya laporan paling akhir yang dihapus.\n*/cancel-all* atau *#cancel-all* — Hapus semua laporan hari ini dan hitung ulang progresmu.\nHanya bisa digunakan pada hari yang sama dengan laporan.",
+		content: "*/cancel* atau *#cancel* — Batalkan laporan utama terakhir hari ini jika kamu salah input. Kalau hari ini ada 2-3 laporan utama, hanya laporan paling akhir yang dihapus.\n*/cancel-all* atau *#cancel-all* — Hapus semua laporan utama hari ini dan hitung ulang progresmu.\n*/cancel sidequest* atau *#cancel sidequest* — Batalkan side quest terakhir hari ini.\n*/cancel-all sidequest* atau *#cancel-all sidequest* — Hapus semua side quest hari ini.\nHanya bisa digunakan pada hari yang sama dengan laporan.",
 	},
 	{
 		emoji:   "🏆",
@@ -54,6 +54,8 @@ func (uc *GetHelpUsecase) Execute() string {
 📌 /lapor-kemarin or #lapor-kemarin — laporan khusus hari kemarin (max 3x/hari)
 ❌ /cancel or #cancel — batalkan laporan terakhir hari ini
 🧹 /cancel-all or #cancel-all — batalkan semua laporan hari ini
+❌ /cancel sidequest or #cancel sidequest — batalkan side quest terakhir hari ini
+🧹 /cancel-all sidequest or #cancel-all sidequest — batalkan semua side quest hari ini
 📚 /tutorial or #tutorial — panduan lengkap penggunaan bot
 ❓ /help or #help — list command ini
 

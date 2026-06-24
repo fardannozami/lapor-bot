@@ -803,3 +803,90 @@ func TestReportRepository_DeleteActivityLog_ReopensCompletedGoalWhenBelowTarget(
 		t.Fatalf("expected GoalsCompleted=0 after cancel, got %d", updated.GoalsCompleted)
 	}
 }
+
+func TestReportRepository_DeleteActivityLogByKind_KeepsOtherKind(t *testing.T) {
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	today := domain.GetToday(time.Now())
+	report := &domain.Report{UserID: "user1", Name: "Budi", LastReportDate: today, StreakFreezes: 1}
+	if err := repo.UpsertReport(ctx, report); err != nil {
+		t.Fatalf("upsert report: %v", err)
+	}
+	if err := repo.UpsertReportWithActivityKind(ctx, report, today, domain.ActivityKindRegularReport); err != nil {
+		t.Fatalf("log regular: %v", err)
+	}
+	if err := repo.UpsertReportWithActivityKind(ctx, report, today, domain.ActivityKindSideQuest); err != nil {
+		t.Fatalf("log sidequest: %v", err)
+	}
+
+	if err := repo.DeleteActivityLogByKind(ctx, "user1", today, domain.ActivityKindRegularReport); err != nil {
+		t.Fatalf("delete regular: %v", err)
+	}
+
+	var totalCount, regularCount, sideQuestCount int
+	err := db.QueryRowContext(ctx, `
+		SELECT report_count, regular_report_count, sidequest_count
+		FROM activity_logs
+		WHERE user_id = ? AND activity_date = ?
+	`, "user1", today.Format(time.DateOnly)).Scan(&totalCount, &regularCount, &sideQuestCount)
+	if err != nil {
+		t.Fatalf("query activity log: %v", err)
+	}
+	if totalCount != 1 || regularCount != 0 || sideQuestCount != 1 {
+		t.Fatalf("expected only sidequest remaining, got total=%d regular=%d sidequest=%d", totalCount, regularCount, sideQuestCount)
+	}
+
+	if err := repo.DeleteActivityLogByKind(ctx, "user1", today, domain.ActivityKindSideQuest); err != nil {
+		t.Fatalf("delete sidequest: %v", err)
+	}
+	err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM activity_logs WHERE user_id = ? AND activity_date = ?`, "user1", today.Format(time.DateOnly)).Scan(&totalCount)
+	if err != nil {
+		t.Fatalf("count activity log: %v", err)
+	}
+	if totalCount != 0 {
+		t.Fatalf("expected activity log deleted after both kinds removed, got %d rows", totalCount)
+	}
+}
+
+func TestReportRepository_DeleteLatestActivityLogByKind_DecrementsOnlyRequestedKind(t *testing.T) {
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	today := domain.GetToday(time.Now())
+	report := &domain.Report{UserID: "user1", Name: "Budi", LastReportDate: today, StreakFreezes: 1}
+	if err := repo.UpsertReport(ctx, report); err != nil {
+		t.Fatalf("upsert report: %v", err)
+	}
+	if err := repo.UpsertReportWithActivityKind(ctx, report, today, domain.ActivityKindRegularReport); err != nil {
+		t.Fatalf("log regular: %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := repo.UpsertReportWithActivityKind(ctx, report, today, domain.ActivityKindSideQuest); err != nil {
+			t.Fatalf("log sidequest %d: %v", i+1, err)
+		}
+	}
+
+	remaining, err := repo.DeleteLatestActivityLogByKind(ctx, "user1", today, domain.ActivityKindSideQuest)
+	if err != nil {
+		t.Fatalf("delete latest sidequest: %v", err)
+	}
+	if remaining != 1 {
+		t.Fatalf("expected 1 sidequest remaining, got %d", remaining)
+	}
+
+	var totalCount, regularCount, sideQuestCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT report_count, regular_report_count, sidequest_count
+		FROM activity_logs
+		WHERE user_id = ? AND activity_date = ?
+	`, "user1", today.Format(time.DateOnly)).Scan(&totalCount, &regularCount, &sideQuestCount)
+	if err != nil {
+		t.Fatalf("query activity log: %v", err)
+	}
+	if totalCount != 2 || regularCount != 1 || sideQuestCount != 1 {
+		t.Fatalf("expected one regular and one sidequest remaining, got total=%d regular=%d sidequest=%d", totalCount, regularCount, sideQuestCount)
+	}
+}

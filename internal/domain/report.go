@@ -188,10 +188,14 @@ type ReportRepository interface {
 
 	DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error
 	DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error)
+	DeleteActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) error
+	DeleteLatestActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) (int, error)
 	GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error)
+	GetUserActivityDatesByKind(ctx context.Context, userID string, kind string) ([]time.Time, error)
 	DeleteReport(ctx context.Context, userID string) error
 
 	GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error)
+	GetDailyActivityCountByKind(ctx context.Context, userID string, date time.Time, kind string) (int, error)
 
 	SetGoal(ctx context.Context, goal *WeeklyGoal) error
 	GetActiveGoal(ctx context.Context, userID string, now time.Time) (*WeeklyGoal, error)
