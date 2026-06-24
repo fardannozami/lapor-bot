@@ -48,9 +48,11 @@ func (m *mockLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 // mockReportRepo implements domain.ReportRepository for testing
 type mockReportRepo struct {
 	domain.ReportRepository
-	reports        map[string]*domain.Report
-	activityCounts []domain.ActivityLeaderboardEntry
-	goals          map[string]*domain.WeeklyGoal
+	reports          map[string]*domain.Report
+	activityCounts   []domain.ActivityLeaderboardEntry
+	dailyCountByKind map[string]int
+	deletedLogKind   string
+	goals            map[string]*domain.WeeklyGoal
 }
 
 func (m *mockReportRepo) GetReport(ctx context.Context, userID string) (*domain.Report, error) {
@@ -116,11 +118,34 @@ func (m *mockReportRepo) DeleteActivityLog(ctx context.Context, userID string, a
 	return nil
 }
 
+func (m *mockReportRepo) DeleteActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) error {
+	m.deletedLogKind = kind
+	if m.dailyCountByKind != nil {
+		m.dailyCountByKind[kind] = 0
+	}
+	return nil
+}
+
 func (m *mockReportRepo) DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error) {
 	return 0, nil
 }
 
+func (m *mockReportRepo) DeleteLatestActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) (int, error) {
+	m.deletedLogKind = kind
+	if m.dailyCountByKind == nil {
+		return 0, nil
+	}
+	if m.dailyCountByKind[kind] > 0 {
+		m.dailyCountByKind[kind]--
+	}
+	return m.dailyCountByKind[kind], nil
+}
+
 func (m *mockReportRepo) GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error) {
+	return nil, nil
+}
+
+func (m *mockReportRepo) GetUserActivityDatesByKind(ctx context.Context, userID string, kind string) ([]time.Time, error) {
 	return nil, nil
 }
 
@@ -131,6 +156,13 @@ func (m *mockReportRepo) DeleteReport(ctx context.Context, userID string) error 
 
 func (m *mockReportRepo) GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error) {
 	return 0, nil
+}
+
+func (m *mockReportRepo) GetDailyActivityCountByKind(ctx context.Context, userID string, date time.Time, kind string) (int, error) {
+	if m.dailyCountByKind == nil {
+		return 0, nil
+	}
+	return m.dailyCountByKind[kind], nil
 }
 
 func (m *mockReportRepo) SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error {
@@ -806,5 +838,58 @@ func TestHandleMessage_MySideQuestCommand(t *testing.T) {
 
 	if msg.Text != "" {
 		t.Errorf("Disabled /mysidequest should be silently ignored, got '%s'", msg.Text)
+	}
+}
+
+func TestHandleMessage_CancelSideQuestCommandsRouteToSideQuestCancel(t *testing.T) {
+	tests := []string{
+		"/cancel sidequest",
+		"/cancel-sidequest",
+		"/cancel all sidequest",
+		"/cancel-all sidequest",
+		"/cancel sidequest all",
+		"#cancel sidequest",
+		"#cancel-all sidequest",
+	}
+
+	for _, input := range tests {
+		t.Run(input, func(t *testing.T) {
+			repo := &mockReportRepo{
+				reports: make(map[string]*domain.Report),
+				dailyCountByKind: map[string]int{
+					domain.ActivityKindRegularReport: 1,
+					domain.ActivityKindSideQuest:     2,
+				},
+			}
+			repo.reports["user1"] = &domain.Report{
+				UserID:             "user1",
+				Name:               "User",
+				ActivityCount:      1,
+				TotalSideQuests:    2,
+				SeasonalSideQuests: 2,
+				LastReportDate:     time.Now(),
+			}
+			reportUC := usecase.NewReportActivityUsecase(repo)
+			leaderboardUC := usecase.NewGetLeaderboardUsecase(repo)
+			myStatsUC := usecase.NewGetMyStatsUsecase(repo)
+			achievementsUC := usecase.NewGetAchievementsUsecase(repo)
+			comebackUC := usecase.NewComebackChallengeUsecase(repo)
+			updateNameUC := usecase.NewUpdateNameUsecase(repo)
+			handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase())
+
+			msg, err := handleUC.Execute(context.Background(), "user1", "User", input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if msg.Text == "" {
+				t.Fatal("expected cancel response")
+			}
+			if repo.deletedLogKind != domain.ActivityKindSideQuest {
+				t.Fatalf("expected sidequest cancel, got %q", repo.deletedLogKind)
+			}
+			if repo.dailyCountByKind[domain.ActivityKindRegularReport] != 1 {
+				t.Fatalf("regular report count should not change, got %d", repo.dailyCountByKind[domain.ActivityKindRegularReport])
+			}
+		})
 	}
 }

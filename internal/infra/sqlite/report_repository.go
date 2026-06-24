@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
@@ -911,6 +912,38 @@ func (r *ReportRepository) GetUserActivityDates(ctx context.Context, userID stri
 	return dates, rows.Err()
 }
 
+func (r *ReportRepository) GetUserActivityDatesByKind(ctx context.Context, userID string, kind string) ([]time.Time, error) {
+	condition := "COALESCE(regular_report_count, 0) > 0"
+	if kind == domain.ActivityKindSideQuest {
+		condition = "COALESCE(sidequest_count, 0) > 0"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT activity_date FROM activity_logs
+		WHERE user_id = ? AND %s
+		ORDER BY activity_date ASC
+	`, condition)
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dates []time.Time
+	for rows.Next() {
+		var dateStr string
+		if err := rows.Scan(&dateStr); err != nil {
+			return nil, err
+		}
+		date, err := time.Parse(time.DateOnly, dateStr)
+		if err != nil {
+			return nil, err
+		}
+		dates = append(dates, date)
+	}
+	return dates, rows.Err()
+}
+
 func (r *ReportRepository) DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -923,6 +956,42 @@ func (r *ReportRepository) DeleteActivityLog(ctx context.Context, userID string,
 	if err := reconcileGoalAfterActivityDelete(ctx, tx, userID, activityDate); err != nil {
 		_ = tx.Rollback()
 		return err
+	}
+	return tx.Commit()
+}
+
+func (r *ReportRepository) DeleteActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) error {
+	date := activityDate.Format(time.DateOnly)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	regularCount, sideQuestCount, err := getActivityKindCounts(ctx, tx, userID, date)
+	if err == sql.ErrNoRows {
+		_ = tx.Rollback()
+		return nil
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if kind == domain.ActivityKindSideQuest {
+		sideQuestCount = 0
+	} else {
+		regularCount = 0
+	}
+
+	if err := saveActivityKindCounts(ctx, tx, userID, date, regularCount, sideQuestCount); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if kind != domain.ActivityKindSideQuest {
+		if err := reconcileGoalAfterActivityDelete(ctx, tx, userID, activityDate); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
 	}
 	return tx.Commit()
 }
@@ -963,6 +1032,90 @@ func (r *ReportRepository) DeleteLatestActivityLog(ctx context.Context, userID s
 	}
 
 	return remaining, tx.Commit()
+}
+
+func (r *ReportRepository) DeleteLatestActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) (int, error) {
+	date := activityDate.Format(time.DateOnly)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	regularCount, sideQuestCount, err := getActivityKindCounts(ctx, tx, userID, date)
+	if err == sql.ErrNoRows {
+		_ = tx.Rollback()
+		return 0, nil
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, err
+	}
+
+	remaining := 0
+	if kind == domain.ActivityKindSideQuest {
+		if sideQuestCount == 0 {
+			_ = tx.Rollback()
+			return 0, nil
+		}
+		sideQuestCount--
+		remaining = sideQuestCount
+	} else {
+		if regularCount == 0 {
+			_ = tx.Rollback()
+			return 0, nil
+		}
+		regularCount--
+		remaining = regularCount
+	}
+
+	if err := saveActivityKindCounts(ctx, tx, userID, date, regularCount, sideQuestCount); err != nil {
+		_ = tx.Rollback()
+		return 0, err
+	}
+	if kind != domain.ActivityKindSideQuest && remaining == 0 {
+		if err := reconcileGoalAfterActivityDelete(ctx, tx, userID, activityDate); err != nil {
+			_ = tx.Rollback()
+			return 0, err
+		}
+	}
+
+	return remaining, tx.Commit()
+}
+
+func getActivityKindCounts(ctx context.Context, tx *sql.Tx, userID, date string) (regularCount, sideQuestCount int, err error) {
+	var totalCount int
+	err = tx.QueryRowContext(ctx, `
+		SELECT COALESCE(report_count, 1), COALESCE(regular_report_count, 0), COALESCE(sidequest_count, 0)
+		FROM activity_logs
+		WHERE user_id = ? AND activity_date = ?
+	`, userID, date).Scan(&totalCount, &regularCount, &sideQuestCount)
+	if err != nil {
+		return 0, 0, err
+	}
+	if regularCount == 0 && sideQuestCount == 0 && totalCount > 0 {
+		regularCount = totalCount
+	}
+	return regularCount, sideQuestCount, nil
+}
+
+func saveActivityKindCounts(ctx context.Context, tx *sql.Tx, userID, date string, regularCount, sideQuestCount int) error {
+	if regularCount < 0 {
+		regularCount = 0
+	}
+	if sideQuestCount < 0 {
+		sideQuestCount = 0
+	}
+	totalCount := regularCount + sideQuestCount
+	if totalCount == 0 {
+		_, err := tx.ExecContext(ctx, `DELETE FROM activity_logs WHERE user_id = ? AND activity_date = ?`, userID, date)
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
+		UPDATE activity_logs
+		SET report_count = ?, regular_report_count = ?, sidequest_count = ?
+		WHERE user_id = ? AND activity_date = ?
+	`, totalCount, regularCount, sideQuestCount, userID, date)
+	return err
 }
 
 func reconcileGoalAfterActivityDelete(ctx context.Context, tx *sql.Tx, userID string, activityDate time.Time) error {

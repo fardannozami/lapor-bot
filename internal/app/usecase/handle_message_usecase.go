@@ -126,13 +126,8 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{Text: text}, err
 	}
 
-	if hasCommand(msg, "/cancel-all") {
-		text, err := uc.cancelUC.ExecuteAll(ctx, userID, name)
-		return MessageResponse{Text: text}, err
-	}
-
-	if hasCommand(msg, "/cancel") {
-		text, err := uc.cancelUC.Execute(ctx, userID, name)
+	if cancelCommand, ok := parseCancelCommand(msg); ok {
+		text, err := uc.executeCancelCommand(ctx, userID, name, cancelCommand)
 		return MessageResponse{Text: text}, err
 	}
 
@@ -215,6 +210,55 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 
 	// Unknown / command → silent (bot does not react to unrecognised commands)
 	return MessageResponse{}, nil
+}
+
+type cancelCommand struct {
+	kind string
+	all  bool
+}
+
+func (uc *HandleMessageUsecase) executeCancelCommand(ctx context.Context, userID, name string, command cancelCommand) (string, error) {
+	if command.kind == domain.ActivityKindSideQuest {
+		if command.all {
+			return uc.cancelUC.ExecuteAllSideQuest(ctx, userID, name)
+		}
+		return uc.cancelUC.ExecuteSideQuest(ctx, userID, name)
+	}
+	if command.all {
+		return uc.cancelUC.ExecuteAll(ctx, userID, name)
+	}
+	return uc.cancelUC.Execute(ctx, userID, name)
+}
+
+func parseCancelCommand(message string) (cancelCommand, bool) {
+	normalized := strings.ReplaceAll(message, "-", " ")
+	fields := strings.Fields(normalized)
+	if len(fields) == 0 || fields[0] != "/cancel" {
+		return cancelCommand{}, false
+	}
+	args := fields[1:]
+
+	isSideQuest := func(tokens []string) bool {
+		if len(tokens) == 1 {
+			return tokens[0] == "sidequest"
+		}
+		return len(tokens) == 2 && tokens[0] == "side" && tokens[1] == "quest"
+	}
+
+	switch {
+	case len(args) == 0:
+		return cancelCommand{kind: domain.ActivityKindRegularReport}, true
+	case len(args) == 1 && args[0] == "all":
+		return cancelCommand{kind: domain.ActivityKindRegularReport, all: true}, true
+	case isSideQuest(args):
+		return cancelCommand{kind: domain.ActivityKindSideQuest}, true
+	case len(args) >= 2 && args[0] == "all" && isSideQuest(args[1:]):
+		return cancelCommand{kind: domain.ActivityKindSideQuest, all: true}, true
+	case len(args) >= 2 && args[len(args)-1] == "all" && isSideQuest(args[:len(args)-1]):
+		return cancelCommand{kind: domain.ActivityKindSideQuest, all: true}, true
+	default:
+		return cancelCommand{}, false
+	}
 }
 
 func extractSideQuestReport(message string) (string, bool) {
