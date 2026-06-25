@@ -230,6 +230,14 @@ func TestHandleMessage_LaporCommand(t *testing.T) {
 
 	ctx := context.Background()
 
+	// Pre-set a report with a job so attribute resolution falls back to job primary.
+	repo.reports["user123"] = &domain.Report{
+		UserID:         "user123",
+		Name:           "TestUser",
+		JobClass:       "fighter",
+		LastReportDate: time.Now().AddDate(0, 0, -7),
+	}
+
 	// Test /lapor command
 	msg, err := handleUC.Execute(ctx, "user123", "TestUser", "/lapor")
 	if err != nil {
@@ -265,8 +273,10 @@ func TestHandleMessage_LaporCaseInsensitive(t *testing.T) {
 
 	testCases := []string{"/LAPOR", "/Lapor", "/LaPor", "/lapor"}
 	for _, cmd := range testCases {
-		// Reset repo for each test
-		repo.reports = make(map[string]*domain.Report)
+		// Reset repo for each test, pre-set with job for attribute resolution
+		repo.reports = map[string]*domain.Report{
+			"user1": {UserID: "user1", Name: "User", JobClass: "fighter", LastReportDate: time.Now().AddDate(0, 0, -7)},
+		}
 
 		msg, err := handleUC.Execute(ctx, "user1", "User", cmd)
 		if err != nil {
@@ -443,6 +453,12 @@ func TestHandleMessage_HashCommand_WorksLikeSlash(t *testing.T) {
 		// Reset for each test case
 		repo.reports = make(map[string]*domain.Report)
 
+		// Pre-set a report with job for /lapor with no activity text, so
+		// attribute resolution falls back to the job primary attribute.
+		if tt.input == "#lapor" || tt.input == "#LAPOR" {
+			repo.reports["user1"] = &domain.Report{UserID: "user1", Name: "User", JobClass: "fighter", LastReportDate: time.Now().AddDate(0, 0, -7)}
+		}
+
 		result, err := handleUC.Execute(ctx, "user1", "User", tt.input)
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", tt.input, err)
@@ -532,7 +548,9 @@ func TestHandleMessage_WhitespaceHandling(t *testing.T) {
 	}
 
 	for i, cmd := range testCases {
-		repo.reports = make(map[string]*domain.Report) // Reset
+		repo.reports = map[string]*domain.Report{
+			"user1": {UserID: "user1", Name: "User", JobClass: "fighter"},
+		}
 		msg, err := handleUC.Execute(ctx, "user1", "User", cmd)
 		if err != nil {
 			t.Fatalf("Test %d: Unexpected error for '%q': %v", i, cmd, err)
@@ -705,6 +723,14 @@ func TestHandleMessage_LaporDoesNotUpdateName(t *testing.T) {
 	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase())
 
 	ctx := context.Background()
+
+	// Pre-set a report with a job so attribute resolution works with no activity text.
+	repo.reports["user1"] = &domain.Report{
+		UserID:   "user1",
+		Name:     "InitialPushName",
+		JobClass: "fighter",
+		LastReportDate: time.Now().AddDate(0, 0, -14),
+	}
 
 	// setname is disabled — PushName is used directly in /lapor instead
 	_, _ = handleUC.Execute(ctx, "user1", "InitialPushName", "/lapor")
