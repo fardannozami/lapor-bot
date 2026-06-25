@@ -172,8 +172,8 @@ func TestStreak_FirstReport(t *testing.T) {
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
-	// First ever report
-	msg, err := uc.Execute(ctx, "user1", "Alice", nil)
+	// First ever report — use activity text with keyword so attrs resolve
+	msg, err := uc.ExecuteWithMessage(ctx, "user1", "Alice", "lari pagi", nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -222,6 +222,7 @@ func TestStreak_ConsecutiveDay_StreakIncreases(t *testing.T) {
 		Name:           "Bob",
 		Streak:         5,
 		ActivityCount:  10,
+		JobClass:       "fighter",
 		LastReportDate: lastWeek,
 	}
 
@@ -252,6 +253,7 @@ func TestStreak_MissedDay_StreakResets(t *testing.T) {
 		Name:           "Charlie",
 		Streak:         20, // Had a 20-week streak
 		ActivityCount:  25,
+		JobClass:       "fighter",
 		LastReportDate: twoWeeksAgo,
 	}
 
@@ -282,6 +284,7 @@ func TestStreak_SameDay_SecondReport(t *testing.T) {
 		Name:           "Diana",
 		Streak:         7,
 		ActivityCount:  15,
+		JobClass:       "fighter",
 		LastReportDate: now,
 	}
 	// Simulate that the user already has 1 activity logged today
@@ -322,6 +325,7 @@ func TestReportLimit_IsSeparateFromSideQuestLimit(t *testing.T) {
 		Name:           "Diana",
 		Streak:         7,
 		ActivityCount:  15,
+		JobClass:       "fighter",
 		LastReportDate: now,
 	}
 	repo.dailyCounts[todayKey] = 3
@@ -357,6 +361,7 @@ func TestReportActivity_AnnouncesLifetimeTierAndSeasonRankUp(t *testing.T) {
 		SeasonalActivityCount: 5,
 		TotalPoints:           1149,
 		SeasonalPoints:        149,
+		JobClass:              "fighter",
 		LastReportDate:        now,
 	}
 
@@ -410,6 +415,7 @@ func TestStreak_SameDay_UsesStoredNameWhenIncomingNameUnknown(t *testing.T) {
 		Name:           "Budi",
 		Streak:         3,
 		ActivityCount:  8,
+		JobClass:       "fighter",
 		LastReportDate: time.Now(),
 	}
 
@@ -436,6 +442,7 @@ func TestStreak_SameDay_HealsUnknownStoredName(t *testing.T) {
 		Name:           "Unknown",
 		Streak:         3,
 		ActivityCount:  8,
+		JobClass:       "fighter",
 		LastReportDate: time.Now(),
 	}
 
@@ -460,7 +467,7 @@ func TestStreak_FirstReport_DoesNotPersistUnknownName(t *testing.T) {
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
-	msg, err := uc.Execute(ctx, "user1", "Unknown", nil)
+	msg, err := uc.ExecuteWithMessage(ctx, "user1", "Unknown", "lari pagi", nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -470,6 +477,95 @@ func TestStreak_FirstReport_DoesNotPersistUnknownName(t *testing.T) {
 	}
 	if containsSubstring(msg, "Unknown") {
 		t.Fatalf("First #lapor should not show Unknown fallback, got %q", msg)
+	}
+}
+
+func TestReportActivity_AttributeGainIsConsistentAcrossUsers(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	lastWeek := time.Now().AddDate(0, 0, -7)
+
+	repo.reports["newer"] = &domain.Report{
+		UserID:                "newer",
+		Name:                  "Newer",
+		Streak:                1,
+		ActivityCount:         5,
+		SeasonalActivityCount: 5,
+		TotalPoints:           0,
+		LastReportDate:        lastWeek,
+		Sta:                   3,
+	}
+	repo.reports["veteran"] = &domain.Report{
+		UserID:                "veteran",
+		Name:                  "Veteran",
+		Streak:                20,
+		ActivityCount:         80,
+		SeasonalActivityCount: 80,
+		TotalPoints:           5000,
+		LastReportDate:        lastWeek,
+		Sta:                   30,
+	}
+
+	newerBefore := repo.reports["newer"].Sta
+	veteranBefore := repo.reports["veteran"].Sta
+	if _, err := uc.ExecuteWithMessage(ctx, "newer", "Newer", "/lapor lari 5km", nil); err != nil {
+		t.Fatalf("newer report: %v", err)
+	}
+	if _, err := uc.ExecuteWithMessage(ctx, "veteran", "Veteran", "/lapor lari 5km", nil); err != nil {
+		t.Fatalf("veteran report: %v", err)
+	}
+
+	if got := repo.reports["newer"].Sta - newerBefore; got != 1 {
+		t.Fatalf("newer STA delta = %d, want 1", got)
+	}
+	if got := repo.reports["veteran"].Sta - veteranBefore; got != 1 {
+		t.Fatalf("veteran STA delta = %d, want 1", got)
+	}
+}
+
+func TestReportActivity_FirstAttributeGainStartsAboveDisplayedBaseline(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	msg, err := uc.ExecuteWithMessage(ctx, "runner", "Runner", "/lapor lari pagi", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if got := repo.reports["runner"].Sta; got != 2 {
+		t.Fatalf("first STA gain should store baseline+gain = 2, got %d", got)
+	}
+	if !containsSubstring(msg, "STA +1") {
+		t.Fatalf("response should announce fixed STA gain, got %q", msg)
+	}
+}
+
+func TestReportActivity_SideQuestUsesSameAttributeClassifier(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	now := time.Now()
+	repo.reports["fighter"] = &domain.Report{
+		UserID:         "fighter",
+		Name:           "Fighter",
+		Streak:         1,
+		ActivityCount:  10,
+		LastReportDate: now,
+		Str:            1,
+	}
+
+	msg, err := uc.ExecuteSideQuest(ctx, "fighter", "Fighter", "Side quest: Wall Push-up / Desk Push-up", 1, 3, now)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if got := repo.reports["fighter"].Str; got != 2 {
+		t.Fatalf("sidequest STR gain = %d, want 2", got)
+	}
+	if !containsSubstring(msg, "STR +1") {
+		t.Fatalf("sidequest response should announce STR gain, got %q", msg)
 	}
 }
 
@@ -483,6 +579,7 @@ func TestStreak_ExistingUnknownStoredNameWithUnknownIncomingNormalizesToTeman(t 
 		Name:           "Unknown",
 		Streak:         3,
 		ActivityCount:  8,
+		JobClass:       "fighter",
 		LastReportDate: time.Now().AddDate(0, 0, -7),
 	}
 
@@ -511,6 +608,7 @@ func TestStreak_LongGap_StreakResets(t *testing.T) {
 		Name:           "Eve",
 		Streak:         36, // Was at max streak
 		ActivityCount:  36,
+		JobClass:       "fighter",
 		LastReportDate: thirtyDaysAgo,
 	}
 
@@ -619,6 +717,7 @@ func TestCenturion_PrestigeTransition(t *testing.T) {
 		Name:           "Centurion-to-be",
 		Streak:         12,
 		ActivityCount:  99,
+		JobClass:       "fighter",
 		LastReportDate: lastWeek,
 	}
 

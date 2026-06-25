@@ -20,6 +20,7 @@ const (
 	ReportEventLedgerYear  = 2026
 	ReportEventLedgerMonth = time.June
 	ReportEventLedgerDay   = 24
+	AttributeGainPerReport = 1
 )
 
 type typedActivityRepository interface {
@@ -275,37 +276,13 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 			activityForParse += " " + ex
 		}
 	}
-	attrs := domain.DetermineAttributes(activityForParse)
-	var statGains []string
-	if reportPoints > 0 && len(attrs) > 0 {
-		statPoints := reportPoints / len(attrs)
-
-		scalingLevel := oldNumericLevel
-		if scalingLevel < 1 {
-			scalingLevel = 1
-		}
-		statPoints = statPoints / scalingLevel
-
-		if statPoints == 0 {
-			statPoints = 1 // Ensure at least 1 point if it divided down to 0
-		}
-		for _, attr := range attrs {
-			switch attr {
-			case domain.AttrStr:
-				report.Str += statPoints
-				statGains = append(statGains, fmt.Sprintf("STR +%d", statPoints))
-			case domain.AttrSta:
-				report.Sta += statPoints
-				statGains = append(statGains, fmt.Sprintf("STA +%d", statPoints))
-			case domain.AttrAgi:
-				report.Agi += statPoints
-				statGains = append(statGains, fmt.Sprintf("AGI +%d", statPoints))
-			case domain.AttrVit:
-				report.Vit += statPoints
-				statGains = append(statGains, fmt.Sprintf("VIT +%d", statPoints))
-			}
-		}
+	attrs, attrOK := domain.ResolveReportAttributes(activityForParse, report.JobClass)
+	if !attrOK {
+		msg := "⚠️ *Sistem Atribut Belum Aktif!*\n\nKamu belum memilih Job. Pilih job dulu agar atribut bisa aktif saat melapor tanpa aktivitas spesifik.\nPilih job via web dashboard: https://lapor-bot.web.id/\n\nAtau tulis aktivitas spesifik agar atribut terdeteksi otomatis (contoh: /lapor lari 5km, /lapor push up 50x). 💪"
+		msg += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
+		return msg, nil
 	}
+	statGains := applyAttributeGains(report, attrs, AttributeGainPerReport)
 
 	var newAchievements []domain.Achievement
 	var comebackAchievements []domain.ComebackAchievement
@@ -640,37 +617,13 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 			activityForParse += " " + ex
 		}
 	}
-	attrs := domain.DetermineAttributes(activityForParse)
-	var statGains []string
-	if reportPoints > 0 && len(attrs) > 0 {
-		statPoints := reportPoints / len(attrs)
-
-		scalingLevel := oldNumericLevel
-		if scalingLevel < 1 {
-			scalingLevel = 1
-		}
-		statPoints = statPoints / scalingLevel
-
-		if statPoints == 0 {
-			statPoints = 1 // Ensure at least 1 point
-		}
-		for _, attr := range attrs {
-			switch attr {
-			case domain.AttrStr:
-				report.Str += statPoints
-				statGains = append(statGains, fmt.Sprintf("STR +%d", statPoints))
-			case domain.AttrSta:
-				report.Sta += statPoints
-				statGains = append(statGains, fmt.Sprintf("STA +%d", statPoints))
-			case domain.AttrAgi:
-				report.Agi += statPoints
-				statGains = append(statGains, fmt.Sprintf("AGI +%d", statPoints))
-			case domain.AttrVit:
-				report.Vit += statPoints
-				statGains = append(statGains, fmt.Sprintf("VIT +%d", statPoints))
-			}
-		}
+	attrs, attrOK := domain.ResolveReportAttributes(activityForParse, report.JobClass)
+	if !attrOK {
+		msg := "⚠️ *Sistem Atribut Belum Aktif!*\n\nKamu belum memilih Job. Pilih job dulu agar atribut bisa aktif saat melapor tanpa aktivitas spesifik.\nPilih job via web dashboard: https://lapor-bot.web.id/\n\nAtau tulis aktivitas spesifik agar atribut terdeteksi otomatis (contoh: /lapor-kemarin lari 5km). 💪"
+		msg += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
+		return msg, nil
 	}
+	statGains := applyAttributeGains(report, attrs, AttributeGainPerReport)
 
 	newAchievements := domain.CheckNewSeasonAchievements(report)
 	pointsGained := 0
@@ -955,6 +908,31 @@ func (uc *ReportActivityUsecase) getNextComebackTarget(report *domain.Report) *d
 		}
 	}
 	return nil
+}
+
+func applyAttributeGains(report *domain.Report, attrs []domain.AttributeType, statPoints int) []string {
+	if report == nil || statPoints <= 0 || len(attrs) == 0 {
+		return nil
+	}
+
+	var statGains []string
+	for _, attr := range attrs {
+		switch attr {
+		case domain.AttrStr:
+			report.Str = domain.ClampedAttribute(report.Str) + statPoints
+			statGains = append(statGains, fmt.Sprintf("STR +%d", statPoints))
+		case domain.AttrSta:
+			report.Sta = domain.ClampedAttribute(report.Sta) + statPoints
+			statGains = append(statGains, fmt.Sprintf("STA +%d", statPoints))
+		case domain.AttrAgi:
+			report.Agi = domain.ClampedAttribute(report.Agi) + statPoints
+			statGains = append(statGains, fmt.Sprintf("AGI +%d", statPoints))
+		case domain.AttrVit:
+			report.Vit = domain.ClampedAttribute(report.Vit) + statPoints
+			statGains = append(statGains, fmt.Sprintf("VIT +%d", statPoints))
+		}
+	}
+	return statGains
 }
 
 func formatCurrentAttributes(report *domain.Report) string {
