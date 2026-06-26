@@ -70,27 +70,24 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ summary, loading }
   ];
 
   return (
-    <View className="flex-col gap-4 mb-6">
+    <View className="flex-row flex-wrap justify-between mb-6">
       {stats.map((stat) => {
         const Icon = stat.icon;
         const tone = TONE_STYLES[stat.tone];
         return (
           <View
             key={stat.key}
-            className="p-5 rounded-2xl bg-[#102018] border border-[#23402e]"
+            className="w-[48%] p-4 mb-4 rounded-3xl bg-[#13281f] border border-[#23402e]"
           >
-            <View className="flex-row items-start justify-between">
-              <View className="flex-1">
-                <Text className="text-gray-400 text-xs font-medium">{stat.label}</Text>
-                <Text className="text-2xl font-bold mt-1 text-white">
-                  {stat.value}
-                </Text>
-              </View>
-              <View className={`p-3 rounded-xl ${tone.bg}`}>
-                <Icon size={24} color={ICON_COLORS[stat.tone]} />
+            <View className="flex-row items-start justify-between mb-3">
+              <View className={`p-2 rounded-xl ${tone.bg}`}>
+                <Icon size={20} color={ICON_COLORS[stat.tone]} />
               </View>
             </View>
-            <Text className="text-[10px] text-gray-500 mt-3">{stat.description}</Text>
+            <Text className="text-gray-400 text-xs font-medium mb-1">{stat.label}</Text>
+            <Text className="text-xl font-bold text-white">
+              {stat.value}
+            </Text>
           </View>
         );
       })}

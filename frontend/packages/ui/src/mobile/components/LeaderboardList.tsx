@@ -3,11 +3,13 @@ import { View, Text, TouchableOpacity, FlatList, TextInput } from 'react-native'
 import { Search, Trophy, Award, Flame, CalendarDays } from 'lucide-react-native';
 import type { EnrichedReport } from '@lapor-bot/shared';
 import { HunterCard } from './HunterCard';
+import { ErrorBoundary } from './ErrorBoundary';
 
 interface LeaderboardListProps {
   hunters: EnrichedReport[];
   onSelectHunter: (hunter: EnrichedReport) => void;
   ListHeaderComponent?: React.ReactElement;
+  StatsComponent?: React.ReactElement;
   refreshing?: boolean;
   onRefresh?: () => void;
 }
@@ -25,6 +27,7 @@ export const LeaderboardList: React.FC<LeaderboardListProps> = ({
   hunters, 
   onSelectHunter, 
   ListHeaderComponent,
+  StatsComponent,
   refreshing = false,
   onRefresh,
 }) => {
@@ -32,9 +35,9 @@ export const LeaderboardList: React.FC<LeaderboardListProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>("seasonal");
 
   const filteredAndSorted = useMemo(() => {
-    // Deduplicate hunters by user_id to prevent duplicate rows in the UI
     const uniqueMap = new Map();
     hunters.forEach(h => {
+      if (!h) return;
       if (!uniqueMap.has(h.user_id)) {
         uniqueMap.set(h.user_id, h);
       }
@@ -43,40 +46,40 @@ export const LeaderboardList: React.FC<LeaderboardListProps> = ({
 
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter((h) => h.name.toLowerCase().includes(q));
+      result = result.filter((h) => String(h.name || "").toLowerCase().includes(q));
     }
 
     if (activeTab === "seasonal") {
-      result = result.filter((h) => h.seasonal_points > 0 || h.seasonal_activity_count > 0);
+      result = result.filter((h) => (h.seasonal_points || 0) > 0 || (h.seasonal_activity_count || 0) > 0);
     }
     if (activeTab === "week") {
-      result = result.filter((h) => h.week_active_days > 0);
+      result = result.filter((h) => (h.week_active_days || 0) > 0);
     }
 
     result.sort((a, b) => {
       if (activeTab === "seasonal") {
         if (b.seasonal_points === a.seasonal_points) {
           if (b.seasonal_activity_count === a.seasonal_activity_count) {
-            return a.name.localeCompare(b.name);
+            return String(a.name || "").localeCompare(String(b.name || ""));
           }
-          return b.seasonal_activity_count - a.seasonal_activity_count;
+          return (b.seasonal_activity_count || 0) - (a.seasonal_activity_count || 0);
         }
-        return b.seasonal_points - a.seasonal_points;
+        return (b.seasonal_points || 0) - (a.seasonal_points || 0);
       } else if (activeTab === "lifetime") {
         if (b.total_points === a.total_points) {
-          return b.activity_count - a.activity_count;
+          return (b.activity_count || 0) - (a.activity_count || 0);
         }
-        return b.total_points - a.total_points;
+        return (b.total_points || 0) - (a.total_points || 0);
       } else if (activeTab === "streak") {
         if (b.streak === a.streak) {
-          return b.max_streak - a.max_streak;
+          return (b.max_streak || 0) - (a.max_streak || 0);
         }
-        return b.streak - a.streak;
+        return (b.streak || 0) - (a.streak || 0);
       } else {
         if (b.week_active_days === a.week_active_days) {
-          return a.name.localeCompare(b.name);
+          return String(a.name || "").localeCompare(String(b.name || ""));
         }
-        return b.week_active_days - a.week_active_days;
+        return (b.week_active_days || 0) - (a.week_active_days || 0);
       }
     });
 
@@ -87,30 +90,29 @@ export const LeaderboardList: React.FC<LeaderboardListProps> = ({
     <View className="flex-1">
       <FlatList
         data={filteredAndSorted}
-        keyExtractor={(item, index) => `${item.user_id}-${index}`}
+        keyExtractor={(item, index) => `${item?.user_id || index}-${index}`}
         refreshing={refreshing}
         onRefresh={onRefresh}
         ListHeaderComponent={
           <View>
             {ListHeaderComponent}
-            {/* Tabs */}
-            <View className="flex-row justify-between mb-4 bg-[#102018] p-1 rounded-xl">
+            {/* Tabs / Segmented Control */}
+            <View className="flex-row justify-between mb-6 bg-[#1a2f24] p-1 rounded-lg">
               {LEADERBOARD_TABS.map((tab) => {
-                const Icon = tab.icon;
                 const active = activeTab === tab.id;
                 return (
                   <TouchableOpacity
                     key={tab.id}
+                    activeOpacity={0.7}
                     onPress={() => {
                       setActiveTab(tab.id);
                       setSearch("");
                     }}
-                    className={`flex-1 flex-row items-center justify-center gap-1 py-2 rounded-lg ${
-                      active ? "bg-[#1f3a2c]" : ""
+                    className={`flex-1 items-center justify-center py-2 rounded-md ${
+                      active ? "bg-[#2dd4bf]" : "bg-transparent"
                     }`}
                   >
-                    <Icon size={12} color={active ? "#2dd4bf" : "#6b7280"} />
-                    <Text className={`text-[10px] font-bold uppercase ${active ? "text-[#2dd4bf]" : "text-gray-500"}`}>
+                    <Text className={`text-xs font-semibold ${active ? "text-black" : "text-gray-400"}`}>
                       {tab.label}
                     </Text>
                   </TouchableOpacity>
@@ -118,29 +120,33 @@ export const LeaderboardList: React.FC<LeaderboardListProps> = ({
               })}
             </View>
 
+            {StatsComponent}
+
             {/* Search */}
             <View className="relative mb-6">
-              <View className="absolute left-3 top-3 z-10">
-                <Search size={16} color="#6b7280" />
+              <View className="absolute left-4 top-4 z-10">
+                <Search size={20} color="#6b7280" />
               </View>
               <TextInput
                 value={search}
                 onChangeText={setSearch}
                 placeholder="Search hunter..."
                 placeholderTextColor="#6b7280"
-                className="w-full bg-[#102018] border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-white text-xs"
+                className="w-full bg-[#13281f] border border-gray-800/50 rounded-2xl pl-12 pr-4 py-4 text-white text-sm"
               />
             </View>
           </View>
         }
         renderItem={({ item }) => (
-          <HunterCard hunter={item} onClick={() => onSelectHunter(item)} />
+          <ErrorBoundary>
+            <HunterCard hunter={item} onClick={() => onSelectHunter(item)} />
+          </ErrorBoundary>
         )}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         ListEmptyComponent={() => (
           <View className="py-10 items-center">
-            <Text className="text-gray-500 text-xs text-center">No active hunters match the filters.</Text>
+            <Text className="text-gray-500 text-sm text-center">No active hunters match the filters.</Text>
           </View>
         )}
       />
