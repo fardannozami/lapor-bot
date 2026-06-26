@@ -14,8 +14,9 @@ This file is the root reference for AI Agents (Gemini, Claude, Cursor, etc) work
 ## Feature Tracking
 Recently added features:
 - **Goals Tracking**: Personal and weekly goals. Includes robust refresh mechanisms and WhatsApp group completion notifications. 
+- **Daily Quests Integration**: Implemented job-specific quest tasks.
 - **Mobile App Setup**: Added Expo mobile app structure.
-- **Mobile UI Stabilization**: Resolved NativeWind navigation crash by removing conditional shadows, and added ErrorBoundary for React components in the mobile UI package.
+- **Mobile UI Enhancements**: Implemented stacked stats layout in HunterCard for the lifetime tab (matching web leaderboard), resolved overlapping UI elements, fixed LeaderboardList `NavigationContainer` context errors, resolved NativeWind navigation crash by removing conditional shadows, and added ErrorBoundary for React components in the mobile UI package.
 
 ## Further Reading
 Before making any changes to the frontend, you **MUST** read:

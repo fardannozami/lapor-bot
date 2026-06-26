@@ -112,6 +112,10 @@ Untuk AI Agent (Gemini, Claude, Cursor, dll), silakan baca file-file berikut unt
 - `CLAUDE.md` / `GEMINI.md` / `AGENTS.md` di root directory.
 - `frontend/agents.md` untuk aturan ketat Turborepo monorepo.
 
+### Recent Updates (June 2026)
+- **Gamification**: Added daily quests and job-specific tasks.
+- **Mobile UI Enhancements**: Implemented stacked stats layout in HunterCard for the lifetime tab, fixed LeaderboardList `NavigationContainer` context errors, resolved NativeWind navigation crash by removing conditional shadows, and added ErrorBoundary for React components in the mobile UI package.
+
 ## Struktur Project
 
 Aplikasi ini menggunakan arsitektur monorepo untuk frontend dan backend Go:

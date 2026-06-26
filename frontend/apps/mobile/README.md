@@ -60,4 +60,4 @@ Join our community of developers creating universal apps.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
 
 ## Current Project Context (June 2026)
-Recent updates include: Expo app setup connected to remote API, goals tracking, profile setup, refined leaderboard metrics, new daily streak heatmaps, and clean architecture shared modules.
+Recent updates include: Expo app setup connected to remote API, goals tracking, profile setup, refined leaderboard metrics, new daily streak heatmaps, clean architecture shared modules, mobile UI enhancements for the HunterCard lifetime stats layout, and daily quest integrations.

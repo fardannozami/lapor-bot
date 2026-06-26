@@ -73,5 +73,5 @@ Recently added features and architectural focus:
 - **Personal Page & Leaderboard**: Enhanced UI/UX for activity tracking (daily streak map, heatmap), and refined leaderboard with seasonal and lifetime metrics.
 - **Mobile App Setup**: Added Expo mobile app structure in `apps/mobile` and configured environment variables (`EXPO_PUBLIC_API_URL`) to connect with the remote backend API.
 - **Clean Architecture Abstraction**: Abstracted web logic into shared modules (`packages/contract`, `packages/design-system`, `packages/shared`) for better reusability between web and mobile.
-- **Mobile UI Stabilization**: Resolved NativeWind navigation crash by removing conditional shadows, and added ErrorBoundary for React components in the mobile UI package.
+- **Mobile UI Enhancements**: Implemented stacked stats layout in HunterCard for the lifetime tab (matching web leaderboard), resolved overlapping UI elements, fixed LeaderboardList `NavigationContainer` context errors, resolved NativeWind navigation crash by removing conditional shadows, and added ErrorBoundary for React components in the mobile UI package.
 - **Dev Proxy Support**: Added `API_TARGET` support for local frontend development proxy.

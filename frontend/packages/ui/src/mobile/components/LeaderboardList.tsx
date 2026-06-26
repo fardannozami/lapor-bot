@@ -137,9 +137,9 @@ export const LeaderboardList: React.FC<LeaderboardListProps> = ({
             </View>
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <ErrorBoundary>
-            <HunterCard hunter={item} onClick={() => onSelectHunter(item)} />
+            <HunterCard hunter={item} onClick={() => onSelectHunter(item)} activeTab={activeTab} rankIndex={index} />
           </ErrorBoundary>
         )}
         showsVerticalScrollIndicator={false}

@@ -77,4 +77,4 @@ export default defineConfig([
 ```
 
 ## Current Project Context (June 2026)
-Recent updates include: Goals tracking, profile setup, refined leaderboard metrics, new daily streak heatmaps, and clean architecture shared modules.
+Recent updates include: Goals tracking, profile setup, refined leaderboard metrics, new daily streak heatmaps, clean architecture shared modules, daily quest integrations, and mobile UI enhancements for the HunterCard lifetime stats layout.
