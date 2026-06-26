@@ -172,7 +172,7 @@ func TestStreak_FirstReport(t *testing.T) {
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
-	// First ever report — use activity text with keyword so attrs resolve
+	// First ever report without a selected job still records the report.
 	msg, err := uc.ExecuteWithMessage(ctx, "user1", "Alice", "lari pagi", nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -489,6 +489,7 @@ func TestReportActivity_AttributeGainIsConsistentAcrossUsers(t *testing.T) {
 	repo.reports["newer"] = &domain.Report{
 		UserID:                "newer",
 		Name:                  "Newer",
+		JobClass:              "ranger",
 		Streak:                1,
 		ActivityCount:         5,
 		SeasonalActivityCount: 5,
@@ -499,6 +500,7 @@ func TestReportActivity_AttributeGainIsConsistentAcrossUsers(t *testing.T) {
 	repo.reports["veteran"] = &domain.Report{
 		UserID:                "veteran",
 		Name:                  "Veteran",
+		JobClass:              "ranger",
 		Streak:                20,
 		ActivityCount:         80,
 		SeasonalActivityCount: 80,
@@ -528,6 +530,12 @@ func TestReportActivity_FirstAttributeGainStartsAboveDisplayedBaseline(t *testin
 	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
+	repo.reports["runner"] = &domain.Report{
+		UserID:         "runner",
+		Name:           "Runner",
+		JobClass:       "ranger",
+		LastReportDate: time.Now().AddDate(0, 0, -7),
+	}
 
 	msg, err := uc.ExecuteWithMessage(ctx, "runner", "Runner", "/lapor lari pagi", nil)
 	if err != nil {
@@ -542,6 +550,54 @@ func TestReportActivity_FirstAttributeGainStartsAboveDisplayedBaseline(t *testin
 	}
 }
 
+func TestReportActivity_NoJobStillAcceptsReportAndHidesAttributes(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	msg, err := uc.Execute(ctx, "newbie", "Newbie", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !containsSubstring(msg, "Laporan diterima") {
+		t.Fatalf("report without job should still be accepted, got %q", msg)
+	}
+	if containsSubstring(msg, "Sistem Atribut Belum Aktif") {
+		t.Fatalf("report without job should not use warning response, got %q", msg)
+	}
+	if containsSubstring(msg, "Attributes:") || containsSubstring(msg, "🛡️ Stats:") {
+		t.Fatalf("report without job should hide attributes, got %q", msg)
+	}
+	if !containsSubstring(msg, "setup job di dashboard") {
+		t.Fatalf("report without job should include setup job notice, got %q", msg)
+	}
+	if repo.reports["newbie"] == nil || repo.reports["newbie"].ActivityCount != 1 {
+		t.Fatalf("report without job should be persisted, got %#v", repo.reports["newbie"])
+	}
+}
+
+func TestReportActivity_NoJobWithSpecificActivityDoesNotActivateAttributes(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	msg, err := uc.ExecuteWithMessage(ctx, "newbie", "Newbie", "/lapor lari pagi", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if repo.reports["newbie"].Sta != 0 {
+		t.Fatalf("attributes should not change before job setup, got STA %d", repo.reports["newbie"].Sta)
+	}
+	if containsSubstring(msg, "STA +1") || containsSubstring(msg, "🛡️ Stats:") {
+		t.Fatalf("specific activity without job should still hide attributes, got %q", msg)
+	}
+	if !containsSubstring(msg, "setup job di dashboard") {
+		t.Fatalf("specific activity without job should include setup job notice, got %q", msg)
+	}
+}
+
 func TestReportActivity_SideQuestUsesSameAttributeClassifier(t *testing.T) {
 	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
 	uc := usecase.NewReportActivityUsecase(repo)
@@ -550,6 +606,7 @@ func TestReportActivity_SideQuestUsesSameAttributeClassifier(t *testing.T) {
 	repo.reports["fighter"] = &domain.Report{
 		UserID:         "fighter",
 		Name:           "Fighter",
+		JobClass:       "fighter",
 		Streak:         1,
 		ActivityCount:  10,
 		LastReportDate: now,
