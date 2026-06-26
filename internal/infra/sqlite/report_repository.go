@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
@@ -112,6 +113,46 @@ func logActivity(ctx context.Context, execer execContexter, userID string, activ
 	return logActivityKind(ctx, execer, userID, activityDate, domain.ActivityKindRegularReport)
 }
 
+func logActivityEvent(ctx context.Context, execer execContexter, event domain.ReportActivityEvent) error {
+	regularIncrement := event.RegularCountDelta
+	sideQuestIncrement := event.SideQuestCountDelta
+	if regularIncrement < 0 {
+		regularIncrement = 0
+	}
+	if sideQuestIncrement < 0 {
+		sideQuestIncrement = 0
+	}
+	totalIncrement := regularIncrement + sideQuestIncrement
+	if totalIncrement == 0 {
+		totalIncrement = 1
+	}
+
+	query := `
+		INSERT INTO activity_logs (user_id, activity_date, created_at, report_count, regular_report_count, sidequest_count, activity_text)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(user_id, activity_date) DO UPDATE SET
+			report_count = report_count + excluded.report_count,
+			regular_report_count = COALESCE(regular_report_count, 0) + excluded.regular_report_count,
+			sidequest_count = COALESCE(sidequest_count, 0) + excluded.sidequest_count,
+			activity_text = CASE
+				WHEN excluded.activity_text = '' THEN activity_text
+				WHEN activity_text = '' THEN excluded.activity_text
+				ELSE activity_text || '\n' || excluded.activity_text
+			END,
+			created_at = excluded.created_at
+	`
+	_, err := execer.ExecContext(ctx, query,
+		event.UserID,
+		event.ActivityDate.Format(time.DateOnly),
+		event.OccurredAt.UTC().Format(time.RFC3339),
+		totalIncrement,
+		regularIncrement,
+		sideQuestIncrement,
+		event.ActivityText,
+	)
+	return err
+}
+
 func logActivityKind(ctx context.Context, execer execContexter, userID string, activityDate time.Time, kind string) error {
 	regularIncrement := 0
 	sideQuestIncrement := 0
@@ -154,6 +195,166 @@ func (r *ReportRepository) UpsertReportWithActivityKind(ctx context.Context, rep
 	}
 
 	return tx.Commit()
+}
+
+func (r *ReportRepository) UpsertReportWithActivityEvent(ctx context.Context, report *domain.Report, event domain.ReportActivityEvent) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	if event.UserID == "" {
+		event.UserID = report.UserID
+	}
+	if event.Kind == "" {
+		event.Kind = domain.ActivityKindRegularReport
+	}
+	if event.ActivityDate.IsZero() {
+		event.ActivityDate = domain.GetToday(report.LastReportDate)
+	}
+	if event.OccurredAt.IsZero() {
+		event.OccurredAt = time.Now().UTC()
+	}
+	if event.RuleVersion == 0 {
+		event.RuleVersion = 1
+	}
+	if event.Source == "" {
+		event.Source = "whatsapp"
+	}
+	if event.MetadataJSON == "" {
+		event.MetadataJSON = "{}"
+	}
+
+	if err := upsertReport(ctx, tx, report); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	inserted, err := insertReportEvent(ctx, tx, event)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if inserted {
+		if err := logActivityEvent(ctx, tx, event); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		if err := upsertDailyActivityProjection(ctx, tx, event); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		if err := upsertSeasonStatsProjection(ctx, tx, event); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func insertReportEvent(ctx context.Context, execer execContexter, event domain.ReportActivityEvent) (bool, error) {
+	query := `
+		INSERT OR IGNORE INTO report_events (
+			event_id, user_id, season_number, kind, activity_date,
+			occurred_at_utc, recorded_at_utc, points_delta,
+			regular_count_delta, sidequest_count_delta, rule_version,
+			source, activity_text, metadata_json
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	result, err := execer.ExecContext(ctx, query,
+		event.EventID,
+		event.UserID,
+		event.SeasonNumber,
+		event.Kind,
+		event.ActivityDate.Format(time.DateOnly),
+		event.OccurredAt.UTC().Format(time.RFC3339),
+		time.Now().UTC().Format(time.RFC3339),
+		event.PointsDelta,
+		event.RegularCountDelta,
+		event.SideQuestCountDelta,
+		event.RuleVersion,
+		event.Source,
+		event.ActivityText,
+		event.MetadataJSON,
+	)
+	if err != nil {
+		return false, err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return rows > 0, nil
+}
+
+func upsertDailyActivityProjection(ctx context.Context, execer execContexter, event domain.ReportActivityEvent) error {
+	query := `
+		INSERT INTO user_daily_activity (
+			user_id, season_number, activity_date,
+			regular_count, sidequest_count, total_points,
+			first_event_id, last_event_id, first_reported_at_utc, last_reported_at_utc
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(user_id, season_number, activity_date) DO UPDATE SET
+			regular_count = regular_count + excluded.regular_count,
+			sidequest_count = sidequest_count + excluded.sidequest_count,
+			total_points = total_points + excluded.total_points,
+			last_event_id = excluded.last_event_id,
+			last_reported_at_utc = excluded.last_reported_at_utc
+	`
+	_, err := execer.ExecContext(ctx, query,
+		event.UserID,
+		event.SeasonNumber,
+		event.ActivityDate.Format(time.DateOnly),
+		event.RegularCountDelta,
+		event.SideQuestCountDelta,
+		event.PointsDelta,
+		event.EventID,
+		event.EventID,
+		event.OccurredAt.UTC().Format(time.RFC3339),
+		event.OccurredAt.UTC().Format(time.RFC3339),
+	)
+	return err
+}
+
+func upsertSeasonStatsProjection(ctx context.Context, execer execContexter, event domain.ReportActivityEvent) error {
+	activityDate := event.ActivityDate.Format(time.DateOnly)
+	occurredAt := event.OccurredAt.UTC().Format(time.RFC3339)
+	query := `
+		INSERT INTO user_season_stats (
+			user_id, season_number, total_points,
+			regular_reports, sidequest_reports, active_days,
+			first_activity_date, last_activity_date,
+			first_reported_at_utc, last_reported_at_utc
+		) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+		ON CONFLICT(user_id, season_number) DO UPDATE SET
+			total_points = total_points + excluded.total_points,
+			regular_reports = regular_reports + excluded.regular_reports,
+			sidequest_reports = sidequest_reports + excluded.sidequest_reports,
+			active_days = active_days + CASE
+				WHEN EXISTS (
+					SELECT 1 FROM user_daily_activity uda
+					WHERE uda.user_id = excluded.user_id
+					  AND uda.season_number = excluded.season_number
+					  AND uda.activity_date = excluded.last_activity_date
+					  AND (uda.regular_count + uda.sidequest_count) > (excluded.regular_reports + excluded.sidequest_reports)
+				) THEN 0 ELSE 1
+			END,
+			first_activity_date = MIN(first_activity_date, excluded.first_activity_date),
+			last_activity_date = MAX(last_activity_date, excluded.last_activity_date),
+			last_reported_at_utc = excluded.last_reported_at_utc
+	`
+	_, err := execer.ExecContext(ctx, query,
+		event.UserID,
+		event.SeasonNumber,
+		event.PointsDelta,
+		event.RegularCountDelta,
+		event.SideQuestCountDelta,
+		activityDate,
+		activityDate,
+		occurredAt,
+		occurredAt,
+	)
+	return err
 }
 
 func (r *ReportRepository) LogActivity(ctx context.Context, userID string, activityDate time.Time) error {
@@ -274,7 +475,89 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 		return err
 	}
 
+	reportEventsQuery := `
+		CREATE TABLE IF NOT EXISTS report_events (
+			event_id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			season_number INTEGER NOT NULL,
+			kind TEXT NOT NULL CHECK (kind IN ('regular_report', 'sidequest')),
+			activity_date TEXT NOT NULL,
+			occurred_at_utc TEXT NOT NULL,
+			recorded_at_utc TEXT NOT NULL,
+			points_delta INTEGER NOT NULL,
+			regular_count_delta INTEGER NOT NULL DEFAULT 0,
+			sidequest_count_delta INTEGER NOT NULL DEFAULT 0,
+			rule_version INTEGER NOT NULL DEFAULT 1,
+			source TEXT NOT NULL DEFAULT 'whatsapp',
+			activity_text TEXT NOT NULL DEFAULT '',
+			metadata_json TEXT NOT NULL DEFAULT '{}',
+			FOREIGN KEY (user_id) REFERENCES user_reports(user_id) ON DELETE CASCADE
+		);
+	`
+	_, err = r.db.ExecContext(ctx, reportEventsQuery)
+	if err != nil {
+		return err
+	}
+
+	dailyActivityQuery := `
+		CREATE TABLE IF NOT EXISTS user_daily_activity (
+			user_id TEXT NOT NULL,
+			season_number INTEGER NOT NULL,
+			activity_date TEXT NOT NULL,
+			regular_count INTEGER NOT NULL DEFAULT 0,
+			sidequest_count INTEGER NOT NULL DEFAULT 0,
+			total_points INTEGER NOT NULL DEFAULT 0,
+			first_event_id TEXT,
+			last_event_id TEXT,
+			first_reported_at_utc TEXT,
+			last_reported_at_utc TEXT,
+			PRIMARY KEY (user_id, season_number, activity_date),
+			FOREIGN KEY (user_id) REFERENCES user_reports(user_id) ON DELETE CASCADE
+		);
+	`
+	_, err = r.db.ExecContext(ctx, dailyActivityQuery)
+	if err != nil {
+		return err
+	}
+
+	seasonStatsQuery := `
+		CREATE TABLE IF NOT EXISTS user_season_stats (
+			user_id TEXT NOT NULL,
+			season_number INTEGER NOT NULL,
+			total_points INTEGER NOT NULL DEFAULT 0,
+			regular_reports INTEGER NOT NULL DEFAULT 0,
+			sidequest_reports INTEGER NOT NULL DEFAULT 0,
+			active_days INTEGER NOT NULL DEFAULT 0,
+			first_activity_date TEXT,
+			last_activity_date TEXT,
+			first_reported_at_utc TEXT,
+			last_reported_at_utc TEXT,
+			PRIMARY KEY (user_id, season_number),
+			FOREIGN KEY (user_id) REFERENCES user_reports(user_id) ON DELETE CASCADE
+		);
+	`
+	_, err = r.db.ExecContext(ctx, seasonStatsQuery)
+	if err != nil {
+		return err
+	}
+
 	_, err = r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_activity_logs_date ON activity_logs (activity_date)`)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_report_events_user_season_date ON report_events (user_id, season_number, activity_date)`)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_report_events_season_date ON report_events (season_number, activity_date)`)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_user_daily_activity_season_date ON user_daily_activity (season_number, activity_date)`)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_user_season_stats_leaderboard ON user_season_stats (season_number, total_points DESC, regular_reports DESC, sidequest_reports DESC, user_id ASC)`)
 	if err != nil {
 		return err
 	}
@@ -629,6 +912,38 @@ func (r *ReportRepository) GetUserActivityDates(ctx context.Context, userID stri
 	return dates, rows.Err()
 }
 
+func (r *ReportRepository) GetUserActivityDatesByKind(ctx context.Context, userID string, kind string) ([]time.Time, error) {
+	condition := "COALESCE(regular_report_count, 0) > 0"
+	if kind == domain.ActivityKindSideQuest {
+		condition = "COALESCE(sidequest_count, 0) > 0"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT activity_date FROM activity_logs
+		WHERE user_id = ? AND %s
+		ORDER BY activity_date ASC
+	`, condition)
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dates []time.Time
+	for rows.Next() {
+		var dateStr string
+		if err := rows.Scan(&dateStr); err != nil {
+			return nil, err
+		}
+		date, err := time.Parse(time.DateOnly, dateStr)
+		if err != nil {
+			return nil, err
+		}
+		dates = append(dates, date)
+	}
+	return dates, rows.Err()
+}
+
 func (r *ReportRepository) DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -641,6 +956,42 @@ func (r *ReportRepository) DeleteActivityLog(ctx context.Context, userID string,
 	if err := reconcileGoalAfterActivityDelete(ctx, tx, userID, activityDate); err != nil {
 		_ = tx.Rollback()
 		return err
+	}
+	return tx.Commit()
+}
+
+func (r *ReportRepository) DeleteActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) error {
+	date := activityDate.Format(time.DateOnly)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	regularCount, sideQuestCount, err := getActivityKindCounts(ctx, tx, userID, date)
+	if err == sql.ErrNoRows {
+		_ = tx.Rollback()
+		return nil
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if kind == domain.ActivityKindSideQuest {
+		sideQuestCount = 0
+	} else {
+		regularCount = 0
+	}
+
+	if err := saveActivityKindCounts(ctx, tx, userID, date, regularCount, sideQuestCount); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if kind != domain.ActivityKindSideQuest {
+		if err := reconcileGoalAfterActivityDelete(ctx, tx, userID, activityDate); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
 	}
 	return tx.Commit()
 }
@@ -681,6 +1032,90 @@ func (r *ReportRepository) DeleteLatestActivityLog(ctx context.Context, userID s
 	}
 
 	return remaining, tx.Commit()
+}
+
+func (r *ReportRepository) DeleteLatestActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) (int, error) {
+	date := activityDate.Format(time.DateOnly)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	regularCount, sideQuestCount, err := getActivityKindCounts(ctx, tx, userID, date)
+	if err == sql.ErrNoRows {
+		_ = tx.Rollback()
+		return 0, nil
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, err
+	}
+
+	remaining := 0
+	if kind == domain.ActivityKindSideQuest {
+		if sideQuestCount == 0 {
+			_ = tx.Rollback()
+			return 0, nil
+		}
+		sideQuestCount--
+		remaining = sideQuestCount
+	} else {
+		if regularCount == 0 {
+			_ = tx.Rollback()
+			return 0, nil
+		}
+		regularCount--
+		remaining = regularCount
+	}
+
+	if err := saveActivityKindCounts(ctx, tx, userID, date, regularCount, sideQuestCount); err != nil {
+		_ = tx.Rollback()
+		return 0, err
+	}
+	if kind != domain.ActivityKindSideQuest && remaining == 0 {
+		if err := reconcileGoalAfterActivityDelete(ctx, tx, userID, activityDate); err != nil {
+			_ = tx.Rollback()
+			return 0, err
+		}
+	}
+
+	return remaining, tx.Commit()
+}
+
+func getActivityKindCounts(ctx context.Context, tx *sql.Tx, userID, date string) (regularCount, sideQuestCount int, err error) {
+	var totalCount int
+	err = tx.QueryRowContext(ctx, `
+		SELECT COALESCE(report_count, 1), COALESCE(regular_report_count, 0), COALESCE(sidequest_count, 0)
+		FROM activity_logs
+		WHERE user_id = ? AND activity_date = ?
+	`, userID, date).Scan(&totalCount, &regularCount, &sideQuestCount)
+	if err != nil {
+		return 0, 0, err
+	}
+	if regularCount == 0 && sideQuestCount == 0 && totalCount > 0 {
+		regularCount = totalCount
+	}
+	return regularCount, sideQuestCount, nil
+}
+
+func saveActivityKindCounts(ctx context.Context, tx *sql.Tx, userID, date string, regularCount, sideQuestCount int) error {
+	if regularCount < 0 {
+		regularCount = 0
+	}
+	if sideQuestCount < 0 {
+		sideQuestCount = 0
+	}
+	totalCount := regularCount + sideQuestCount
+	if totalCount == 0 {
+		_, err := tx.ExecContext(ctx, `DELETE FROM activity_logs WHERE user_id = ? AND activity_date = ?`, userID, date)
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
+		UPDATE activity_logs
+		SET report_count = ?, regular_report_count = ?, sidequest_count = ?
+		WHERE user_id = ? AND activity_date = ?
+	`, totalCount, regularCount, sideQuestCount, userID, date)
+	return err
 }
 
 func reconcileGoalAfterActivityDelete(ctx context.Context, tx *sql.Tx, userID string, activityDate time.Time) error {
@@ -753,6 +1188,15 @@ func reconcileGoalAfterActivityDelete(ctx context.Context, tx *sql.Tx, userID st
 }
 
 func (r *ReportRepository) DeleteReport(ctx context.Context, userID string) error {
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM report_events WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM user_daily_activity WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM user_season_stats WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
 	if _, err := r.db.ExecContext(ctx, `DELETE FROM activity_logs WHERE user_id = ?`, userID); err != nil {
 		return err
 	}

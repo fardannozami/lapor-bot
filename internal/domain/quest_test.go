@@ -38,6 +38,64 @@ func TestGenerateDailyQuest(t *testing.T) {
 	if tasksUserA[1].ID == tasksUserB[1].ID && tasksUserA[2].ID == tasksUserB[2].ID {
 		t.Errorf("expected different users to get randomized medium/hard quests, got %+v and %+v", tasksUserA, tasksUserB)
 	}
+
+	// 5. Same user/job/day is deterministic.
+	tasksUserAAgain := GenerateDailyQuestForUser("628111", "fighter", 5, now)
+	for i := range tasksUserA {
+		if tasksUserA[i].ID != tasksUserAAgain[i].ID || tasksUserA[i].Target != tasksUserAAgain[i].Target {
+			t.Fatalf("expected deterministic quests, got %+v and %+v", tasksUserA, tasksUserAAgain)
+		}
+	}
+}
+
+func TestGenerateDailyQuest_JobAttributeSpecialists(t *testing.T) {
+	now := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		job  string
+		want AttributeType
+	}{
+		{"fighter", AttrStr},
+		{"ranger", AttrSta},
+		{"assassin", AttrAgi},
+		{"healer", AttrVit},
+		{"tank", AttrVit},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.job, func(t *testing.T) {
+			tasks := GenerateDailyQuestForUser("628111", tt.job, 5, now)
+			if len(tasks) != 3 {
+				t.Fatalf("expected 3 tasks, got %d", len(tasks))
+			}
+			for _, task := range tasks[1:] {
+				attrs, _ := ResolveReportAttributes(task.Name, tt.job)
+				if !hasAttribute(attrs, tt.want) {
+					t.Fatalf("%s task %q classified as %#v, want %s", tt.job, task.Name, attrs, tt.want)
+				}
+				if !MatchTask(task.Name, task.ID) {
+					t.Fatalf("generated task should be matchable by its name: %+v", task)
+				}
+			}
+		})
+	}
+}
+
+func TestGenerateDailyQuest_AvoidsOverlappingMediumAndHardTasks(t *testing.T) {
+	jobs := []string{"fighter", "ranger", "assassin", "mage", "healer", "tank", "necromancer"}
+	for day := 1; day <= 14; day++ {
+		date := time.Date(2026, 6, day, 0, 0, 0, 0, time.UTC)
+		for _, job := range jobs {
+			for _, userID := range []string{"628111", "628222", "628333"} {
+				tasks := GenerateDailyQuestForUser(userID, job, 8, date)
+				if len(tasks) != 3 {
+					t.Fatalf("expected 3 tasks for %s/%s/%s, got %d", userID, job, date.Format(time.DateOnly), len(tasks))
+				}
+				if questTasksConflict(tasks[1], tasks[2]) {
+					t.Fatalf("medium and hard tasks should not overlap for %s/%s/%s: %+v", userID, job, date.Format(time.DateOnly), tasks)
+				}
+			}
+		}
+	}
 }
 
 func TestMatchTask(t *testing.T) {
@@ -82,6 +140,9 @@ func TestMatchTask(t *testing.T) {
 		{"lateral shuffle 45 detik", "lateralshuffle", true},
 		// Negative cases
 		{"bicycle crunch 10", "reversecrunch", false}, // should not match: exclude "bicycle"
+		{"chair squat", "air", false},
+		{"rundown meeting", "lari", false},
+		{"legacy cleanup", "weight", false},
 		{"random text", "highknees", false},
 	}
 
@@ -91,4 +152,13 @@ func TestMatchTask(t *testing.T) {
 			t.Errorf("MatchTask(%q, %q) = %v, want %v", tt.input, tt.taskID, got, tt.want)
 		}
 	}
+}
+
+func hasAttribute(attrs []AttributeType, want AttributeType) bool {
+	for _, attr := range attrs {
+		if attr == want {
+			return true
+		}
+	}
+	return false
 }

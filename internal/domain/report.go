@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode"
 )
 
 var ErrActiveGoalExists = errors.New("active goal exists")
@@ -81,30 +82,117 @@ func ClampedAttribute(v int) int {
 	return v
 }
 
+var attributeKeywordSets = []struct {
+	attr     AttributeType
+	keywords []string
+}{
+	{AttrStr, []string{
+		"beban", "weight", "weightlifting", "strength", "gym", "angkat", "powerlifting",
+		"push up", "pushup", "pull up", "pullup", "squat", "chair squat", "sit to stand",
+		"push day", "pull day", "push workout", "pull workout", "deadlift", "bench press",
+		"row", "leg day", "plank", "desk plank", "lunges", "lunge", "glute bridge",
+		"calf raises", "calf raise", "jinjit", "reverse crunch", "wall sit", "dead bug", "core",
+	}},
+	{AttrSta, []string{
+		"lari", "berlari", "run", "running", "jogging", "marathon", "sepeda", "bersepeda",
+		"cycle", "cycling", "bike", "kardio", "cardio", "renang", "berenang", "swim",
+		"swimming", "hiking", "trekking", "jalan jauh", "stairs", "tangga", "naik turun tangga",
+		"jumping jacks", "jumpingjacks", "step up", "stepup", "skipping", "rope jump",
+		"mountain climber", "mountainclimber",
+	}},
+	{AttrAgi, []string{
+		"bola", "sepak bola", "soccer", "football", "futsal", "basket", "basketball",
+		"bulutangkis", "bulu tangkis", "badminton", "tenis", "tennis", "padel", "padle",
+		"pickleball", "sprint", "hiit", "tabata", "muay thai", "muaythai", "boxing",
+		"tinju", "shadow boxing", "shadowboxing", "calisthenics", "voli", "volleyball",
+		"high knees", "highknees", "mountain climber", "mountainclimber", "lateral shuffle",
+		"lateralshuffle", "squat jump", "jump squat", "ladder drill", "shuttle run",
+	}},
+	{AttrVit, []string{
+		"yoga", "pilates", "stretching", "stretch", "peregangan", "mobility", "recovery",
+		"walk", "walking", "jalan kaki", "jalan santai", "meditasi", "meditation", "meditate",
+		"napas", "breathing", "deep breathing", "pemulihan", "mobility flow", "bird dog",
+		"balance", "keseimbangan", "shoulder mobility", "neck mobility",
+	}},
+}
+
 // DetermineAttributes parses an activity text to find matching RPG attributes.
+// Matching is table-driven and boundary-aware so unrelated words like
+// "legacy" or "rundown" do not accidentally grant STR/STA.
+// Returns an empty slice when no keywords match — callers should handle
+// the fallback via ResolveReportAttributes instead of hardcoding a default.
 func DetermineAttributes(text string) []AttributeType {
-	text = strings.ToLower(text)
+	normalized := normalizeActivityText(text)
 	var attrs []AttributeType
 
-	if strings.Contains(text, "beban") || strings.Contains(text, "weight") || strings.Contains(text, "strength") || strings.Contains(text, "gym") || strings.Contains(text, "angkat") || strings.Contains(text, "powerlifting") || strings.Contains(text, "push") || strings.Contains(text, "pull") || strings.Contains(text, "leg") {
-		attrs = append(attrs, AttrStr)
-	}
-	if strings.Contains(text, "lari") || strings.Contains(text, "run") || strings.Contains(text, "running") || strings.Contains(text, "sepeda") || strings.Contains(text, "cycle") || strings.Contains(text, "hiit") || strings.Contains(text, "kardio") || strings.Contains(text, "cardio") || strings.Contains(text, "renang") || strings.Contains(text, "swim") {
-		attrs = append(attrs, AttrSta)
-	}
-	if strings.Contains(text, "bola") || strings.Contains(text, "futsal") || strings.Contains(text, "basket") || strings.Contains(text, "bulutangkis") || strings.Contains(text, "tenis") || strings.Contains(text, "sprint") || strings.Contains(text, "muaythai") || strings.Contains(text, "boxing") || strings.Contains(text, "calisthenics") || strings.Contains(text, "padel") || strings.Contains(text, "padle") {
-		attrs = append(attrs, AttrAgi)
-	}
-	if strings.Contains(text, "yoga") || strings.Contains(text, "pilates") || strings.Contains(text, "stretching") || strings.Contains(text, "recovery") || strings.Contains(text, "jalan") || strings.Contains(text, "walk") || strings.Contains(text, "meditasi") {
-		attrs = append(attrs, AttrVit)
-	}
-
-	if len(attrs) == 0 {
-		// Default to VIT (General Health/Vitality) if no specific keywords match
-		attrs = append(attrs, AttrVit)
+	for _, set := range attributeKeywordSets {
+		if containsAnyActivityKeyword(normalized, set.keywords) {
+			attrs = append(attrs, set.attr)
+		}
 	}
 
 	return attrs
+}
+
+// ResolveReportAttributes determines which attributes are activated by an
+// activity, falling back to the user's job primary attribute when no keywords
+// match. Returns (attributes, ok). When ok is false the caller should prompt
+// the user to pick a job first.
+func ResolveReportAttributes(text string, jobClass string) ([]AttributeType, bool) {
+	attrs := DetermineAttributes(text)
+	if len(attrs) > 0 {
+		return attrs, true
+	}
+
+	// No keywords matched — fall back to job primary attribute.
+	if jobClass != "" {
+		primary := JobClassPrimaryAttribute(jobClass)
+		if primary != "" {
+			return []AttributeType{primary}, true
+		}
+		// Mage has no single primary attribute — give all attributes.
+		return []AttributeType{AttrStr, AttrSta, AttrAgi, AttrVit}, true
+	}
+
+	// No job selected — user needs to pick one.
+	return nil, false
+}
+
+func normalizeActivityText(text string) string {
+	text = strings.ToLower(text)
+	var b strings.Builder
+	lastSpace := true
+
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			lastSpace = false
+			continue
+		}
+		if !lastSpace {
+			b.WriteByte(' ')
+			lastSpace = true
+		}
+	}
+
+	return strings.TrimSpace(b.String())
+}
+
+func containsAnyActivityKeyword(normalizedText string, keywords []string) bool {
+	for _, keyword := range keywords {
+		if containsActivityKeyword(normalizedText, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsActivityKeyword(normalizedText, keyword string) bool {
+	normalizedKeyword := normalizeActivityText(keyword)
+	if normalizedText == "" || normalizedKeyword == "" {
+		return false
+	}
+	return strings.Contains(" "+normalizedText+" ", " "+normalizedKeyword+" ")
 }
 
 // ReportCutoffOffset is the spare time allowed for late-night reporting.
@@ -115,6 +203,25 @@ const (
 	ActivityKindRegularReport = "regular_report"
 	ActivityKindSideQuest     = "sidequest"
 )
+
+// ReportActivityEvent is the immutable fact written for every accepted /lapor
+// or /lapor sidequest command. Aggregates can change shape over time, but this
+// event preserves the awarded deltas for Season 2+ leaderboard rebuilds.
+type ReportActivityEvent struct {
+	EventID             string
+	UserID              string
+	SeasonNumber        int
+	Kind                string
+	ActivityDate        time.Time
+	OccurredAt          time.Time
+	PointsDelta         int
+	RegularCountDelta   int
+	SideQuestCountDelta int
+	RuleVersion         int
+	Source              string
+	ActivityText        string
+	MetadataJSON        string
+}
 
 // GetToday returns the normalized "today" (midnight) based on the cutoff offset.
 func GetToday(t time.Time) time.Time {
@@ -169,10 +276,14 @@ type ReportRepository interface {
 
 	DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error
 	DeleteLatestActivityLog(ctx context.Context, userID string, activityDate time.Time) (int, error)
+	DeleteActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) error
+	DeleteLatestActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) (int, error)
 	GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error)
+	GetUserActivityDatesByKind(ctx context.Context, userID string, kind string) ([]time.Time, error)
 	DeleteReport(ctx context.Context, userID string) error
 
 	GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error)
+	GetDailyActivityCountByKind(ctx context.Context, userID string, date time.Time, kind string) (int, error)
 
 	SetGoal(ctx context.Context, goal *WeeklyGoal) error
 	GetActiveGoal(ctx context.Context, userID string, now time.Time) (*WeeklyGoal, error)

@@ -109,9 +109,41 @@ func CompareReports(a, b *Report, key LeaderboardSortKey) bool {
 
 // SortReports sorts a slice of reports in-place using the given sort key.
 func SortReports(reports []*Report, key LeaderboardSortKey) {
-	sort.Slice(reports, func(i, j int) bool {
+	sort.SliceStable(reports, func(i, j int) bool {
 		return CompareReports(reports[i], reports[j], key)
 	})
+}
+
+// DedupReportsByUserID returns one report per canonical user ID while keeping
+// the highest-ranking row for the requested leaderboard. This protects callers
+// that aggregate from multiple sources before sorting.
+func DedupReportsByUserID(reports []*Report, key LeaderboardSortKey) []*Report {
+	seenIndex := make(map[string]int, len(reports))
+	result := make([]*Report, 0, len(reports))
+
+	for _, report := range reports {
+		if report == nil {
+			continue
+		}
+		if report.UserID == "" {
+			result = append(result, report)
+			continue
+		}
+
+		index, ok := seenIndex[report.UserID]
+		if !ok {
+			seenIndex[report.UserID] = len(result)
+			result = append(result, report)
+			continue
+		}
+
+		current := result[index]
+		if CompareReports(report, current, key) {
+			result[index] = report
+		}
+	}
+
+	return result
 }
 
 // HasSeasonActivity returns true if a report has any seasonal engagement.
@@ -165,7 +197,7 @@ func compareSeasonRank(a, b *Report) bool {
 	if a.TotalActiveDays() != b.TotalActiveDays() {
 		return a.TotalActiveDays() > b.TotalActiveDays()
 	}
-	return a.Name < b.Name
+	return compareNameThenUserID(a, b)
 }
 
 func compareLifetimeXP(a, b *Report) bool {
@@ -178,7 +210,7 @@ func compareLifetimeXP(a, b *Report) bool {
 	if a.MaxStreak != b.MaxStreak {
 		return a.MaxStreak > b.MaxStreak
 	}
-	return a.Name < b.Name
+	return compareNameThenUserID(a, b)
 }
 
 func compareWeeklyStreak(a, b *Report) bool {
@@ -191,7 +223,7 @@ func compareWeeklyStreak(a, b *Report) bool {
 	if a.SeasonalPoints != b.SeasonalPoints {
 		return a.SeasonalPoints > b.SeasonalPoints
 	}
-	return a.Name < b.Name
+	return compareNameThenUserID(a, b)
 }
 
 func compareDailyStreak(a, b *Report) bool {
@@ -207,7 +239,7 @@ func compareDailyStreak(a, b *Report) bool {
 	if a.TotalPoints != b.TotalPoints {
 		return a.TotalPoints > b.TotalPoints
 	}
-	return a.Name < b.Name
+	return compareNameThenUserID(a, b)
 }
 
 func compareWeeklyActivity(a, b *Report) bool {
@@ -221,7 +253,7 @@ func compareWeeklyActivity(a, b *Report) bool {
 	if a.SeasonalPoints != b.SeasonalPoints {
 		return a.SeasonalPoints > b.SeasonalPoints
 	}
-	return a.Name < b.Name
+	return compareNameThenUserID(a, b)
 }
 
 func compareAttributeOverall(a, b *Report) bool {
@@ -233,7 +265,7 @@ func compareAttributeOverall(a, b *Report) bool {
 	if a.TotalPoints != b.TotalPoints {
 		return a.TotalPoints > b.TotalPoints
 	}
-	return a.Name < b.Name
+	return compareNameThenUserID(a, b)
 }
 
 func compareAttribute(a, b *Report, key LeaderboardSortKey) bool {
@@ -259,7 +291,14 @@ func compareAttribute(a, b *Report, key LeaderboardSortKey) bool {
 	if a.TotalPoints != b.TotalPoints {
 		return a.TotalPoints > b.TotalPoints
 	}
-	return a.Name < b.Name
+	return compareNameThenUserID(a, b)
+}
+
+func compareNameThenUserID(a, b *Report) bool {
+	if a.Name != b.Name {
+		return a.Name < b.Name
+	}
+	return a.UserID < b.UserID
 }
 
 // AttributeSortKeyFromType converts an AttributeType to its corresponding

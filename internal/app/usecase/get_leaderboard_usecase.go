@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ func (uc *GetLeaderboardUsecase) Execute(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	reports = domain.DedupReportsByUserID(reports, domain.SortBySeasonRank)
 
 	now := time.Now()
 	displayDate := domain.GetToday(now)
@@ -81,6 +83,7 @@ func (uc *GetLeaderboardUsecase) ExecuteSeasonal(ctx context.Context) (string, e
 	if err != nil {
 		return "", err
 	}
+	reports = domain.DedupReportsByUserID(reports, domain.SortBySeasonRank)
 
 	now := time.Now()
 	seasonNumber, _ := GetCurrentSessionInfo(now)
@@ -118,6 +121,7 @@ func (uc *GetLeaderboardUsecase) ExecuteRanks(ctx context.Context) (string, erro
 	if err != nil {
 		return "", err
 	}
+	reports = domain.DedupReportsByUserID(reports, domain.SortBySeasonRank)
 
 	now := time.Now()
 	seasonNumber, _ := GetCurrentSessionInfo(now)
@@ -167,6 +171,7 @@ func (uc *GetLeaderboardUsecase) ExecuteLifetime(ctx context.Context) (string, e
 	if err != nil {
 		return "", err
 	}
+	reports = domain.DedupReportsByUserID(reports, domain.SortByLifetimeXP)
 
 	seasonNumber, _ := GetCurrentSessionInfo(time.Now())
 
@@ -219,7 +224,8 @@ func (uc *GetLeaderboardUsecase) ExecuteStreakMasters(ctx context.Context, strea
 	var key domain.LeaderboardSortKey
 	var title, icon, metricLabel string
 
-	switch strings.ToLower(streakType) {
+	normalizedType := strings.ToLower(streakType)
+	switch normalizedType {
 	case "daily":
 		key = domain.SortByDailyStreak
 		title = "Streak Masters — Daily"
@@ -232,6 +238,13 @@ func (uc *GetLeaderboardUsecase) ExecuteStreakMasters(ctx context.Context, strea
 		metricLabel = "minggu beruntun"
 	default:
 		return "", fmt.Errorf("invalid streak type %q: expected daily or weekly", streakType)
+	}
+	reports = domain.DedupReportsByUserID(reports, key)
+	if normalizedType == "daily" {
+		return uc.executeDailyStreakMasters(ctx, reports, seasonNumber, title, icon, metricLabel)
+	}
+	if normalizedType == "weekly" || normalizedType == "" {
+		return uc.executeWeeklyStreakMasters(ctx, reports, seasonNumber, title, icon, metricLabel)
 	}
 
 	domain.SortReports(reports, key)
@@ -253,7 +266,7 @@ func (uc *GetLeaderboardUsecase) ExecuteStreakMasters(ctx context.Context, strea
 
 	for rank := 0; rank < maxRank; rank++ {
 		r := active[rank]
-		sb.WriteString(formatStreakEntry(rank+1, r, strings.ToLower(streakType), metricLabel))
+		sb.WriteString(formatStreakEntry(rank+1, r, normalizedType, metricLabel))
 	}
 
 	sb.WriteString("\nStreak dihitung dari konsistensi laporan. Jangan sampai putus! 🔥")
@@ -275,6 +288,7 @@ func (uc *GetLeaderboardUsecase) ExecuteAttribute(ctx context.Context, attrType 
 	if err != nil {
 		return "", err
 	}
+	reports = domain.DedupReportsByUserID(reports, key)
 
 	domain.SortReports(reports, key)
 	active := domain.FilterReports(reports, domain.HasAttributeActivity)
@@ -324,6 +338,179 @@ func (uc *GetLeaderboardUsecase) ExecuteAttribute(ctx context.Context, attrType 
 	sb.WriteString("\nAttribute naik dari laporan aktivitas. Variasikan latihanmu! ⚔️")
 
 	return sb.String(), nil
+}
+
+type dailyStreakEntry struct {
+	report  *domain.Report
+	current int
+	longest int
+}
+
+type weeklyStreakEntry struct {
+	report       *domain.Report
+	dailyCurrent int
+}
+
+func (uc *GetLeaderboardUsecase) executeWeeklyStreakMasters(ctx context.Context, reports []*domain.Report, seasonNumber int, title, icon, metricLabel string) (string, error) {
+	today := domain.GetToday(time.Now())
+	entries := make([]weeklyStreakEntry, 0, len(reports))
+	for _, report := range reports {
+		if !domain.HasStreakActivity(report) {
+			continue
+		}
+		dates, err := uc.repo.GetUserActivityDates(ctx, report.UserID)
+		if err != nil {
+			return "", err
+		}
+		current, _ := calculateDailyStreaks(dates, today)
+		entries = append(entries, weeklyStreakEntry{report: report, dailyCurrent: current})
+	}
+
+	sort.SliceStable(entries, func(i, j int) bool {
+		a, b := entries[i], entries[j]
+		if a.report.Streak != b.report.Streak {
+			return a.report.Streak > b.report.Streak
+		}
+		if a.dailyCurrent != b.dailyCurrent {
+			return a.dailyCurrent > b.dailyCurrent
+		}
+		if a.report.SeasonalPoints != b.report.SeasonalPoints {
+			return a.report.SeasonalPoints > b.report.SeasonalPoints
+		}
+		if a.report.MaxStreak != b.report.MaxStreak {
+			return a.report.MaxStreak > b.report.MaxStreak
+		}
+		return domain.CompareReports(a.report, b.report, domain.SortByWeeklyStreak)
+	})
+
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("%s *%s*\n", icon, title))
+	sb.WriteString(fmt.Sprintf("Season %d\n\n", seasonNumber))
+
+	if len(entries) == 0 {
+		sb.WriteString("Belum ada hunter dengan streak. Mulai dengan /lapor! 💪")
+		return sb.String(), nil
+	}
+
+	maxRank := 10
+	if len(entries) < maxRank {
+		maxRank = len(entries)
+	}
+
+	for rank := 0; rank < maxRank; rank++ {
+		entry := entries[rank]
+		sb.WriteString(fmt.Sprintf(
+			"%d. %s — %d %s (current %d hari, %d pts, max %d minggu)\n",
+			rank+1,
+			entry.report.Name,
+			entry.report.Streak,
+			metricLabel,
+			entry.dailyCurrent,
+			entry.report.SeasonalPoints,
+			entry.report.MaxStreak,
+		))
+	}
+
+	sb.WriteString("\nPeringkat: streak mingguan → current streak harian → poin season. Jangan sampai putus! 🔥")
+
+	return sb.String(), nil
+}
+
+func (uc *GetLeaderboardUsecase) executeDailyStreakMasters(ctx context.Context, reports []*domain.Report, seasonNumber int, title, icon, metricLabel string) (string, error) {
+	today := domain.GetToday(time.Now())
+	entries := make([]dailyStreakEntry, 0, len(reports))
+	for _, report := range reports {
+		dates, err := uc.repo.GetUserActivityDates(ctx, report.UserID)
+		if err != nil {
+			return "", err
+		}
+		current, longest := calculateDailyStreaks(dates, today)
+		if current > 0 {
+			entries = append(entries, dailyStreakEntry{report: report, current: current, longest: longest})
+		}
+	}
+
+	sort.SliceStable(entries, func(i, j int) bool {
+		a, b := entries[i], entries[j]
+		if a.current != b.current {
+			return a.current > b.current
+		}
+		if a.longest != b.longest {
+			return a.longest > b.longest
+		}
+		if a.report.TotalPoints != b.report.TotalPoints {
+			return a.report.TotalPoints > b.report.TotalPoints
+		}
+		return domain.CompareReports(a.report, b.report, domain.SortByLifetimeXP)
+	})
+
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("%s *%s*\n", icon, title))
+	sb.WriteString(fmt.Sprintf("Season %d\n\n", seasonNumber))
+
+	if len(entries) == 0 {
+		sb.WriteString("Belum ada hunter dengan streak harian aktif. Mulai dengan /lapor! 💪")
+		return sb.String(), nil
+	}
+
+	maxRank := 10
+	if len(entries) < maxRank {
+		maxRank = len(entries)
+	}
+
+	for rank := 0; rank < maxRank; rank++ {
+		entry := entries[rank]
+		sb.WriteString(fmt.Sprintf(
+			"%d. %s — %d %s (best %d hari, %d pts)\n",
+			rank+1,
+			entry.report.Name,
+			entry.current,
+			metricLabel,
+			entry.longest,
+			entry.report.TotalPoints,
+		))
+	}
+
+	sb.WriteString("\nStreak harian dihitung dari laporan beruntun per hari. Jangan sampai putus! 🔥")
+
+	return sb.String(), nil
+}
+
+func calculateDailyStreaks(activityDates []time.Time, today time.Time) (int, int) {
+	sort.Slice(activityDates, func(i, j int) bool {
+		return activityDates[i].Before(activityDates[j])
+	})
+
+	activeDates := make(map[string]bool, len(activityDates))
+	for _, date := range activityDates {
+		activeDates[date.Format(time.DateOnly)] = true
+	}
+
+	current := 0
+	for date := today; activeDates[date.Format(time.DateOnly)]; date = date.AddDate(0, 0, -1) {
+		current++
+	}
+
+	longest := 0
+	running := 0
+	var previous time.Time
+	for _, date := range activityDates {
+		day := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+		if !previous.IsZero() && day.Equal(previous) {
+			continue
+		}
+		if !previous.IsZero() && day.Equal(previous.AddDate(0, 0, 1)) {
+			running++
+		} else {
+			running = 1
+		}
+		if running > longest {
+			longest = running
+		}
+		previous = day
+	}
+
+	return current, longest
 }
 
 func countStreakStatus(reports []*domain.Report, now time.Time) (active, lost int) {

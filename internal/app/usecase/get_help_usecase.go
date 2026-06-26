@@ -20,7 +20,7 @@ var helpSections = []struct {
 	{
 		emoji:   "❌",
 		title:   "Membatalkan Laporan",
-		content: "*/cancel* atau *#cancel* — Batalkan laporan terakhir hari ini jika kamu salah input. Kalau hari ini ada 2-3 laporan, hanya laporan paling akhir yang dihapus.\n*/cancel-all* atau *#cancel-all* — Hapus semua laporan hari ini dan hitung ulang progresmu.\nHanya bisa digunakan pada hari yang sama dengan laporan.",
+		content: "*/cancel* atau *#cancel* — Batalkan laporan utama terakhir hari ini jika kamu salah input. Kalau hari ini ada 2-3 laporan utama, hanya laporan paling akhir yang dihapus.\n*/cancel-all* atau *#cancel-all* — Hapus semua laporan utama hari ini dan hitung ulang progresmu.\n*/cancel sidequest* atau *#cancel sidequest* — Batalkan side quest terakhir hari ini.\n*/cancel-all sidequest* atau *#cancel-all sidequest* — Hapus semua side quest hari ini.\nHanya bisa digunakan pada hari yang sama dengan laporan.",
 	},
 	{
 		emoji:   "🏆",
@@ -35,7 +35,7 @@ var helpSections = []struct {
 	{
 		emoji:   "⚔️",
 		title:   "Status RPG (Attributes)",
-		content: "Bot akan membaca laporan `/lapor` atau `#lapor` dan menaikkan status tertentu berdasarkan kata kunci aktivitas.\n\n💪 *STR (Strength)*: beban, weight, strength, gym, angkat, powerlifting, push, pull, leg\n🏃‍♂️ *STA (Stamina)*: lari, run, running, sepeda, cycle, hiit, kardio, cardio, renang, swim\n⚡ *AGI (Agility)*: bola, futsal, basket, bulutangkis, tenis, sprint, muaythai, boxing, calisthenics, padel, padle\n🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, recovery, jalan, walk, meditasi\n\nJika tidak ada kata kunci spesifik, laporan akan otomatis meningkatkan *VIT*.",
+		content: "Bot membaca laporan `/lapor` atau `#lapor` dengan daftar kata kunci yang sama untuk semua user. Setiap attribute yang cocok naik +1 per laporan valid.\n\n💪 *STR (Strength)*: gym, beban, push-up, pull-up, squat, plank, lunges, glute bridge, calf raises\n🏃‍♂️ *STA (Stamina)*: lari, jogging, sepeda, cardio, renang, hiking, tangga, jumping jacks, skipping\n⚡ *AGI (Agility)*: futsal/sepak bola, basket, badminton, tenis/padel, sprint, HIIT/tabata, boxing/muay thai, high knees, lateral shuffle\n🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, mobility, recovery, jalan santai, meditasi, breathing, balance\n\nJika tidak ada kata kunci spesifik, laporan otomatis masuk *VIT*.",
 	},
 }
 
@@ -54,6 +54,8 @@ func (uc *GetHelpUsecase) Execute() string {
 📌 /lapor-kemarin or #lapor-kemarin — laporan khusus hari kemarin (max 3x/hari)
 ❌ /cancel or #cancel — batalkan laporan terakhir hari ini
 🧹 /cancel-all or #cancel-all — batalkan semua laporan hari ini
+❌ /cancel sidequest or #cancel sidequest — batalkan side quest terakhir hari ini
+🧹 /cancel-all sidequest or #cancel-all sidequest — batalkan semua side quest hari ini
 📚 /tutorial or #tutorial — panduan lengkap penggunaan bot
 ❓ /help or #help — list command ini
 
@@ -62,12 +64,12 @@ func (uc *GetHelpUsecase) Execute() string {
 
 func (uc *GetHelpUsecase) ExecuteAttributes() string {
 	msg := "⚔️ *Status RPG (Attributes)* ⚔️\n\n"
-	msg += "Setiap kali kamu `/lapor`, bot akan membaca kata kunci dari laporanmu dan memberikan atribut ke status tertentu. Berikut daftar kata kuncinya:\n\n"
-	msg += "💪 *STR (Strength)*: beban, weight, strength, gym, angkat, powerlifting, push, pull, leg\n"
-	msg += "🏃‍♂️ *STA (Stamina)*: lari, run, running, sepeda, cycle, hiit, kardio, cardio, renang, swim\n"
-	msg += "⚡ *AGI (Agility)*: bola, futsal, basket, bulutangkis, tenis, sprint, muaythai, boxing, calisthenics, padel, padle\n"
-	msg += "🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, recovery, jalan, walk, meditasi\n\n"
-	msg += "💡 *Tips:* Jika tidak ada kata kunci di atas yang cocok dalam teks laporanmu, secara default atributmu akan otomatis masuk ke *VIT*."
+	msg += "Setiap `/lapor` valid memberi +1 ke setiap attribute yang cocok. Aturannya sama untuk semua user; XP, level, streak, dan bonus tidak mengubah nilai attribute.\n\n"
+	msg += "💪 *STR (Strength)*: gym, beban, push-up, pull-up, squat, plank, lunges, glute bridge, calf raises\n"
+	msg += "🏃‍♂️ *STA (Stamina)*: lari/jogging, sepeda, cardio, renang, hiking, tangga, jumping jacks, skipping\n"
+	msg += "⚡ *AGI (Agility)*: futsal/sepak bola, basket, badminton, tenis/padel, sprint, HIIT/tabata, boxing/muay thai, high knees, lateral shuffle\n"
+	msg += "🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, mobility, recovery, jalan santai, meditasi, breathing, balance\n\n"
+	msg += "💡 *Tips:* Jika tidak ada kata kunci di atas yang cocok, laporan otomatis masuk *VIT*."
 	return msg
 }
 

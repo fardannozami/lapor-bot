@@ -20,14 +20,22 @@ func NewCancelReportUsecase(repo domain.ReportRepository) *CancelReportUsecase {
 }
 
 func (uc *CancelReportUsecase) Execute(ctx context.Context, userID, name string) (string, error) {
-	return uc.cancelToday(ctx, userID, name, false)
+	return uc.cancelToday(ctx, userID, name, domain.ActivityKindRegularReport, false)
 }
 
 func (uc *CancelReportUsecase) ExecuteAll(ctx context.Context, userID, name string) (string, error) {
-	return uc.cancelToday(ctx, userID, name, true)
+	return uc.cancelToday(ctx, userID, name, domain.ActivityKindRegularReport, true)
 }
 
-func (uc *CancelReportUsecase) cancelToday(ctx context.Context, userID, name string, all bool) (string, error) {
+func (uc *CancelReportUsecase) ExecuteSideQuest(ctx context.Context, userID, name string) (string, error) {
+	return uc.cancelToday(ctx, userID, name, domain.ActivityKindSideQuest, false)
+}
+
+func (uc *CancelReportUsecase) ExecuteAllSideQuest(ctx context.Context, userID, name string) (string, error) {
+	return uc.cancelToday(ctx, userID, name, domain.ActivityKindSideQuest, true)
+}
+
+func (uc *CancelReportUsecase) cancelToday(ctx context.Context, userID, name string, kind string, all bool) (string, error) {
 	report, err := uc.repo.GetReport(ctx, userID)
 	if err != nil {
 		return "", err
@@ -39,36 +47,38 @@ func (uc *CancelReportUsecase) cancelToday(ctx context.Context, userID, name str
 
 	now := time.Now()
 	today := domain.GetToday(now)
-	lastReportDate := domain.GetToday(report.LastReportDate)
 
-	if !lastReportDate.Equal(today) {
-		return fmt.Sprintf("Halo %s, kamu belum laporan hari ini. Tidak ada yang perlu dibatalkan.", report.Name), nil
-	}
-
-	dates, err := uc.repo.GetUserActivityDates(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-
-	if len(dates) == 0 {
-		return fmt.Sprintf("Halo %s, tidak ada aktivitas yang tercatat.", report.Name), nil
-	}
-
-	dailyCount, err := uc.repo.GetDailyActivityCount(ctx, userID, today)
+	dailyCount, err := uc.repo.GetDailyActivityCountByKind(ctx, userID, today, kind)
 	if err != nil {
 		return "", err
 	}
 	if dailyCount == 0 {
+		return fmt.Sprintf("Halo %s, tidak menemukan %s untuk hari ini.", report.Name, cancelItemLabel(kind)), nil
+	}
+
+	if kind == domain.ActivityKindSideQuest {
+		return uc.cancelSideQuestToday(ctx, report, today, dailyCount, all)
+	}
+
+	dates, err := uc.repo.GetUserActivityDatesByKind(ctx, userID, kind)
+	if err != nil {
+		return "", err
+	}
+	if len(dates) == 0 {
+		return fmt.Sprintf("Halo %s, tidak ada aktivitas yang tercatat.", report.Name), nil
+	}
+
+	if !containsDate(dates, today) {
 		return fmt.Sprintf("Halo %s, tidak menemukan laporan untuk hari ini.", report.Name), nil
 	}
 
 	if !all && dailyCount > 1 {
-		remainingReports, err := uc.repo.DeleteLatestActivityLog(ctx, userID, today)
+		remainingReports, err := uc.repo.DeleteLatestActivityLogByKind(ctx, userID, today, kind)
 		if err != nil {
 			return "", err
 		}
 		if remainingReports == 0 {
-			return uc.cancelToday(ctx, userID, name, true)
+			return uc.cancelToday(ctx, userID, name, kind, true)
 		}
 
 		removeRepeatReportPoints(report)
@@ -89,7 +99,7 @@ func (uc *CancelReportUsecase) cancelToday(ctx context.Context, userID, name str
 		return fmt.Sprintf("Halo %s, tidak menemukan laporan untuk hari ini.", report.Name), nil
 	}
 
-	if err := uc.repo.DeleteActivityLog(ctx, userID, today); err != nil {
+	if err := uc.repo.DeleteActivityLogByKind(ctx, userID, today, kind); err != nil {
 		return "", err
 	}
 
@@ -111,6 +121,7 @@ func (uc *CancelReportUsecase) cancelToday(ctx context.Context, userID, name str
 	} else {
 		newReport = recalculateReportFromDates(userID, report.Name, remainingDates)
 	}
+	preserveNonReportFields(newReport, report)
 
 	if err := uc.repo.UpsertReport(ctx, newReport); err != nil {
 		return "", err
@@ -130,6 +141,73 @@ func (uc *CancelReportUsecase) cancelToday(ctx context.Context, userID, name str
 
 	msg += "\n_Kamu bisa lapor lagi hari ini dengan /lapor._"
 	return msg, nil
+}
+
+func (uc *CancelReportUsecase) cancelSideQuestToday(ctx context.Context, report *domain.Report, today time.Time, dailyCount int, all bool) (string, error) {
+	deletedCount := dailyCount
+	if !all && dailyCount > 1 {
+		remainingSideQuests, err := uc.repo.DeleteLatestActivityLogByKind(ctx, report.UserID, today, domain.ActivityKindSideQuest)
+		if err != nil {
+			return "", err
+		}
+		deletedCount = 1
+		decrementSideQuestCount(report, deletedCount)
+		if err := uc.repo.UpsertReport(ctx, report); err != nil {
+			return "", err
+		}
+
+		msg := fmt.Sprintf("✅ Side quest terakhir hari ini telah dibatalkan, %s.\n\n", report.Name)
+		msg += fmt.Sprintf("📌 Sisa side quest hari ini: %d/%d\n", remainingSideQuests, MaxDailySideQuests)
+		msg += fmt.Sprintf("🧩 Total side quest: %d\n", report.TotalSideQuests)
+		msg += "\nKalau ingin menghapus semua side quest hari ini, ketik /cancel-all sidequest."
+		return msg, nil
+	}
+
+	if err := uc.repo.DeleteActivityLogByKind(ctx, report.UserID, today, domain.ActivityKindSideQuest); err != nil {
+		return "", err
+	}
+	decrementSideQuestCount(report, deletedCount)
+	if err := uc.repo.UpsertReport(ctx, report); err != nil {
+		return "", err
+	}
+
+	msg := fmt.Sprintf("✅ Semua side quest hari ini telah dibatalkan, %s.\n\n", report.Name)
+	if !all {
+		msg = fmt.Sprintf("✅ Side quest hari ini telah dibatalkan, %s.\n\n", report.Name)
+	}
+	msg += fmt.Sprintf("🧩 Total side quest: %d\n", report.TotalSideQuests)
+	msg += "\n_Kamu bisa lapor side quest lagi hari ini dengan /lapor sidequest._"
+	return msg, nil
+}
+
+func decrementSideQuestCount(report *domain.Report, count int) {
+	report.TotalSideQuests -= count
+	if report.TotalSideQuests < 0 {
+		report.TotalSideQuests = 0
+	}
+	report.SeasonalSideQuests -= count
+	if report.SeasonalSideQuests < 0 {
+		report.SeasonalSideQuests = 0
+	}
+}
+
+func cancelItemLabel(kind string) string {
+	if kind == domain.ActivityKindSideQuest {
+		return "side quest"
+	}
+	return "laporan"
+}
+
+func preserveNonReportFields(next, current *domain.Report) {
+	next.JobClass = current.JobClass
+	next.StreakFreezes = current.StreakFreezes
+	next.GoalsCompleted = current.GoalsCompleted
+	next.TotalSideQuests = current.TotalSideQuests
+	next.SeasonalSideQuests = current.SeasonalSideQuests
+	next.Str = current.Str
+	next.Sta = current.Sta
+	next.Agi = current.Agi
+	next.Vit = current.Vit
 }
 
 func removeRepeatReportPoints(report *domain.Report) {
@@ -153,6 +231,15 @@ func removeDate(dates []time.Time, target time.Time) []time.Time {
 		}
 	}
 	return result
+}
+
+func containsDate(dates []time.Time, target time.Time) bool {
+	for _, d := range dates {
+		if d.Equal(target) {
+			return true
+		}
+	}
+	return false
 }
 
 func recalculateReportFromDates(userID, name string, dates []time.Time) *domain.Report {

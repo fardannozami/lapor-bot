@@ -170,6 +170,23 @@ func FormatJobClass(id string) string {
 	return fmt.Sprintf("%s %s", job.Name, job.Icon)
 }
 
+// JobClassPrimaryAttribute returns the attribute specialty used for daily
+// side-quest rotation. Mage stays mixed by returning an empty attribute.
+func JobClassPrimaryAttribute(jobClass string) AttributeType {
+	switch strings.ToLower(strings.TrimSpace(jobClass)) {
+	case "fighter":
+		return AttrStr
+	case "ranger":
+		return AttrSta
+	case "assassin":
+		return AttrAgi
+	case "tank", "healer", "necromancer":
+		return AttrVit
+	default:
+		return ""
+	}
+}
+
 // GetNextLevel returns the next level and how many points are needed, or nil if max level.
 func GetNextLevel(totalPoints int) (*Level, int) {
 	for _, l := range AllLevels {

@@ -10,15 +10,18 @@ import (
 
 type cancelReportRepoStub struct {
 	domain.ReportRepository
-	report         *domain.Report
-	dates          []time.Time
-	deletedLog     bool
-	deletedLogDate time.Time
-	latestDeleted  bool
-	dailyCount     int
-	remainingCount int
-	deletedReport  bool
-	upsertedReport *domain.Report
+	report           *domain.Report
+	dates            []time.Time
+	datesByKind      map[string][]time.Time
+	deletedLog       bool
+	deletedLogDate   time.Time
+	deletedLogKind   string
+	latestDeleted    bool
+	dailyCount       int
+	dailyCountByKind map[string]int
+	remainingCount   int
+	deletedReport    bool
+	upsertedReport   *domain.Report
 }
 
 func (r *cancelReportRepoStub) GetReport(ctx context.Context, userID string) (*domain.Report, error) {
@@ -66,10 +69,29 @@ func (r *cancelReportRepoStub) GetUserActivityDates(ctx context.Context, userID 
 	return r.dates, nil
 }
 
+func (r *cancelReportRepoStub) GetUserActivityDatesByKind(ctx context.Context, userID string, kind string) ([]time.Time, error) {
+	if r.datesByKind != nil {
+		return r.datesByKind[kind], nil
+	}
+	return r.dates, nil
+}
+
 func (r *cancelReportRepoStub) DeleteActivityLog(ctx context.Context, userID string, activityDate time.Time) error {
 	r.deletedLog = true
 	r.deletedLogDate = activityDate
 	r.dailyCount = 0
+	return nil
+}
+
+func (r *cancelReportRepoStub) DeleteActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) error {
+	r.deletedLog = true
+	r.deletedLogDate = activityDate
+	r.deletedLogKind = kind
+	if r.dailyCountByKind != nil {
+		r.dailyCountByKind[kind] = 0
+	} else {
+		r.dailyCount = 0
+	}
 	return nil
 }
 
@@ -80,6 +102,24 @@ func (r *cancelReportRepoStub) DeleteLatestActivityLog(ctx context.Context, user
 		r.dailyCount--
 	}
 	r.remainingCount = r.dailyCount
+	return r.remainingCount, nil
+}
+
+func (r *cancelReportRepoStub) DeleteLatestActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) (int, error) {
+	r.latestDeleted = true
+	r.deletedLogDate = activityDate
+	r.deletedLogKind = kind
+	if r.dailyCountByKind != nil {
+		if r.dailyCountByKind[kind] > 0 {
+			r.dailyCountByKind[kind]--
+		}
+		r.remainingCount = r.dailyCountByKind[kind]
+	} else {
+		if r.dailyCount > 0 {
+			r.dailyCount--
+		}
+		r.remainingCount = r.dailyCount
+	}
 	return r.remainingCount, nil
 }
 
@@ -101,6 +141,13 @@ func (r *cancelReportRepoStub) GetStravaAccountByUserID(ctx context.Context, use
 }
 
 func (r *cancelReportRepoStub) GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error) {
+	return r.dailyCount, nil
+}
+
+func (r *cancelReportRepoStub) GetDailyActivityCountByKind(ctx context.Context, userID string, date time.Time, kind string) (int, error) {
+	if r.dailyCountByKind != nil {
+		return r.dailyCountByKind[kind], nil
+	}
 	return r.dailyCount, nil
 }
 
@@ -162,7 +209,7 @@ func TestCancelReport_NotToday(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if msg != "Halo Budi, kamu belum laporan hari ini. Tidak ada yang perlu dibatalkan." {
+	if msg != "Halo Budi, tidak menemukan laporan untuk hari ini." {
 		t.Fatalf("unexpected message: %s", msg)
 	}
 	if repo.deletedLog {
@@ -177,7 +224,8 @@ func TestCancelReport_NoActivityDates(t *testing.T) {
 			Name:           "Budi",
 			LastReportDate: time.Now(),
 		},
-		dates: []time.Time{},
+		dates:      []time.Time{},
+		dailyCount: 1,
 	}
 	uc := NewCancelReportUsecase(repo)
 
@@ -201,7 +249,8 @@ func TestCancelReport_TodayNotInDates(t *testing.T) {
 			Name:           "Budi",
 			LastReportDate: time.Now(),
 		},
-		dates: []time.Time{yesterday},
+		dates:      []time.Time{yesterday},
+		dailyCount: 1,
 	}
 	uc := NewCancelReportUsecase(repo)
 
@@ -316,5 +365,125 @@ func TestCancelReport_MultipleDays_Recalculates(t *testing.T) {
 
 	if msg == "" {
 		t.Fatal("message should not be empty")
+	}
+}
+
+func TestCancelReport_DeletesOnlyRegularReportKind(t *testing.T) {
+	today := domain.GetToday(time.Now())
+	repo := &cancelReportRepoStub{
+		report: &domain.Report{
+			UserID:             "user1",
+			Name:               "Budi",
+			JobClass:           "fighter",
+			LastReportDate:     time.Now(),
+			ActivityCount:      1,
+			TotalPoints:        10,
+			TotalSideQuests:    2,
+			SeasonalSideQuests: 2,
+			Str:                7,
+		},
+		datesByKind: map[string][]time.Time{
+			domain.ActivityKindRegularReport: {today},
+			domain.ActivityKindSideQuest:     {today},
+		},
+		dailyCountByKind: map[string]int{
+			domain.ActivityKindRegularReport: 1,
+			domain.ActivityKindSideQuest:     2,
+		},
+	}
+	uc := NewCancelReportUsecase(repo)
+
+	_, err := uc.Execute(context.Background(), "user1", "Budi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.deletedLogKind != domain.ActivityKindRegularReport {
+		t.Fatalf("expected regular report delete, got %q", repo.deletedLogKind)
+	}
+	if repo.dailyCountByKind[domain.ActivityKindSideQuest] != 2 {
+		t.Fatalf("sidequest count should not change, got %d", repo.dailyCountByKind[domain.ActivityKindSideQuest])
+	}
+	if repo.upsertedReport.TotalSideQuests != 2 {
+		t.Fatalf("sidequest total should be preserved, got %d", repo.upsertedReport.TotalSideQuests)
+	}
+	if repo.upsertedReport.JobClass != "fighter" || repo.upsertedReport.Str != 7 {
+		t.Fatalf("non-report fields should be preserved, got job=%q str=%d", repo.upsertedReport.JobClass, repo.upsertedReport.Str)
+	}
+}
+
+func TestCancelSideQuest_DeletesOnlyLatestSideQuestKind(t *testing.T) {
+	today := domain.GetToday(time.Now())
+	repo := &cancelReportRepoStub{
+		report: &domain.Report{
+			UserID:             "user1",
+			Name:               "Budi",
+			LastReportDate:     time.Now(),
+			ActivityCount:      3,
+			TotalSideQuests:    2,
+			SeasonalSideQuests: 2,
+		},
+		dailyCountByKind: map[string]int{
+			domain.ActivityKindRegularReport: 1,
+			domain.ActivityKindSideQuest:     2,
+		},
+	}
+	uc := NewCancelReportUsecase(repo)
+
+	msg, err := uc.ExecuteSideQuest(context.Background(), "user1", "Budi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !repo.latestDeleted {
+		t.Fatal("DeleteLatestActivityLogByKind should be called")
+	}
+	if !repo.deletedLogDate.Equal(today) {
+		t.Fatalf("expected delete date %v, got %v", today, repo.deletedLogDate)
+	}
+	if repo.deletedLogKind != domain.ActivityKindSideQuest {
+		t.Fatalf("expected sidequest delete, got %q", repo.deletedLogKind)
+	}
+	if repo.dailyCountByKind[domain.ActivityKindRegularReport] != 1 {
+		t.Fatalf("regular report count should not change, got %d", repo.dailyCountByKind[domain.ActivityKindRegularReport])
+	}
+	if repo.upsertedReport.TotalSideQuests != 1 {
+		t.Fatalf("expected TotalSideQuests=1, got %d", repo.upsertedReport.TotalSideQuests)
+	}
+	if repo.upsertedReport.ActivityCount != 3 {
+		t.Fatalf("regular ActivityCount should not change, got %d", repo.upsertedReport.ActivityCount)
+	}
+	if msg == "" {
+		t.Fatal("message should not be empty")
+	}
+}
+
+func TestCancelAllSideQuest_DeletesOnlySideQuestKind(t *testing.T) {
+	repo := &cancelReportRepoStub{
+		report: &domain.Report{
+			UserID:             "user1",
+			Name:               "Budi",
+			LastReportDate:     time.Now(),
+			ActivityCount:      3,
+			TotalSideQuests:    2,
+			SeasonalSideQuests: 2,
+		},
+		dailyCountByKind: map[string]int{
+			domain.ActivityKindRegularReport: 1,
+			domain.ActivityKindSideQuest:     2,
+		},
+	}
+	uc := NewCancelReportUsecase(repo)
+
+	_, err := uc.ExecuteAllSideQuest(context.Background(), "user1", "Budi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.deletedLogKind != domain.ActivityKindSideQuest {
+		t.Fatalf("expected sidequest delete, got %q", repo.deletedLogKind)
+	}
+	if repo.dailyCountByKind[domain.ActivityKindRegularReport] != 1 {
+		t.Fatalf("regular report count should not change, got %d", repo.dailyCountByKind[domain.ActivityKindRegularReport])
+	}
+	if repo.upsertedReport.TotalSideQuests != 0 {
+		t.Fatalf("expected TotalSideQuests=0, got %d", repo.upsertedReport.TotalSideQuests)
 	}
 }
