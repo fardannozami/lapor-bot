@@ -21,6 +21,7 @@ const (
 	ReportEventLedgerMonth = time.June
 	ReportEventLedgerDay   = 24
 	AttributeGainPerReport = 1
+	jobSetupURL            = "https://lapor-bot.web.id/"
 )
 
 type typedActivityRepository interface {
@@ -276,13 +277,12 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 			activityForParse += " " + ex
 		}
 	}
-	attrs, attrOK := domain.ResolveReportAttributes(activityForParse, report.JobClass)
-	if !attrOK {
-		msg := "⚠️ *Sistem Atribut Belum Aktif!*\n\nKamu belum memilih Job. Pilih job dulu agar atribut bisa aktif saat melapor tanpa aktivitas spesifik.\nPilih job via web dashboard: https://lapor-bot.web.id/\n\nAtau tulis aktivitas spesifik agar atribut terdeteksi otomatis (contoh: /lapor lari 5km, /lapor push up 50x). 💪"
-		msg += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
-		return msg, nil
+	attributesActive := hasSelectedJob(report)
+	var statGains []string
+	if attributesActive {
+		attrs, _ := domain.ResolveReportAttributes(activityForParse, report.JobClass)
+		statGains = applyAttributeGains(report, attrs, AttributeGainPerReport)
 	}
-	statGains := applyAttributeGains(report, attrs, AttributeGainPerReport)
 
 	var newAchievements []domain.Achievement
 	var comebackAchievements []domain.ComebackAchievement
@@ -401,6 +401,9 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 			response += fmt.Sprintf("\n🧭 Job: %s", domain.FormatJobClass(report.JobClass))
 		}
 	}
+	if !attributesActive {
+		response += "\n\n" + formatJobSetupNotice()
+	}
 
 	if isFullReport && report.ActivityCount == 1 && report.CenturionCycles > 0 && !isComeback {
 		response = "🔥 *ERA BARU DIMULAI!* 🔥\n" +
@@ -471,7 +474,9 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 
 	response += fmt.Sprintf("\n%s", domain.FormatNumericLevelProgressBar(report.TotalPoints))
 	response += fmt.Sprintf("\n%s", domain.FormatProgressBar(report.TotalPoints))
-	response += fmt.Sprintf("\n\n%s", formatCurrentAttributes(report))
+	if attributesActive {
+		response += fmt.Sprintf("\n\n%s", formatCurrentAttributes(report))
+	}
 
 	return response, nil
 }
@@ -617,13 +622,12 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 			activityForParse += " " + ex
 		}
 	}
-	attrs, attrOK := domain.ResolveReportAttributes(activityForParse, report.JobClass)
-	if !attrOK {
-		msg := "⚠️ *Sistem Atribut Belum Aktif!*\n\nKamu belum memilih Job. Pilih job dulu agar atribut bisa aktif saat melapor tanpa aktivitas spesifik.\nPilih job via web dashboard: https://lapor-bot.web.id/\n\nAtau tulis aktivitas spesifik agar atribut terdeteksi otomatis (contoh: /lapor-kemarin lari 5km). 💪"
-		msg += fmt.Sprintf("\n\n💬 _\"%s\"_", RandomQuote())
-		return msg, nil
+	attributesActive := hasSelectedJob(report)
+	var statGains []string
+	if attributesActive {
+		attrs, _ := domain.ResolveReportAttributes(activityForParse, report.JobClass)
+		statGains = applyAttributeGains(report, attrs, AttributeGainPerReport)
 	}
-	statGains := applyAttributeGains(report, attrs, AttributeGainPerReport)
 
 	newAchievements := domain.CheckNewSeasonAchievements(report)
 	pointsGained := 0
@@ -717,6 +721,9 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 			response += fmt.Sprintf("\n🧭 Job: %s", domain.FormatJobClass(report.JobClass))
 		}
 	}
+	if !attributesActive {
+		response += "\n\n" + formatJobSetupNotice()
+	}
 
 	if report.ActivityCount == 1 && report.CenturionCycles > 0 && !isComeback {
 		response = "🔥 *ERA BARU DIMULAI!* 🔥\n" +
@@ -781,7 +788,9 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 
 	response += fmt.Sprintf("\n%s", domain.FormatNumericLevelProgressBar(report.TotalPoints))
 	response += fmt.Sprintf("\n%s", domain.FormatProgressBar(report.TotalPoints))
-	response += fmt.Sprintf("\n\n%s", formatCurrentAttributes(report))
+	if attributesActive {
+		response += fmt.Sprintf("\n\n%s", formatCurrentAttributes(report))
+	}
 
 	return response, nil
 }
@@ -933,6 +942,14 @@ func applyAttributeGains(report *domain.Report, attrs []domain.AttributeType, st
 		}
 	}
 	return statGains
+}
+
+func hasSelectedJob(report *domain.Report) bool {
+	return report != nil && strings.TrimSpace(report.JobClass) != ""
+}
+
+func formatJobSetupNotice() string {
+	return fmt.Sprintf("ℹ️ Atribut belum ditampilkan karena kamu belum memilih job. Laporan tetap masuk; setup job di dashboard agar atribut aktif: %s", jobSetupURL)
 }
 
 func formatCurrentAttributes(report *domain.Report) string {
