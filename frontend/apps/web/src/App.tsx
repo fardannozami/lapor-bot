@@ -10,7 +10,7 @@ import {
 	Moon,
 	LogIn,
 } from "lucide-react";
-import { useReports } from "@lapor-bot/shared";
+import { useReports, useAuth } from "@lapor-bot/shared";
 import type { EnrichedReport } from "@lapor-bot/shared";
 import { StatsOverview } from "./components/StatsOverview";
 import { LeaderboardTable } from "./components/LeaderboardTable";
@@ -33,6 +33,7 @@ function getInitialTheme(): Theme {
 function App() {
 	const { summary, hunters, loading, refreshing, error, refresh } =
 		useReports();
+	const { user: authUser, token, logout } = useAuth();
 	const [selectedHunter, setSelectedHunter] = useState<EnrichedReport | null>(
 		null,
 	);
@@ -41,6 +42,18 @@ function App() {
 	const [cardPage, setCardPage] = useState(1);
 	const [page, setPage] = useState<Page>("dashboard");
 	const [personalUser, setPersonalUser] = useState<EnrichedReport | null>(null);
+
+	// Sync personalUser with auth state on mount / token change
+	useEffect(() => {
+		if (authUser && token) {
+			setPersonalUser(authUser);
+		} else {
+			setPersonalUser(null);
+			if (page === "personal" || page === "profile-setup") {
+				setPage("dashboard");
+			}
+		}
+	}, [authUser, token]);
 
 	const seasonTitle = summary
 		? `SWEG Healthy Club - Season ${summary.current_season}`
@@ -128,14 +141,25 @@ function App() {
 						{theme === "dark" ? "Dark" : "Light"}
 					</button>
 
-					<button
-						type="button"
-						onClick={() => setPage("login")}
-						className="flex items-center gap-2 px-3 py-2 rounded-xl bg-system-blue/10 hover:bg-system-blue/20 border border-system-blue/30 font-mono text-xs text-system-blue hover:text-white transition-colors"
-					>
-						<LogIn size={14} />
-						Masuk
-					</button>
+					{personalUser ? (
+						<button
+							type="button"
+							onClick={() => setPage("personal")}
+							className="flex items-center gap-2 px-3 py-2 rounded-xl bg-system-green/10 hover:bg-system-green/20 border border-system-green/30 font-mono text-xs text-system-green hover:text-white transition-colors"
+						>
+							<LogIn size={14} />
+							{personalUser.name || 'Profil'}
+						</button>
+					) : (
+						<button
+							type="button"
+							onClick={() => setPage("login")}
+							className="flex items-center gap-2 px-3 py-2 rounded-xl bg-system-blue/10 hover:bg-system-blue/20 border border-system-blue/30 font-mono text-xs text-system-blue hover:text-white transition-colors"
+						>
+							<LogIn size={14} />
+							Masuk
+						</button>
+					)}
 
 					<button
 						onClick={() => refresh()}
@@ -168,6 +192,7 @@ function App() {
 					<PersonalPage
 						user={personalUser}
 						onLogout={() => {
+							logout();
 							setPersonalUser(null);
 							setPage("dashboard");
 						}}
@@ -183,6 +208,7 @@ function App() {
 							setPage("personal");
 						}}
 						onBack={() => {
+							logout();
 							setPersonalUser(null);
 							setPage("login");
 						}}
