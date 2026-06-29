@@ -1,12 +1,29 @@
+export type GetTokenFn = () => string | null;
+export type OnUnauthorizedFn = () => void;
+
 export class HttpClient {
   protected baseURL: string;
+  private getToken: GetTokenFn;
+  private onUnauthorized?: OnUnauthorizedFn;
 
-  constructor(baseURL: string = '') {
+  constructor(baseURL: string = '', getToken: GetTokenFn = () => null, onUnauthorized?: OnUnauthorizedFn) {
     this.baseURL = baseURL;
+    this.getToken = getToken;
+    this.onUnauthorized = onUnauthorized;
+  }
+
+  private authHeaders(): Record<string, string> {
+    const token = this.getToken();
+    if (token) return { Authorization: `Bearer ${token}` };
+    return {};
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
     if (response.ok) return response.json() as Promise<T>;
+
+    if (response.status === 401) {
+      this.onUnauthorized?.();
+    }
 
     let message: string;
     try {
@@ -19,14 +36,16 @@ export class HttpClient {
   }
 
   protected async get<T>(path: string): Promise<T> {
-    const response = await fetch(`${this.baseURL}${path}`);
+    const response = await fetch(`${this.baseURL}${path}`, {
+      headers: { ...this.authHeaders() },
+    });
     return this.handleResponse<T>(response);
   }
 
   protected async post<T>(path: string, body: unknown): Promise<T> {
     const response = await fetch(`${this.baseURL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
       body: JSON.stringify(body),
     });
     return this.handleResponse<T>(response);
@@ -35,11 +54,9 @@ export class HttpClient {
   protected async patch<T>(path: string, body: unknown): Promise<T> {
     const response = await fetch(`${this.baseURL}${path}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
       body: JSON.stringify(body),
     });
     return this.handleResponse<T>(response);
   }
-
-  // Add PUT, DELETE as needed in the future
 }

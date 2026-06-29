@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useRepositories } from '../providers/RepositoryProvider';
+import { useAuthContext } from '../providers/AuthProvider';
 import type { EnrichedReport } from '../types';
 
 export const useAuth = () => {
-  const { auth } = useRepositories();
+  const { login: ctxLogin, logout, user, token, isLoading: ctxLoading } = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -11,8 +11,8 @@ export const useAuth = () => {
     setLoading(true);
     setError(null);
     try {
-      const user = await auth.login(phone);
-      return user;
+      const profile = await ctxLogin(phone);
+      return profile;
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -25,5 +25,5 @@ export const useAuth = () => {
     }
   };
 
-  return { login, loading, error };
+  return { login, logout, user, token, loading: loading || ctxLoading, error };
 };
