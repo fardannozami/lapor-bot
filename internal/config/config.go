@@ -23,6 +23,8 @@ type Config struct {
 	StravaClientSecret    string
 	StravaVerifyToken     string
 	AppBaseURL            string
+	JWTSecret             string
+	JWTExpiryHours        int
 }
 
 func Load() Config {
@@ -41,6 +43,12 @@ func Load() Config {
 	stravaClientSecret := getenv("STRAVA_CLIENT_SECRET", "")
 	stravaVerifyToken := getenv("STRAVA_VERIFY_TOKEN", "")
 	appBaseURL := getenv("APP_BASE_URL", "http://localhost:8080")
+	jwtSecret := getenv("JWT_SECRET", "")
+	jwtExpiryHours := getenvInt("JWT_EXPIRY_HOURS", 24)
+
+	if jwtSecret == "" {
+		log.Println("WARNING: JWT_SECRET is not set. Generate one with: openssl rand -hex 32")
+	}
 
 	return Config{
 		Port:                  port,
@@ -57,6 +65,8 @@ func Load() Config {
 		StravaClientSecret:    stravaClientSecret,
 		StravaVerifyToken:     stravaVerifyToken,
 		AppBaseURL:            appBaseURL,
+		JWTSecret:             jwtSecret,
+		JWTExpiryHours:        jwtExpiryHours,
 	}
 }
 

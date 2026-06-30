@@ -33,7 +33,6 @@ const STEPS = [
 
 export function ProfileSetup({ user, onComplete, onBack }: ProfileSetupProps) {
 	const { reports: repo } = useRepositories();
-	const phone = user.user_id;
 
 	const [step, setStep] = useState<1 | 2 | 3>(1);
 	const [name, setName] = useState(user.name ?? "");
@@ -74,7 +73,7 @@ export function ProfileSetup({ user, onComplete, onBack }: ProfileSetupProps) {
 		setError(null);
 		setLoading(true);
 		try {
-			await repo.updateName(phone, trimmed);
+			await repo.updateName(trimmed);
 			setStep(2);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Gagal memperbarui nama");
@@ -88,7 +87,7 @@ export function ProfileSetup({ user, onComplete, onBack }: ProfileSetupProps) {
 		setLoading(true);
 		try {
 			if (selectedJobId) {
-				await repo.selectJob(phone, selectedJobId);
+				await repo.selectJob(selectedJobId);
 			}
 			setStep(3);
 		} catch (err) {
@@ -106,8 +105,8 @@ export function ProfileSetup({ user, onComplete, onBack }: ProfileSetupProps) {
 		setError(null);
 		setLoading(true);
 		try {
-			await repo.setGoal(phone, targetDays, activity.trim() || "Olahraga");
-			const refreshedUser = await repo.fetchUserByPhone(phone);
+			await repo.setGoal(targetDays, activity.trim() || "Olahraga");
+			const refreshedUser = await repo.fetchUser();
 			onComplete(refreshedUser);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Gagal menyimpan goal");

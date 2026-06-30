@@ -102,7 +102,6 @@ export function PersonalPage({
 	onUserRefresh,
 }: PersonalPageProps) {
 	const { reports: repo } = useRepositories();
-	const phone = user.user_id;
 
 	// inline edit states
 	const [editingName, setEditingName] = useState(false);
@@ -143,7 +142,7 @@ export function PersonalPage({
 
 		for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
 			try {
-				const refreshed = await repo.fetchUserByPhone(phone);
+				const refreshed = await repo.fetchUser();
 				setLocalUser(refreshed);
 				onUserRefresh?.(refreshed);
 				return;
@@ -243,7 +242,7 @@ export function PersonalPage({
 												setNameLoading(true);
 												setNameError(null);
 												try {
-													await repo.updateName(phone, v);
+													await repo.updateName(v);
 													await refreshUser();
 													setEditingName(false);
 												} catch (e: any) {
@@ -589,15 +588,7 @@ export function PersonalPage({
 												setResetLoading(true);
 												setGoalError(null);
 												try {
-													if ((repo as any).resetGoal) {
-														await (repo as any).resetGoal(phone);
-													} else {
-														await fetch("/api/user/goal", {
-															method: "POST",
-															headers: { "Content-Type": "application/json" },
-															body: JSON.stringify({ phone, action: "reset" }),
-														});
-													}
+													await repo.resetGoal!();
 													await refreshUser();
 												} catch (e: any) {
 													setGoalError(e?.message || "Gagal reset goal");
@@ -686,7 +677,6 @@ export function PersonalPage({
 														if (startDate) startPayload.startDate = startDate;
 														if (startHour || startHour === 0) startPayload.startHour = startHour;
 														await repo.setGoal(
-															phone,
 															targetDays,
 															activity || "Olahraga",
 															startPayload,
@@ -1026,7 +1016,7 @@ export function PersonalPage({
 					setJobLoading(true);
 					setJobError(null);
 					try {
-						await repo.selectJob(phone, jobId);
+						await repo.selectJob(jobId);
 						await refreshUser();
 						setShowJobModal(false);
 					} catch (e: any) {

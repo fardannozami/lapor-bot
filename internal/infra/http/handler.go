@@ -19,25 +19,28 @@ import (
 	"github.com/fardannozami/whatsapp-gateway/internal/app/usecase"
 	"github.com/fardannozami/whatsapp-gateway/internal/config"
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
-	"github.com/fardannozami/whatsapp-gateway/internal/domain/phone"
 	"go.mau.fi/whatsmeow"
 )
 
 type Server struct {
-	repo        domain.ReportRepository
-	linkUC      *usecase.LinkStravaUsecase
-	processUC   *usecase.ProcessStravaWebhookUsecase
-	waClient    *whatsmeow.Client
-	verifyToken string
+	repo           domain.ReportRepository
+	linkUC         *usecase.LinkStravaUsecase
+	processUC      *usecase.ProcessStravaWebhookUsecase
+	waClient       *whatsmeow.Client
+	verifyToken    string
+	jwtSecret      string
+	jwtExpiryHours int
 }
 
 func NewServer(repo domain.ReportRepository, linkUC *usecase.LinkStravaUsecase, processUC *usecase.ProcessStravaWebhookUsecase, waClient *whatsmeow.Client, cfg config.Config) *Server {
 	return &Server{
-		repo:        repo,
-		linkUC:      linkUC,
-		processUC:   processUC,
-		waClient:    waClient,
-		verifyToken: cfg.StravaVerifyToken,
+		repo:           repo,
+		linkUC:         linkUC,
+		processUC:      processUC,
+		waClient:       waClient,
+		verifyToken:    cfg.StravaVerifyToken,
+		jwtSecret:      cfg.JWTSecret,
+		jwtExpiryHours: cfg.JWTExpiryHours,
 	}
 }
 
@@ -49,13 +52,16 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api/leaderboard", s.HandleLeaderboard)
 	mux.HandleFunc("/api/summary", s.HandleSummary)
 	mux.HandleFunc("/api/motivation", s.HandleMotivation)
-	mux.HandleFunc("/api/user", s.HandleGetUser)
-	mux.HandleFunc("PATCH /api/user/name", s.HandleUpdateName)
-	mux.HandleFunc("PATCH /api/user/job", s.HandleSelectJob)
-	mux.HandleFunc("PATCH /api/user/goal", s.HandleSetGoal)
 	mux.HandleFunc("GET /api/jobs", s.HandleListJobs)
-	mux.HandleFunc("POST /api/user", s.HandleGetUserByPhone)
 	mux.HandleFunc("/", s.HandleStatic)
+
+	mux.HandleFunc("POST /api/auth/login", s.HandleLogin)
+
+	mux.HandleFunc("GET /api/user", s.AuthMiddleware(s.HandleGetUser))
+	mux.HandleFunc("POST /api/user", s.AuthMiddleware(s.HandleGetUserByPhone))
+	mux.HandleFunc("PATCH /api/user/name", s.AuthMiddleware(s.HandleUpdateName))
+	mux.HandleFunc("PATCH /api/user/job", s.AuthMiddleware(s.HandleSelectJob))
+	mux.HandleFunc("PATCH /api/user/goal", s.AuthMiddleware(s.HandleSetGoal))
 }
 
 func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
@@ -575,8 +581,8 @@ func enrichReportWithMasking(r *domain.Report, today time.Time, weekActivity []b
 
 func (s *Server) writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
@@ -711,10 +717,9 @@ func (s *Server) HandleGetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawPhone := r.URL.Query().Get("phone")
-	normalized, err := phone.Normalize(rawPhone)
-	if err != nil {
-		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
+	normalized, ok := UserIDFromContext(r.Context())
+	if !ok {
+		s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 		return
 	}
 
@@ -777,18 +782,17 @@ func (s *Server) HandleUpdateName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body struct {
-		Phone string `json:"phone"`
-		Name  string `json:"name"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Body tidak valid"})
+	normalized, ok := UserIDFromContext(r.Context())
+	if !ok {
+		s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 		return
 	}
 
-	normalized, err := phone.Normalize(body.Phone)
-	if err != nil {
-		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Body tidak valid"})
 		return
 	}
 
@@ -807,18 +811,17 @@ func (s *Server) HandleSelectJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	normalized, ok := UserIDFromContext(r.Context())
+	if !ok {
+		s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
 	var body struct {
-		Phone string `json:"phone"`
 		JobID string `json:"job_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Body tidak valid"})
-		return
-	}
-
-	normalized, err := phone.Normalize(body.Phone)
-	if err != nil {
-		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
 		return
 	}
 
@@ -837,8 +840,13 @@ func (s *Server) HandleSetGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	normalized, ok := UserIDFromContext(r.Context())
+	if !ok {
+		s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
 	var body struct {
-		Phone      string `json:"phone"`
 		TargetDays string `json:"target_days"`
 		Activity   string `json:"activity"`
 		Action     string `json:"action,omitempty"` // "reset"
@@ -849,12 +857,6 @@ func (s *Server) HandleSetGoal(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Body tidak valid"})
-		return
-	}
-
-	normalized, err := phone.Normalize(body.Phone)
-	if err != nil {
-		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
 		return
 	}
 
@@ -962,17 +964,9 @@ func (s *Server) HandleGetUserByPhone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body struct {
-		Phone string `json:"phone"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Body tidak valid"})
-		return
-	}
-
-	normalized, err := phone.Normalize(body.Phone)
-	if err != nil {
-		s.writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Nomor telepon tidak valid"})
+	normalized, ok := UserIDFromContext(r.Context())
+	if !ok {
+		s.writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 		return
 	}
 
@@ -1032,8 +1026,8 @@ func (s *Server) HandleGetUserByPhone(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
