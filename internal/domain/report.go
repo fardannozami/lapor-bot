@@ -158,6 +158,68 @@ func ResolveReportAttributes(text string, jobClass string) ([]AttributeType, boo
 	return nil, false
 }
 
+// SelectReportAttribute picks the single attribute that should actually be
+// rewarded for a report, given the activity-matched attributes and the user's
+// job. This keeps the attribute grant FAIR and CONSISTENT across reports:
+//
+//   - Every report grants the same total attribute budget (one attribute),
+//     regardless of how many categories the activity text happens to match.
+//     Without this, a mixed session ("gym lalu lari dan stretching") would
+//     grant +1 to each of STR/STA/VIT while a focused session grants only +1,
+//     making some workouts worth several times the attribute points of others.
+//   - The activity directs the reward (a run still boosts STA, not STR), so
+//     the grant reflects the sport that was reported.
+//   - The job acts as a tie-breaker when several attributes match (the hunter's
+//     specialty wins among the matches), and as the fallback when nothing
+//     matches — so the user's job always shapes the gain.
+//   - Jobs with no single primary attribute (Mage) distribute the gain across
+//     the matched attributes using a stable per-report seed, instead of always
+//     defaulting to the first match (which would bias Mage gains toward STR).
+//
+// seed must be stable for a given report slot (e.g. user+date+slot+activity)
+// so the same report context always picks the same attribute, while different
+// reports spread Mage's gains evenly across its candidate attributes.
+//
+// Returns the chosen attribute, or "" if attrs is empty.
+func SelectReportAttribute(attrs []AttributeType, jobClass, seed string) AttributeType {
+	if len(attrs) == 0 {
+		return ""
+	}
+	if primary := JobClassPrimaryAttribute(jobClass); primary != "" {
+		for _, a := range attrs {
+			if a == primary {
+				return a
+			}
+		}
+		// Job's specialty is not among the matches — keep a deterministic
+		// fallback (first matched) so the result is stable per input.
+		return attrs[0]
+	}
+	// No single primary (Mage, or an unknown job): distribute fairly across
+	// the matched attributes using the stable per-report seed.
+	if len(attrs) > 1 {
+		return attrs[stableAttributeIndex(seed, len(attrs))]
+	}
+	return attrs[0]
+}
+
+// stableAttributeIndex maps a seed string to a deterministic index in [0, n).
+// Same seed always yields the same index (reproducible tests), and as the seed
+// varies across report slots the indices spread uniformly over n.
+func stableAttributeIndex(seed string, n int) int {
+	if n <= 0 {
+		return 0
+	}
+	const fnvOffset uint32 = 2166136261
+	const fnvPrime uint32 = 16777619
+	h := fnvOffset
+	for i := 0; i < len(seed); i++ {
+		h ^= uint32(seed[i])
+		h *= fnvPrime
+	}
+	return int(h % uint32(n))
+}
+
 func normalizeActivityText(text string) string {
 	text = strings.ToLower(text)
 	var b strings.Builder

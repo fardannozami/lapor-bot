@@ -22,6 +22,23 @@ const (
 	ReportEventLedgerDay   = 24
 	AttributeGainPerReport = 1
 	jobSetupURL            = "https://lapor-bot.web.id/"
+
+	// Scoring model. Base points are fixed per trigger so every user earns the
+	// same amount for the same command (lapor / lapor sidequest). Streak
+	// bonuses are additive and capped so a long streak cannot dominate the
+	// base reward (best practice: streak share stays ≤ ~30% of a report).
+	baseReportPoints         = 10
+	sideQuestFallbackPoints  = 5
+	seasonalFirstReportBonus = 5
+
+	// Weekly streak bonus is worth more per step than the daily one, but both
+	// apply additively when a user keeps both streaks alive — so a user with
+	// an active daily AND weekly streak always earns more than with either
+	// alone, while the weekly component stays the larger of the two.
+	weeklyStreakBonusPerStep = 2
+	weeklyStreakBonusCap     = 10 // max +20 pts per report from weekly streak
+	dailyStreakBonusPerStep  = 1
+	dailyStreakBonusCap      = 5  // max +5 pts per report from daily streak
 )
 
 type typedActivityRepository interface {
@@ -240,29 +257,35 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		}
 	}
 
-	basePoints := 10
-	streakBonus := 0
+	basePoints := baseReportPoints
+	weeklyStreakBonus := 0
+	dailyStreakBonus := 0
 	seasonalFirstBonus := 0
 	if isFullReport {
-		streakBonus = 2 * (report.Streak - 1)
-		if streakBonus < 0 {
-			streakBonus = 0
-		}
+		weeklyStreakBonus = cappedStreakBonus(int64(report.Streak)-1, weeklyStreakBonusCap, weeklyStreakBonusPerStep)
+		dailyStreak := uc.computeDailyStreak(ctx, userID, today)
+		dailyStreakBonus = cappedStreakBonus(int64(dailyStreak)-1, dailyStreakBonusCap, dailyStreakBonusPerStep)
 		if report.SeasonalActivityCount == 1 {
-			seasonalFirstBonus = 5
+			seasonalFirstBonus = seasonalFirstReportBonus
 		}
 	}
 	if isSideQuest {
 		if opts.sideQuestPoints > 0 {
 			basePoints = opts.sideQuestPoints
 		} else {
-			basePoints = 5 // fallback for callers that don't pass difficulty points
+			basePoints = sideQuestFallbackPoints // fallback for callers that don't pass difficulty points
 		}
-		streakBonus = 0
+		weeklyStreakBonus = 0
+		dailyStreakBonus = 0
 		seasonalFirstBonus = 0
 		report.TotalSideQuests += opts.sideQuestCount
 		report.SeasonalSideQuests += opts.sideQuestCount
 	}
+	// streakBonus is the additive sum of weekly + daily components. Weekly
+	// per-step (2) > daily per-step (1), and both caps apply, so the weekly
+	// bonus is always the larger contributor and the two stack when both
+	// streaks are active.
+	streakBonus := weeklyStreakBonus + dailyStreakBonus
 	reportPoints := basePoints + streakBonus + seasonalFirstBonus
 	if isRepeatReport && !isSideQuest {
 		reportPoints = reportPoints / 2
@@ -280,8 +303,15 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	attributesActive := hasSelectedJob(report)
 	var statGains []string
 	if attributesActive {
+		// A report grants a single, fair attribute point. The activity directs
+		// which attribute is rewarded; the job breaks ties among multiple
+		// matches and is the fallback when nothing matches. Granting +1 to
+		// every matched attribute would make mixed sessions worth several
+		// times the attribute points of focused ones.
 		attrs, _ := domain.ResolveReportAttributes(activityForParse, report.JobClass)
-		statGains = applyAttributeGains(report, attrs, AttributeGainPerReport)
+		chosen := domain.SelectReportAttribute(attrs, report.JobClass,
+			attributeSelectionSeed(userID, activityKind, today.Format(time.DateOnly), dailyCount+1, activityForParse))
+		statGains = applyAttributeGains(report, []domain.AttributeType{chosen}, AttributeGainPerReport)
 	}
 
 	var newAchievements []domain.Achievement
@@ -370,19 +400,10 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 			cyclePrefix = fmt.Sprintf("[C%d] ", report.CenturionCycles+1)
 		}
 
-		expBreakdown := fmt.Sprintf("⭐ +%d pts", basePoints)
-		if streakBonus > 0 {
-			expBreakdown += fmt.Sprintf(" (streak bonus +%d)", streakBonus)
-		}
-		if seasonalFirstBonus > 0 {
-			expBreakdown += " (first season report +5)"
-		}
-		if isSideQuest {
-			expBreakdown += " (side quest)"
-		} else if isRepeatReport {
-			expBreakdown += " (repeat report, ½ XP)"
-		}
-
+		// Only the final point result is shown; the per-component breakdown
+		// (base / weekly / daily / seasonal / repeat ½) is intentionally hidden
+		// from the user-facing message for both /lapor and /lapor sidequest.
+		expBreakdown := fmt.Sprintf("⭐ +%d pts", reportPoints)
 		if len(statGains) > 0 {
 			expBreakdown += fmt.Sprintf("\n💪 Attributes: %s", strings.Join(statGains, ", "))
 		}
@@ -503,7 +524,7 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	today := domain.GetToday(now)
 	yesterday := today.AddDate(0, 0, -1)
 
-	dailyCount, err := uc.repo.GetDailyActivityCount(ctx, userID, yesterday)
+	dailyCount, err := uc.getDailyActivityCount(ctx, userID, yesterday, domain.ActivityKindRegularReport)
 	if err != nil {
 		return "", err
 	}
@@ -600,17 +621,20 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	}
 
 	basePoints := 5
-	streakBonus := 0
+	weeklyStreakBonus := 0
 	seasonalFirstBonus := 0
 	if report.Streak > 1 {
-		streakBonus = (2 * (report.Streak - 1)) / 2
-		if streakBonus < 0 {
-			streakBonus = 0
+		// Yesterday catch-up reports earn ½ XP: halve the (already capped)
+		// weekly streak bonus so inflation stays bounded here too.
+		weeklyStreakBonus = cappedStreakBonus(int64(report.Streak)-1, weeklyStreakBonusCap, weeklyStreakBonusPerStep) / 2
+		if weeklyStreakBonus < 0 {
+			weeklyStreakBonus = 0
 		}
 	}
 	if report.SeasonalActivityCount == 1 {
 		seasonalFirstBonus = 2
 	}
+	streakBonus := weeklyStreakBonus
 	reportPoints := basePoints + streakBonus + seasonalFirstBonus
 	report.TotalPoints += reportPoints
 	report.SeasonalPoints += reportPoints
@@ -625,8 +649,15 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	attributesActive := hasSelectedJob(report)
 	var statGains []string
 	if attributesActive {
+		// A report grants a single, fair attribute point. The activity directs
+		// which attribute is rewarded; the job breaks ties among multiple
+		// matches and is the fallback when nothing matches. Granting +1 to
+		// every matched attribute would make mixed sessions worth several
+		// times the attribute points of focused ones.
 		attrs, _ := domain.ResolveReportAttributes(activityForParse, report.JobClass)
-		statGains = applyAttributeGains(report, attrs, AttributeGainPerReport)
+		chosen := domain.SelectReportAttribute(attrs, report.JobClass,
+			attributeSelectionSeed(userID, domain.ActivityKindRegularReport, yesterday.Format(time.DateOnly), dailyCount+1, activityForParse))
+		statGains = applyAttributeGains(report, []domain.AttributeType{chosen}, AttributeGainPerReport)
 	}
 
 	newAchievements := domain.CheckNewSeasonAchievements(report)
@@ -702,14 +733,10 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 			cyclePrefix = fmt.Sprintf("[C%d] ", report.CenturionCycles+1)
 		}
 
-		expBreakdown := fmt.Sprintf("⭐ +%d pts", basePoints)
-		if streakBonus > 0 {
-			expBreakdown += fmt.Sprintf(" (streak bonus +%d)", streakBonus)
-		}
-		if seasonalFirstBonus > 0 {
-			expBreakdown += " (first season report +2)"
-		}
-		expBreakdown += " (lapor kemarin, ½ XP)"
+		// Only the final point result is shown; the per-component breakdown is
+		// intentionally hidden from the user-facing message.
+		expBreakdown := fmt.Sprintf("⭐ +%d pts", reportPoints)
+		expBreakdown += " (lapor kemarin)"
 
 		if len(statGains) > 0 {
 			expBreakdown += fmt.Sprintf("\n💪 Attributes: %s", strings.Join(statGains, ", "))
@@ -866,6 +893,60 @@ func boolToInt(v bool) int {
 		return 1
 	}
 	return 0
+}
+
+// cappedStreakBonus computes a capped linear streak bonus.
+// steps is the streak length minus one (the number of "extra" periods), clamped
+// to [0, cap]; the bonus is steps * perStep. Capping prevents a long streak
+// from dominating the fixed base reward (runaway XP).
+func cappedStreakBonus(steps, cap, perStep int64) int {
+	if steps < 0 {
+		steps = 0
+	}
+	if steps > cap {
+		steps = cap
+	}
+	return int(steps * perStep)
+}
+
+// attributeSelectionSeed builds a stable, per-report-slot seed used to
+// distribute attribute gains fairly for jobs without a single primary
+// attribute (Mage). The same report context always yields the same seed, so
+// the chosen attribute is deterministic; varying the slot/date/activity
+// spreads Mage's gains across its candidate attributes over time.
+func attributeSelectionSeed(userID, kind, date string, slot int, activityText string) string {
+	return fmt.Sprintf("%s|%s|%s|%d|%s", userID, kind, date, slot, activityText)
+}
+
+// computeDailyStreak returns the number of consecutive days (ending at today)
+// the user has logged any activity. today is counted even though the
+// activity_log row for the current report is upserted after scoring, so the
+// bonus reflects the streak this report is extending.
+func (uc *ReportActivityUsecase) computeDailyStreak(ctx context.Context, userID string, today time.Time) int {
+	dates, err := uc.repo.GetUserActivityDates(ctx, userID)
+	if err != nil {
+		// Fail open: treat as the first day so we never block a report on a
+		// read error. The bonus is simply not awarded.
+		return 1
+	}
+	return dailyStreakFromDates(dates, today)
+}
+
+// dailyStreakFromDates counts consecutive calendar days ending at today,
+// including today itself. priorDates are the user's historical activity
+// dates (which do not yet contain today for the current report).
+func dailyStreakFromDates(priorDates []time.Time, today time.Time) int {
+	active := make(map[string]bool, len(priorDates)+1)
+	for _, d := range priorDates {
+		active[d.Format(time.DateOnly)] = true
+	}
+	active[today.Format(time.DateOnly)] = true
+
+	streak := 0
+	for d := today; active[d.Format(time.DateOnly)]; d = d.AddDate(0, 0, -1) {
+		streak++
+	}
+	return streak
 }
 
 func reportName(storedName, incomingName string) string {

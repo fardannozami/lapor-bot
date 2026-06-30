@@ -2,12 +2,27 @@ package usecase_test
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/app/usecase"
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
 )
+
+// allSeasonBadgeIDs returns every season achievement id joined into the stored
+// comma-separated form. Pre-seeding a report's SeasonalAchievements with this
+// prevents any season achievement from (re)firing during a test, so the
+// SeasonalPoints delta reflects only the report's own point calculation
+// (base + streak bonuses), letting tests assert exact point deltas.
+func allSeasonBadgeIDs() string {
+	ids := make([]string, 0, len(domain.AllSeasonAchievements))
+	for _, a := range domain.AllSeasonAchievements {
+		ids = append(ids, a.ID)
+	}
+	return strings.Join(ids, ",")
+}
 
 type mockRepo struct {
 	domain.ReportRepository
@@ -300,8 +315,10 @@ func TestStreak_SameDay_SecondReport(t *testing.T) {
 	if !containsSubstring(msg, "Laporan diterima (laporan ke-2 hari ini)") {
 		t.Errorf("Same day: expected repeat report message, got '%s'", msg)
 	}
-	if !containsSubstring(msg, "repeat report, ½ XP") {
-		t.Errorf("Same day: expected halved XP note, got '%s'", msg)
+	// The per-point breakdown (including the "½ XP" note) is intentionally
+	// hidden from the message; only the final total is shown.
+	if containsSubstring(msg, "½ XP") || containsSubstring(msg, "repeat report") {
+		t.Errorf("Same day: point breakdown should be hidden, got '%s'", msg)
 	}
 
 	// Values should NOT change (streak and activity count stay same)
@@ -920,6 +937,240 @@ func TestReportEventLedgerEnabled_StartsOnConfiguredDayInWIB(t *testing.T) {
 	start := time.Date(2026, time.June, 24, 0, 0, 0, 0, loc)
 	if !usecase.ReportEventLedgerEnabled(start) {
 		t.Fatalf("ledger should be enabled starting 24 Jun 2026 WIB")
+	}
+}
+
+// TestStreakBonus_DailyAndWeeklyAwardedTogether checks that a user who reports
+// on consecutive days AND consecutive weeks earns BOTH the daily and weekly
+// streak bonuses in a single /lapor, that the two stack (combined > either),
+// and that the per-component breakdown stays hidden — only the final total is
+// shown. SeasonalAchievements is pre-seeded so no achievement fires and the
+// SeasonalPoints delta equals the report's own point calculation.
+func TestStreakBonus_DailyAndWeeklyAwardedTogether(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	today := domain.GetToday(time.Now())
+	// Use a non-midnight LastReportDate so the -30m cutoff in domain.GetToday
+	// doesn't shift it across a day bound (matches existing streak tests).
+	lastWeek := time.Now().AddDate(0, 0, -7)
+	repo.reports["user1"] = &domain.Report{
+		UserID:                "user1",
+		Name:                  "Consistent",
+		JobClass:              "fighter",
+		Streak:                3,
+		MaxStreak:             5, // already past streak_4, so 3→4 doesn't re-fire it
+		SeasonalMaxStreak:     5,
+		ActivityCount:         30,
+		SeasonalActivityCount: 30,
+		SeasonalAchievements:  allSeasonBadgeIDs(), // suppress all achievement fires
+		LastReportDate:        lastWeek,
+	}
+	// Reported yesterday and the day before → daily streak after this report
+	// is 3 (today + 2 prior days) → 2 steps × 1 = +2 daily bonus.
+	repo.activityDates["user1"] = []time.Time{
+		today.AddDate(0, 0, -2), today.AddDate(0, 0, -1),
+	}
+	before := repo.reports["user1"].SeasonalPoints
+
+	msg, err := uc.Execute(ctx, "user1", "Consistent", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Weekly streak 3→4 (consecutive week): 3 steps × 2 = +6.
+	// Daily streak 3: 2 steps × 1 = +2. Base 10. Total = 18. No achievements fire.
+	gained := repo.reports["user1"].SeasonalPoints - before
+	if gained != 18 {
+		t.Fatalf("expected +18 pts (base 10 + weekly 6 + daily 2), got %d", gained)
+	}
+	if !containsSubstring(msg, "⭐ +18 pts") {
+		t.Fatalf("expected final total '⭐ +18 pts' in message, got: %s", msg)
+	}
+	// Breakdown must be hidden.
+	for _, bad := range []string{"(weekly streak", "(daily streak", "(streak bonus", "½ XP"} {
+		if containsSubstring(msg, bad) {
+			t.Fatalf("point breakdown %q should be hidden, got: %s", bad, msg)
+		}
+	}
+}
+
+// TestStreakBonus_WeeklyCappedForLongStreak ensures a very long weekly streak
+// no longer produces runaway XP. With cap=10, a streak of 11 (→12) and 50 (→51)
+// must both yield the same capped weekly bonus (max +20), not +22 / +100.
+func TestStreakBonus_WeeklyCappedForLongStreak(t *testing.T) {
+	lastWeek := time.Now().AddDate(0, 0, -7)
+
+	for _, streak := range []int{11, 50} {
+		t.Run(fmt.Sprintf("streak_%d", streak), func(t *testing.T) {
+			repo := &mockRepo{
+				reports:       make(map[string]*domain.Report),
+				dailyCounts:   make(map[string]int),
+				activityDates: make(map[string][]time.Time),
+			}
+			uc := usecase.NewReportActivityUsecase(repo)
+			ctx := context.Background()
+			repo.reports["u"] = &domain.Report{
+				UserID: "u", Name: "Vet", JobClass: "fighter",
+				Streak: streak, MaxStreak: streak, SeasonalMaxStreak: streak,
+				ActivityCount: 30, SeasonalActivityCount: 30,
+				SeasonalAchievements: allSeasonBadgeIDs(),
+				LastReportDate:        lastWeek,
+			}
+			// No daily history → daily bonus 0, isolating the weekly cap.
+			before := repo.reports["u"].SeasonalPoints
+			msg, err := uc.Execute(ctx, "u", "Vet", nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			// Both long streaks: base 10 + capped weekly 20 = +30.
+			gained := repo.reports["u"].SeasonalPoints - before
+			if gained != 30 {
+				t.Fatalf("streak %d: expected capped +30 (base 10 + weekly 20), got %d", streak, gained)
+			}
+			if containsSubstring(msg, "(weekly streak") {
+				t.Fatalf("streak %d: breakdown should be hidden, got: %s", streak, msg)
+			}
+		})
+	}
+}
+
+// TestStreakBonus_SideQuestHasNoStreakBonus verifies side quest reports pay
+// only their difficulty-based points (consistent per trigger) and receive no
+// streak bonus — so a side quest's points do not vary by the user's streak
+// state. The breakdown is also hidden.
+func TestStreakBonus_SideQuestHasNoStreakBonus(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	today := domain.GetToday(time.Now())
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Questor", JobClass: "fighter",
+		Streak: 30, MaxStreak: 30, SeasonalMaxStreak: 30,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:        today.AddDate(0, 0, -7),
+	}
+	before := repo.reports["u"].TotalPoints
+
+	msg, err := uc.ExecuteSideQuest(ctx, "u", "Questor", "Side quest: jalan kaki", 1, 5, time.Now())
+	if err != nil {
+		t.Fatalf("ExecuteSideQuest: %v", err)
+	}
+	gained := repo.reports["u"].TotalPoints - before
+	// Only the side-quest difficulty points (5) should be awarded — no streak
+	// bonus despite the user having a 30-week streak.
+	if gained != 5 {
+		t.Fatalf("side quest should earn exactly its difficulty points (5), got %d", gained)
+	}
+	for _, bad := range []string{"(weekly streak", "(daily streak", "(side quest)"} {
+		if containsSubstring(msg, bad) {
+			t.Fatalf("side quest breakdown %q should be hidden, got: %s", bad, msg)
+		}
+	}
+}
+
+// TestReportPoints_RepeatReportHalved verifies a same-day repeat /lapor earns
+// exactly half of the first report's points (the first report's daily streak
+// bonus and isFullReport-only path don't apply to repeats). Achievements are
+// suppressed so the delta equals the raw point calculation.
+func TestReportPoints_RepeatReportHalved(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Repeat", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:        time.Now().AddDate(0, 0, -7),
+	}
+
+	// First report of the day (isFullReport): base 10 + weekly (3→4, +6) = 16.
+	// No daily history → daily bonus 0.
+	before1 := repo.reports["u"].SeasonalPoints
+	if _, err := uc.Execute(ctx, "u", "Repeat", nil); err != nil {
+		t.Fatalf("first report: %v", err)
+	}
+	first := repo.reports["u"].SeasonalPoints - before1
+	if first != 16 {
+		t.Fatalf("first report: expected +16, got %d", first)
+	}
+
+	// Second report same day (isRepeatReport): halved, no streak bonuses.
+	before2 := repo.reports["u"].SeasonalPoints
+	msg, err := uc.Execute(ctx, "u", "Repeat", nil)
+	if err != nil {
+		t.Fatalf("second report: %v", err)
+	}
+	second := repo.reports["u"].SeasonalPoints - before2
+	// (base 10) / 2 = 5. Streak/ActivityCount unchanged so no bonus applies.
+	if second != 5 {
+		t.Fatalf("repeat report: expected halved +5, got %d", second)
+	}
+	if !containsSubstring(msg, "laporan ke-2 hari ini") {
+		t.Fatalf("expected repeat report label, got: %s", msg)
+	}
+	if containsSubstring(msg, "½ XP") {
+		t.Fatalf("halving breakdown should be hidden, got: %s", msg)
+	}
+}
+
+// TestReportActivity_MultiAttributeGrantsSinglePoint verifies the attribute
+// fairness fix at the usecase level: a mixed session ("gym lalu lari dan
+// stretching") that matches three attribute categories grants exactly ONE
+// attribute point (the fighter's specialty STR), not +1 to each. This keeps
+// the total attribute budget per report constant regardless of how many
+// categories the activity text touches.
+func TestReportActivity_MultiAttributeGrantsSinglePoint(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Mixed", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:        time.Now().AddDate(0, 0, -7),
+		// Start above the attribute clamp floor so a single fair grant shows
+		// as a clean +1 delta on the chosen attribute and +0 on the rest.
+		Str: 5, Sta: 5, Agi: 5, Vit: 5,
+	}
+	strBefore := repo.reports["u"].Str
+	staBefore := repo.reports["u"].Sta
+	agiBefore := repo.reports["u"].Agi
+	vitBefore := repo.reports["u"].Vit
+
+	if _, err := uc.ExecuteWithMessage(ctx, "u", "Mixed", "gym lalu lari dan stretching", nil); err != nil {
+		t.Fatalf("ExecuteWithMessage: %v", err)
+	}
+	r := repo.reports["u"]
+	// Exactly one attribute (STR, the fighter specialty among the matches)
+	// gains +1. The others must not move — the old code gave +1 to each.
+	if r.Str-strBefore != 1 {
+		t.Fatalf("STR delta = %d, want 1 (single fair grant)", r.Str-strBefore)
+	}
+	if r.Sta-staBefore != 0 || r.Agi-agiBefore != 0 || r.Vit-vitBefore != 0 {
+		t.Fatalf("other attributes must not gain: STA Δ%d AGI Δ%d VIT Δ%d, want all 0",
+			r.Sta-staBefore, r.Agi-agiBefore, r.Vit-vitBefore)
 	}
 }
 
