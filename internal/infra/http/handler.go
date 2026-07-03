@@ -53,7 +53,6 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api/summary", s.HandleSummary)
 	mux.HandleFunc("/api/motivation", s.HandleMotivation)
 	mux.HandleFunc("GET /api/jobs", s.HandleListJobs)
-	mux.HandleFunc("/api/recover-yustar", s.HandleRecoverYustar)
 	mux.HandleFunc("/", s.HandleStatic)
 
 	mux.HandleFunc("POST /api/auth/login", s.HandleLogin)
@@ -1045,18 +1044,4 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeFile(w, r, fullPath)
-}
-
-func (s *Server) HandleRecoverYustar(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
-		s.writeJSON(w, http.StatusNoContent, nil)
-		return
-	}
-
-	msg, err := s.repo.RecoverUserProgress(r.Context(), "hunter-e1ec69226d-72")
-	if err != nil {
-		s.writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-	s.writeJSON(w, http.StatusOK, map[string]string{"message": msg})
 }

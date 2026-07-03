@@ -95,14 +95,6 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{Text: text}, nil
 	}
 
-	if hasCommand(msg, "/recover-yustar") {
-		text, err := uc.reportUC.repo.RecoverUserProgress(ctx, "hunter-e1ec69226d-72")
-		if err != nil {
-			return MessageResponse{Text: "❌ Gagal merestore Yustar: " + err.Error()}, nil
-		}
-		return MessageResponse{Text: text}, nil
-	}
-
 	// if hasCommand(msg, "/attributes") || hasCommand(msg, "/attributs") || hasCommand(msg, "/atributs") {
 	// 	text := uc.helpUC.ExecuteAttributes()
 	// 	return MessageResponse{Text: text}, nil
