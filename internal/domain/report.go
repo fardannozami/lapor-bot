@@ -366,4 +366,7 @@ type ReportRepository interface {
 	// Job Classes
 	GetAllJobClasses(ctx context.Context) ([]JobClass, error)
 	GetJobClass(ctx context.Context, id string) (*JobClass, error)
+
+	// Recovery
+	RecoverUserProgress(ctx context.Context, userID string) (string, error)
 }
