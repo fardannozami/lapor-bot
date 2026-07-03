@@ -2,10 +2,13 @@ package sqlite
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
@@ -1598,6 +1601,27 @@ func (r *ReportRepository) GetJobClass(ctx context.Context, id string) (*domain.
 
 func (r *ReportRepository) RecoverUserProgress(ctx context.Context, userID string) (string, error) {
 	// Step 1: Read current (corrupted) state
+	// First resolve the target (in case a masked ID or name was provided)
+	rowsRes, err := r.db.QueryContext(ctx, `SELECT user_id, name FROM user_reports`)
+	if err != nil {
+		return "", fmt.Errorf("failed to query user_reports for ID resolution: %w", err)
+	}
+	defer rowsRes.Close()
+
+	var resolvedID string
+	for rowsRes.Next() {
+		var uid, uname string
+		if err := rowsRes.Scan(&uid, &uname); err == nil {
+			if uid == userID || maskPhoneSQLite(uid) == userID || strings.EqualFold(uname, userID) || strings.EqualFold(uname, "Yustar") {
+				resolvedID = uid
+				break
+			}
+		}
+	}
+	if resolvedID != "" {
+		userID = resolvedID
+	}
+
 	var (
 		name            string
 		jobClass        sql.NullString
@@ -1622,7 +1646,7 @@ func (r *ReportRepository) RecoverUserProgress(ctx context.Context, userID strin
 		str_, sta, agi, vit int
 	)
 
-	err := r.db.QueryRowContext(ctx, `
+	err = r.db.QueryRowContext(ctx, `
 		SELECT name, COALESCE(job_class, ''), streak, activity_count, last_report_date,
 		       COALESCE(max_streak,0), COALESCE(total_points,0), COALESCE(level,0),
 		       COALESCE(achievements,''), COALESCE(comeback_streak,0), COALESCE(inactive_days,0),
@@ -1861,4 +1885,13 @@ func calculateStreaksFromWeeksSQLite(weeks []time.Time) (streak, maxStreak, come
 	}
 
 	return streak, maxStreak, comebackStreak, inactiveDays
+}
+
+func maskPhoneSQLite(phone string) string {
+	sum := sha256.Sum256([]byte(phone))
+	digest := hex.EncodeToString(sum[:])[:10]
+	if len(phone) <= 2 {
+		return "hunter-" + digest
+	}
+	return "hunter-" + digest + "-" + phone[len(phone)-2:]
 }

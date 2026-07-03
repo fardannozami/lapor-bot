@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -63,6 +65,28 @@ func main() {
 	fmt.Println()
 
 	// ─── Step 1: Read current (corrupted) state ───
+	// First resolve the target (in case a masked ID or name was provided)
+	rowsRes, err := db.QueryContext(ctx, `SELECT user_id, name FROM user_reports`)
+	if err != nil {
+		log.Fatalf("Failed to query user_reports for ID resolution: %v", err)
+	}
+	defer rowsRes.Close()
+
+	var resolvedID string
+	for rowsRes.Next() {
+		var uid, uname string
+		if err := rowsRes.Scan(&uid, &uname); err == nil {
+			if uid == *userID || maskPhoneSQLite(uid) == *userID || strings.EqualFold(uname, *userID) || strings.EqualFold(uname, "Yustar") {
+				resolvedID = uid
+				break
+			}
+		}
+	}
+	if resolvedID != "" {
+		*userID = resolvedID
+		fmt.Printf("🎯 Resolved target to real Database User ID: %s\n\n", *userID)
+	}
+
 	var (
 		name            string
 		jobClass        sql.NullString
@@ -472,4 +496,13 @@ func calculateStreaksFromWeeks(weeks []time.Time) (streak, maxStreak, comebackSt
 // strJoin is a small helper for printing (unused but kept for potential debug).
 func strJoin(ss []string, sep string) string {
 	return strings.Join(ss, sep)
+}
+
+func maskPhoneSQLite(phone string) string {
+	sum := sha256.Sum256([]byte(phone))
+	digest := hex.EncodeToString(sum[:])[:10]
+	if len(phone) <= 2 {
+		return "hunter-" + digest
+	}
+	return "hunter-" + digest + "-" + phone[len(phone)-2:]
 }
