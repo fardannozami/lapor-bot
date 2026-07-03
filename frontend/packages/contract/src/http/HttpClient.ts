@@ -6,7 +6,11 @@ export class HttpClient {
   private getToken: GetTokenFn;
   private onUnauthorized?: OnUnauthorizedFn;
 
-  constructor(baseURL: string = '', getToken: GetTokenFn = () => null, onUnauthorized?: OnUnauthorizedFn) {
+  constructor(
+    baseURL: string = "",
+    getToken: GetTokenFn = () => null,
+    onUnauthorized?: OnUnauthorizedFn,
+  ) {
     this.baseURL = baseURL;
     this.getToken = getToken;
     this.onUnauthorized = onUnauthorized;
@@ -38,14 +42,17 @@ export class HttpClient {
   protected async get<T>(path: string): Promise<T> {
     const response = await fetch(`${this.baseURL}${path}`, {
       headers: { ...this.authHeaders() },
+      // Bypass the browser HTTP cache so a refetch right after a PATCH
+      // (e.g. goal update) returns fresh data instead of a stale copy.
+      cache: "no-store",
     });
     return this.handleResponse<T>(response);
   }
 
   protected async post<T>(path: string, body: unknown): Promise<T> {
     const response = await fetch(`${this.baseURL}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...this.authHeaders() },
       body: JSON.stringify(body),
     });
     return this.handleResponse<T>(response);
@@ -53,8 +60,8 @@ export class HttpClient {
 
   protected async patch<T>(path: string, body: unknown): Promise<T> {
     const response = await fetch(`${this.baseURL}${path}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...this.authHeaders() },
       body: JSON.stringify(body),
     });
     return this.handleResponse<T>(response);
