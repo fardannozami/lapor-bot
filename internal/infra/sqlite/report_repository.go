@@ -1682,7 +1682,7 @@ func (r *ReportRepository) RecoverUserProgress(ctx context.Context, userID strin
 		trueLifetimePoints = totalPoints
 	}
 
-	// Step 3: Get all activity dates from activity_logs
+	// Step 3: Get all activity dates by combining activity_logs, report_events, and user_daily_activity
 	type activityLogEntry struct {
 		date         time.Time
 		regularCount int
@@ -1690,10 +1690,26 @@ func (r *ReportRepository) RecoverUserProgress(ctx context.Context, userID strin
 	}
 	var activityEntries []activityLogEntry
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT activity_date, COALESCE(regular_report_count, report_count), COALESCE(sidequest_count, 0)
-		FROM activity_logs
-		WHERE user_id = ?
-		ORDER BY activity_date ASC`, userID)
+		SELECT activity_date,
+		       MAX(regular_cnt),
+		       MAX(sq_cnt)
+		FROM (
+			SELECT activity_date, COALESCE(regular_report_count, report_count) AS regular_cnt, COALESCE(sidequest_count, 0) AS sq_cnt
+			FROM activity_logs WHERE user_id = ?
+			UNION ALL
+			SELECT activity_date, SUM(CASE WHEN kind = 'regular_report' OR regular_count_delta > 0 OR (kind = '' AND points_delta > 0) THEN 1 ELSE 0 END) AS regular_cnt,
+			                      SUM(CASE WHEN kind = 'sidequest' OR sidequest_count_delta > 0 THEN 1 ELSE 0 END) AS sq_cnt
+			FROM report_events WHERE user_id = ? GROUP BY activity_date
+			UNION ALL
+			SELECT activity_date, regular_count AS regular_cnt, sidequest_count AS sq_cnt
+			FROM user_daily_activity WHERE user_id = ?
+			UNION ALL
+			SELECT activity_date, 1 AS regular_cnt, 0 AS sq_cnt
+			FROM goal_activity_logs WHERE user_id = ?
+		)
+		WHERE regular_cnt > 0 OR sq_cnt > 0
+		GROUP BY activity_date
+		ORDER BY activity_date ASC`, userID, userID, userID, userID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -1704,6 +1720,15 @@ func (r *ReportRepository) RecoverUserProgress(ctx context.Context, userID strin
 				d, err := time.ParseInLocation(time.DateOnly, dateStr, loc)
 				if err == nil {
 					activityEntries = append(activityEntries, activityLogEntry{date: d, regularCount: rc, sqCount: sc})
+					// Heal activity_logs table for any discovered missing rows
+					_, _ = r.db.ExecContext(ctx, `
+						INSERT INTO activity_logs (user_id, activity_date, created_at, report_count, regular_report_count, sidequest_count, activity_text)
+						VALUES (?, ?, ?, ?, ?, ?, 'Restored report')
+						ON CONFLICT(user_id, activity_date) DO UPDATE SET
+							report_count = CASE WHEN excluded.regular_report_count > activity_logs.report_count THEN excluded.regular_report_count ELSE activity_logs.report_count END,
+							regular_report_count = CASE WHEN excluded.regular_report_count > activity_logs.regular_report_count THEN excluded.regular_report_count ELSE activity_logs.regular_report_count END,
+							sidequest_count = CASE WHEN excluded.sidequest_count > activity_logs.sidequest_count THEN excluded.sidequest_count ELSE activity_logs.sidequest_count END
+					`, userID, dateStr, time.Now().UTC().Format(time.RFC3339), rc, rc, sc)
 				}
 			}
 		}
