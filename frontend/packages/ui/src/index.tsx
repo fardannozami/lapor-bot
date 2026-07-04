@@ -1,2 +1,1 @@
-// Export mobile components and screens here
-export {};
+export { StravaConnectPanel } from "./StravaConnectPanel";

@@ -65,9 +65,10 @@ func main() {
 	stravaClient := strava.NewClient(cfg)
 	linkStravaUC := usecase.NewLinkStravaUsecase(repo, stravaClient, cfg)
 	processStravaUC := usecase.NewProcessStravaWebhookUsecase(repo, stravaClient, reportUC, cfg.GroupID)
+	disconnectStravaUC := usecase.NewDisconnectStravaUsecase(repo, stravaClient)
 
 	handleMessageUC := usecase.NewHandleMessageUsecase(
-		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, cancelUC, updateNameUC, linkStravaUC, broadcastUpdateUC, motivationUC, helpUC,
+		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, cancelUC, updateNameUC, linkStravaUC, disconnectStravaUC, broadcastUpdateUC, motivationUC, helpUC,
 	)
 
 	// 5. WhatsApp Service
@@ -91,7 +92,7 @@ func main() {
 			return
 		}
 		sb := new(strings.Builder)
-		sb.WriteString(fmt.Sprintf("🎯 *GOAL MINGGUAN TERCAPAI!* 🎯\n\n"))
+		sb.WriteString("🎯 *GOAL MINGGUAN TERCAPAI!* 🎯\n\n")
 		sb.WriteString(fmt.Sprintf("%s baru saja menyelesaikan goal mingguannya! 💪🔥\n", name))
 		sb.WriteString(fmt.Sprintf("Total goal terselesaikan: %d 🏆\n\n", totalCompleted))
 		sb.WriteString("Keren banget! Tetap semangat dan jaga konsistensinya! 👏\n")
@@ -105,7 +106,8 @@ func main() {
 	waService.SetMessageHandler(func(ctx context.Context, client *whatsmeow.Client, evt *events.Message) {
 		fmt.Printf("[DEBUG] Incoming message from Chat ID: %s\n", evt.Info.Chat.String())
 
-		if cfg.GroupID != "" && evt.Info.Chat.String() != cfg.GroupID {
+		isGroupMsg := evt.Info.Chat.Server == "g.us"
+		if cfg.GroupID != "" && isGroupMsg && evt.Info.Chat.String() != cfg.GroupID {
 			return
 		}
 
@@ -214,7 +216,7 @@ func main() {
 			return
 		}
 
-		response, err := handleMessageUC.Execute(ctx, userID, pushName, msg)
+		response, err := handleMessageUC.Execute(ctx, userID, pushName, msg, isGroupMsg)
 		if err != nil {
 			log.Printf("Error handling message: %v", err)
 			return
@@ -295,6 +297,79 @@ func main() {
 	// 9. Start message sender (serializes all SendMessage calls)
 	sender = queue.NewMessageSender(waService.GetClient(), appCtx)
 	sender.Start()
+
+	// Launch one-time announcement after connection is established
+	go func() {
+		// Wait for WA client connection
+		for {
+			if waService.GetClient() != nil && waService.GetClient().IsConnected() {
+				break
+			}
+			select {
+			case <-appCtx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
+		}
+
+		ctx := context.Background()
+		exists, err := repo.HasMigration(ctx, "announcement_strava_v1")
+		if err != nil {
+			log.Printf("[ANNOUNCEMENT] Failed to check migration: %v", err)
+			return
+		}
+		if exists {
+			return
+		}
+
+		if cfg.GroupID == "" {
+			log.Println("[ANNOUNCEMENT] Group ID is empty, skipping announcement")
+			return
+		}
+
+		targetJID, err := types.ParseJID(cfg.GroupID)
+		if err != nil {
+			log.Printf("[ANNOUNCEMENT] Invalid GroupID: %v", err)
+			return
+		}
+
+		connected, err := repo.CountStravaAccounts(ctx)
+		if err != nil {
+			log.Printf("[ANNOUNCEMENT] Failed to count strava accounts: %v", err)
+			connected = 0
+		}
+		remaining := 10 - connected
+		if remaining < 0 {
+			remaining = 0
+		}
+
+		announcement := "📢 *PENGUMUMAN STRAVA* 📢\n\n" +
+			"Fitur *Strava Integration* 🚴‍♂️🏃‍♂️ telah aktif!\n\n" +
+			"✅ *Connect Strava:*\n" +
+			"👉 Command: `/strava`\n" +
+			"👉 Dashboard: " + cfg.AppBaseURL + "\n\n" +
+			"❌ *Disconnect Strava:*\n" +
+			"👉 Command: `/disconnect-strava`\n" +
+			"👉 Dashboard: " + cfg.AppBaseURL + "\n\n" +
+			"📊 *Slot terpakai:* " + fmt.Sprintf("%d/10", connected) + "\n" +
+			"📊 *Sisa slot:* " + fmt.Sprintf("%d", remaining)
+
+		msg := &waE2E.Message{
+			Conversation: &announcement,
+		}
+
+		err = sender.SendHighPriority(ctx, targetJID, msg)
+		if err != nil {
+			log.Printf("[ANNOUNCEMENT] Failed to send announcement message: %v", err)
+			return
+		}
+
+		if err := repo.SaveMigration(ctx, "announcement_strava_v1"); err != nil {
+			log.Printf("[ANNOUNCEMENT] Failed to save migration: %v", err)
+		} else {
+			log.Println("[ANNOUNCEMENT] Announcement sent successfully")
+		}
+	}()
 
 	// 10. Schedule seasonal reset every 4 months at 00:00 WIB.
 	resetCtx, resetCancel := context.WithCancel(appCtx)
@@ -468,7 +543,7 @@ func main() {
 	log.Printf("Starting HTTP server on port %s", cfg.Port)
 
 	// 12. HTTP server (Healthcheck + Strava + Leaderboard API)
-	httpServer := botHTTP.NewServer(repo, linkStravaUC, processStravaUC, waService.GetClient(), cfg)
+	httpServer := botHTTP.NewServer(repo, linkStravaUC, processStravaUC, disconnectStravaUC, waService.GetClient(), cfg)
 	mux := http.NewServeMux()
 	httpServer.RegisterHandlers(mux)
 

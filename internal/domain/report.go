@@ -358,6 +358,8 @@ type ReportRepository interface {
 	UpsertStravaAccount(ctx context.Context, account *StravaAccount) error
 	GetStravaAccountByAthleteID(ctx context.Context, athleteID int64) (*StravaAccount, error)
 	GetStravaAccountByUserID(ctx context.Context, userID string) (*StravaAccount, error)
+	DeleteStravaAccount(ctx context.Context, userID string) error
+	CountStravaAccounts(ctx context.Context) (int, error)
 
 	// Daily Quests
 	SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error
@@ -366,4 +368,8 @@ type ReportRepository interface {
 	// Job Classes
 	GetAllJobClasses(ctx context.Context) ([]JobClass, error)
 	GetJobClass(ctx context.Context, id string) (*JobClass, error)
+
+	// Migrations / One-time tasks
+	HasMigration(ctx context.Context, name string) (bool, error)
+	SaveMigration(ctx context.Context, name string) error
 }

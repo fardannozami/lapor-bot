@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 	"unicode"
@@ -26,6 +27,7 @@ type HandleMessageUsecase struct {
 	cancelUC            *CancelReportUsecase
 	updateNameUC        *UpdateNameUsecase
 	linkStravaUC        *LinkStravaUsecase
+	disconnectStravaUC  *DisconnectStravaUsecase
 	broadcastUpdateUC   *BroadcastUpdateUsecase
 	motivationUC        *GetMotivationUsecase
 	helpUC              *GetHelpUsecase
@@ -43,6 +45,7 @@ func NewHandleMessageUsecase(
 	cancelUC *CancelReportUsecase,
 	updateNameUC *UpdateNameUsecase,
 	linkStravaUC *LinkStravaUsecase,
+	disconnectStravaUC *DisconnectStravaUsecase,
 	broadcastUpdateUC *BroadcastUpdateUsecase,
 	motivationUC *GetMotivationUsecase,
 	helpUC *GetHelpUsecase,
@@ -57,6 +60,7 @@ func NewHandleMessageUsecase(
 		cancelUC:            cancelUC,
 		updateNameUC:        updateNameUC,
 		linkStravaUC:        linkStravaUC,
+		disconnectStravaUC:  disconnectStravaUC,
 		broadcastUpdateUC:   broadcastUpdateUC,
 		motivationUC:        motivationUC,
 		helpUC:              helpUC,
@@ -66,7 +70,7 @@ func NewHandleMessageUsecase(
 	}
 }
 
-func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, message string) (MessageResponse, error) {
+func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, message string, isGroup bool) (MessageResponse, error) {
 	trimmedMessage := strings.TrimSpace(message)
 	msg := strings.ToLower(trimmedMessage)
 
@@ -197,11 +201,23 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 	// 	return MessageResponse{Text: text}, err
 	// }
 
-	// if hasCommand(msg, "/strava") {
-	// 	authURL := uc.linkStravaUC.GetAuthURL(userID, name)
-	// 	text := fmt.Sprintf("🚴‍♂️ *Integrasi Strava* 🏃‍♂️\n\nKlik link di bawah ini untuk menghubungkan akun Strava kamu:\n\n%s\n\nSetelah berhasil, aktivitas larimu akan otomatis dilaporkan! 🎉", authURL)
-	// 	return MessageResponse{Text: text, IsPrivate: true}, nil
-	// }
+	if hasCommand(msg, "/strava") {
+		if isGroup {
+			waLink, ok := uc.linkStravaUC.GetWhatsAppStartURL("/strava")
+			if ok {
+				text := fmt.Sprintf("🚴‍♂️ *Integrasi Strava* 🏃‍♂️\n\nUntuk menghubungkan Strava, silakan chat saya di private.\nKlik link di bawah ini:\n\n%s\n\nLalu kirim *%s* di chat private.", waLink, "/strava")
+				return MessageResponse{Text: text}, nil
+			}
+		}
+		authURL := uc.linkStravaUC.GetAuthURL(userID, name)
+		text := fmt.Sprintf("🚴‍♂️ *Integrasi Strava* 🏃‍♂️\n\nKlik link di bawah ini untuk menghubungkan akun Strava kamu:\n\n%s\n\nSetelah berhasil, aktivitas larimu akan otomatis dilaporkan! 🎉", authURL)
+		return MessageResponse{Text: text}, nil
+	}
+
+	if hasCommand(msg, "/disconnect-strava") || hasCommand(msg, "/disconnectstrava") {
+		text, err := uc.disconnectStravaUC.Execute(ctx, userID)
+		return MessageResponse{Text: text, IsPrivate: true}, err
+	}
 
 	// if strings.HasPrefix(msg, "!broadcast_update") {
 	// 	text := uc.broadcastUpdateUC.Execute()
