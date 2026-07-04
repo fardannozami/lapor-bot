@@ -1542,6 +1542,11 @@ func (r *ReportRepository) GetStravaAccountByUserID(ctx context.Context, userID 
 	return &account, nil
 }
 
+func (r *ReportRepository) DeleteStravaAccount(ctx context.Context, userID string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM strava_accounts WHERE user_id = ?`, userID)
+	return err
+}
+
 func (r *ReportRepository) SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error {
 	query := `
 		INSERT INTO daily_quests (user_id, quest_date, tasks_json)

@@ -65,9 +65,10 @@ func main() {
 	stravaClient := strava.NewClient(cfg)
 	linkStravaUC := usecase.NewLinkStravaUsecase(repo, stravaClient, cfg)
 	processStravaUC := usecase.NewProcessStravaWebhookUsecase(repo, stravaClient, reportUC, cfg.GroupID)
+	disconnectStravaUC := usecase.NewDisconnectStravaUsecase(repo)
 
 	handleMessageUC := usecase.NewHandleMessageUsecase(
-		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, cancelUC, updateNameUC, linkStravaUC, broadcastUpdateUC, motivationUC, helpUC,
+		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, cancelUC, updateNameUC, linkStravaUC, disconnectStravaUC, broadcastUpdateUC, motivationUC, helpUC,
 	)
 
 	// 5. WhatsApp Service
@@ -91,7 +92,7 @@ func main() {
 			return
 		}
 		sb := new(strings.Builder)
-		sb.WriteString(fmt.Sprintf("🎯 *GOAL MINGGUAN TERCAPAI!* 🎯\n\n"))
+		sb.WriteString("🎯 *GOAL MINGGUAN TERCAPAI!* 🎯\n\n")
 		sb.WriteString(fmt.Sprintf("%s baru saja menyelesaikan goal mingguannya! 💪🔥\n", name))
 		sb.WriteString(fmt.Sprintf("Total goal terselesaikan: %d 🏆\n\n", totalCompleted))
 		sb.WriteString("Keren banget! Tetap semangat dan jaga konsistensinya! 👏\n")
