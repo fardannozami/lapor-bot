@@ -81,8 +81,10 @@ export function QuickReport({
       setMessage("");
       inputRef.current?.focus();
       await onReported();
-    } catch (err: any) {
-      showFeedback(err?.message || "Gagal mengirim laporan", "error");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Gagal mengirim laporan";
+      showFeedback(message, "error");
     } finally {
       setSubmitting(false);
     }
@@ -100,11 +102,10 @@ export function QuickReport({
       setSidequestInput("");
       setShowSidequest(false);
       await onReported();
-    } catch (err: any) {
-      showFeedback(
-        err?.message || "Gagal mengirim sidequest",
-        "error",
-      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Gagal mengirim sidequest";
+      showFeedback(message, "error");
     } finally {
       setSubmitting(false);
     }
@@ -217,8 +218,8 @@ export function QuickReport({
         {showSidequest && (
           <div className="mt-3 p-4 rounded-2xl bg-gray-950/50 border border-gray-800">
             <p className="text-[10px] text-gray-500 font-mono mb-3">
-              Format: &lt;kegiatan&gt; &lt;jumlah&gt;. Contoh: pushup 15, lari 10
-              km, plank 30 detik
+              Format: &lt;kegiatan&gt; &lt;jumlah&gt;. Contoh: pushup 15, lari
+              10 km, plank 30 detik
             </p>
 
             <div className="flex flex-wrap gap-1.5 mb-3">

@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@lapor-bot/shared/*": ["../shared/src/*"]
+    }
+  },
+  "include": ["src"]
+}

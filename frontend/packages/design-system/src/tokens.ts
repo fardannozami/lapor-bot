@@ -1,15 +1,15 @@
 export const colors = {
   dark: {
-    bg: "#07130c",
-    card: "#102018",
-    border: "#23402e",
-    input: "#14251b",
+    bg: "#0a0f1a",
+    card: "#111928",
+    border: "#1e293b",
+    input: "#162032",
   },
   system: {
-    blue: "#2dd4bf",
-    purple: "#a855f7",
-    red: "#f97316",
-    gold: "#eab308",
+    blue: "#3b82f6",
+    purple: "#8b5cf6",
+    red: "#ef4444",
+    gold: "#f59e0b",
     green: "#22c55e",
   },
 };
@@ -22,8 +22,8 @@ export const typography = {
 };
 
 export const shadows = {
-  'neon-blue': '0 0 15px rgba(0, 240, 255, 0.35)',
-  'neon-purple': '0 0 15px rgba(168, 85, 247, 0.35)',
-  'neon-red': '0 0 15px rgba(255, 59, 48, 0.35)',
-  'neon-gold': '0 0 15px rgba(234, 179, 8, 0.35)',
+  'neon-blue': '0 0 15px rgba(59, 130, 246, 0.35)',
+  'neon-purple': '0 0 15px rgba(139, 92, 246, 0.35)',
+  'neon-red': '0 0 15px rgba(239, 68, 68, 0.35)',
+  'neon-gold': '0 0 15px rgba(245, 158, 11, 0.35)',
 };
