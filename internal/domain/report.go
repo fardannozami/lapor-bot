@@ -367,4 +367,8 @@ type ReportRepository interface {
 	// Job Classes
 	GetAllJobClasses(ctx context.Context) ([]JobClass, error)
 	GetJobClass(ctx context.Context, id string) (*JobClass, error)
+
+	// Migrations / One-time tasks
+	HasMigration(ctx context.Context, name string) (bool, error)
+	SaveMigration(ctx context.Context, name string) error
 }

@@ -1598,3 +1598,17 @@ func (r *ReportRepository) GetJobClass(ctx context.Context, id string) (*domain.
 	}
 	return &j, nil
 }
+
+func (r *ReportRepository) HasMigration(ctx context.Context, name string) (bool, error) {
+	var exists int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sys_migrations WHERE name = ?", name).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists > 0, nil
+}
+
+func (r *ReportRepository) SaveMigration(ctx context.Context, name string) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO sys_migrations (name) VALUES (?)", name)
+	return err
+}

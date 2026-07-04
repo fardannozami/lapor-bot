@@ -297,6 +297,67 @@ func main() {
 	sender = queue.NewMessageSender(waService.GetClient(), appCtx)
 	sender.Start()
 
+	// Launch one-time announcement after connection is established
+	go func() {
+		// Wait for WA client connection
+		for {
+			if waService.GetClient() != nil && waService.GetClient().IsConnected() {
+				break
+			}
+			select {
+			case <-appCtx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
+		}
+
+		ctx := context.Background()
+		exists, err := repo.HasMigration(ctx, "announcement_strava_v1")
+		if err != nil {
+			log.Printf("[ANNOUNCEMENT] Failed to check migration: %v", err)
+			return
+		}
+		if exists {
+			return
+		}
+
+		if cfg.GroupID == "" {
+			log.Println("[ANNOUNCEMENT] Group ID is empty, skipping announcement")
+			return
+		}
+
+		targetJID, err := types.ParseJID(cfg.GroupID)
+		if err != nil {
+			log.Printf("[ANNOUNCEMENT] Invalid GroupID: %v", err)
+			return
+		}
+
+		announcement := "📢 *PENGUMUMAN PENTING* 📢\n\n" +
+			"Fitur *Strava Integration* 🚴‍♂️🏃‍♂️ dan *Disconnect Strava* telah aktif!\n\n" +
+			"Sekarang kamu bisa menghubungkan akun Strava-mu menggunakan command:\n" +
+			"👉 `/strava`\n\n" +
+			"Dan jika ingin memutus koneksi, gunakan:\n" +
+			"👉 `/disconnect-strava`\n\n" +
+			"⚠️ *Catatan:* Kuota maksimal saat ini dibatasi hanya untuk *10 athlete*."
+
+		msg := &waE2E.Message{
+			Conversation: &announcement,
+		}
+
+		err = sender.SendHighPriority(ctx, targetJID, msg)
+		if err != nil {
+			log.Printf("[ANNOUNCEMENT] Failed to send announcement message: %v", err)
+			return
+		}
+
+		if err := repo.SaveMigration(ctx, "announcement_strava_v1"); err != nil {
+			log.Printf("[ANNOUNCEMENT] Failed to save migration: %v", err)
+		} else {
+			log.Println("[ANNOUNCEMENT] Announcement sent successfully")
+		}
+	}()
+
+
 	// 10. Schedule seasonal reset every 4 months at 00:00 WIB.
 	resetCtx, resetCancel := context.WithCancel(appCtx)
 	defer resetCancel()
