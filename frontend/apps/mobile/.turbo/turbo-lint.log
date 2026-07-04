@@ -2,4 +2,3 @@
 > @lapor-bot/mobile@1.0.0 lint
 > expo lint
 
-No ESLint config found. Configuring automatically.

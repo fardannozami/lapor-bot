@@ -16,7 +16,7 @@ import {
   CalendarDays,
   Edit2,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import {
   useRepositories,
   getJobColor,
@@ -148,6 +148,7 @@ export function PersonalPage({
   const [resetLoading, setResetLoading] = useState(false);
 
   const [localUser, setLocalUser] = useState<EnrichedReport>(user);
+  const [prevUser, setPrevUser] = useState(user);
 
   // Confirmation toasts for mutation success/error feedback.
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -157,11 +158,14 @@ export function PersonalPage({
     setToast({ id: toastIdRef.current, message, tone });
   };
 
-  // keep local in sync if parent pushes a new user object
-  useEffect(() => {
+  // Keep local state in sync when the parent pushes a new user object.
+  // Render-phase adjustment (not an effect) avoids setState-in-effect
+  // and re-renders immediately with the new values.
+  if (user !== prevUser) {
+    setPrevUser(user);
     setLocalUser(user);
     setNameValue(user.name || "");
-  }, [user]);
+  }
 
   const refreshUser = async () => {
     const MAX_ATTEMPTS = 2;
@@ -291,8 +295,12 @@ export function PersonalPage({
                           await refreshUser();
                           setEditingName(false);
                           showToast(res.message || "Nama berhasil diperbarui");
-                        } catch (e: any) {
-                          setNameError(e?.message || "Gagal update nama");
+                        } catch (e) {
+                          setNameError(
+                            e instanceof Error
+                              ? e.message
+                              : "Gagal update nama",
+                          );
                         } finally {
                           setNameLoading(false);
                         }
@@ -680,8 +688,12 @@ export function PersonalPage({
                             const res = await repo.resetGoal!();
                             await refreshUser();
                             showToast(res.message || "Goal berhasil direset");
-                          } catch (e: any) {
-                            setGoalError(e?.message || "Gagal reset goal");
+                          } catch (e) {
+                            setGoalError(
+                              e instanceof Error
+                                ? e.message
+                                : "Gagal reset goal",
+                            );
                           } finally {
                             setResetLoading(false);
                           }
@@ -767,7 +779,10 @@ export function PersonalPage({
                           setGoalLoading(true);
                           setGoalError(null);
                           try {
-                            const startPayload: any = {};
+                            const startPayload: {
+                              startDate?: string;
+                              startHour?: number;
+                            } = {};
                             if (startDate) startPayload.startDate = startDate;
                             if (startHour || startHour === 0)
                               startPayload.startHour = startHour;
@@ -791,10 +806,11 @@ export function PersonalPage({
                             showToast(
                               res.message || "Goal berhasil diperbarui",
                             );
-                          } catch (e: any) {
+                          } catch (e) {
                             setGoalError(
-                              e?.message ||
-                                "Gagal menyimpan goal (mungkin sudah ada goal aktif)",
+                              e instanceof Error
+                                ? e.message
+                                : "Gagal menyimpan goal (mungkin sudah ada goal aktif)",
                             );
                           } finally {
                             setGoalLoading(false);
@@ -926,8 +942,10 @@ export function PersonalPage({
                       try {
                         const list = await repo.listJobs();
                         setJobs(list);
-                      } catch (e: any) {
-                        setJobError(e?.message || "Gagal memuat jobs");
+                      } catch (e) {
+                        setJobError(
+                          e instanceof Error ? e.message : "Gagal memuat jobs",
+                        );
                       } finally {
                         setJobsLoading(false);
                       }
@@ -1127,9 +1145,11 @@ export function PersonalPage({
               await refreshUser();
               setShowJobModal(false);
               showToast(res.message || "Job berhasil diganti");
-            } catch (e: any) {
+            } catch (e) {
               setJobError(
-                e?.message || "Gagal memilih job (mungkin butuh >=50 poin)",
+                e instanceof Error
+                  ? e.message
+                  : "Gagal memilih job (mungkin butuh >=50 poin)",
               );
             } finally {
               setJobLoading(false);

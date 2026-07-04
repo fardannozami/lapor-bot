@@ -52,10 +52,16 @@ function App() {
     }
     return "dashboard";
   });
-  const [personalUser, setPersonalUser] = useState<EnrichedReport | null>(null);
+  const [personalUser, setPersonalUser] = useState<EnrichedReport | null>(
+    authUser && token ? authUser : null,
+  );
+  const [prevToken, setPrevToken] = useState(token);
 
   // Sync personalUser with auth state on token change (login / logout).
-  useEffect(() => {
+  // Render-phase adjustment (not an effect) avoids setState-in-effect and
+  // re-renders immediately with the derived value.
+  if (token !== prevToken) {
+    setPrevToken(token);
     if (authUser && token) {
       setPersonalUser(authUser);
     } else {
@@ -64,7 +70,7 @@ function App() {
         setPage("dashboard");
       }
     }
-  }, [authUser, token]);
+  }
 
   const seasonTitle = summary
     ? `SWEG Healthy Club - Season ${summary.current_season}`
