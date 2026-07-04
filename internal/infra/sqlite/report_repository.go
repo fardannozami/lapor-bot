@@ -1547,6 +1547,13 @@ func (r *ReportRepository) DeleteStravaAccount(ctx context.Context, userID strin
 	return err
 }
 
+func (r *ReportRepository) CountStravaAccounts(ctx context.Context) (int, error) {
+	query := `SELECT COUNT(*) FROM strava_accounts`
+	var count int
+	err := r.db.QueryRowContext(ctx, query).Scan(&count)
+	return count, err
+}
+
 func (r *ReportRepository) SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error {
 	query := `
 		INSERT INTO daily_quests (user_id, quest_date, tasks_json)

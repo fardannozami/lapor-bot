@@ -19,4 +19,5 @@ type StravaRepository interface {
 	GetStravaAccountByAthleteID(ctx context.Context, athleteID int64) (*StravaAccount, error)
 	GetStravaAccountByUserID(ctx context.Context, userID string) (*StravaAccount, error)
 	DeleteStravaAccount(ctx context.Context, userID string) error
+	CountStravaAccounts(ctx context.Context) (int, error)
 }

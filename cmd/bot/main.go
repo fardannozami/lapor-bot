@@ -333,13 +333,26 @@ func main() {
 			return
 		}
 
-		announcement := "📢 *PENGUMUMAN PENTING* 📢\n\n" +
-			"Fitur *Strava Integration* 🚴‍♂️🏃‍♂️ dan *Disconnect Strava* telah aktif!\n\n" +
-			"Sekarang kamu bisa menghubungkan akun Strava-mu menggunakan command:\n" +
-			"👉 `/strava`\n\n" +
-			"Dan jika ingin memutus koneksi, gunakan:\n" +
-			"👉 `/disconnect-strava`\n\n" +
-			"⚠️ *Catatan:* Kuota maksimal saat ini dibatasi hanya untuk *10 athlete*."
+		connected, err := repo.CountStravaAccounts(ctx)
+		if err != nil {
+			log.Printf("[ANNOUNCEMENT] Failed to count strava accounts: %v", err)
+			connected = 0
+		}
+		remaining := 10 - connected
+		if remaining < 0 {
+			remaining = 0
+		}
+
+		announcement := "📢 *PENGUMUMAN STRAVA* 📢\n\n" +
+			"Fitur *Strava Integration* 🚴‍♂️🏃‍♂️ telah aktif!\n\n" +
+			"✅ *Connect Strava:*\n" +
+			"👉 Command: `/strava`\n" +
+			"👉 Dashboard: " + cfg.AppBaseURL + "\n\n" +
+			"❌ *Disconnect Strava:*\n" +
+			"👉 Command: `/disconnect-strava`\n" +
+			"👉 Dashboard: " + cfg.AppBaseURL + "\n\n" +
+			"📊 *Slot terpakai:* " + fmt.Sprintf("%d/10", connected) + "\n" +
+			"📊 *Sisa slot:* " + fmt.Sprintf("%d", remaining)
 
 		msg := &waE2E.Message{
 			Conversation: &announcement,
