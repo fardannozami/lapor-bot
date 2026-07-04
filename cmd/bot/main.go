@@ -357,7 +357,6 @@ func main() {
 		}
 	}()
 
-
 	// 10. Schedule seasonal reset every 4 months at 00:00 WIB.
 	resetCtx, resetCancel := context.WithCancel(appCtx)
 	defer resetCancel()
@@ -530,7 +529,7 @@ func main() {
 	log.Printf("Starting HTTP server on port %s", cfg.Port)
 
 	// 12. HTTP server (Healthcheck + Strava + Leaderboard API)
-	httpServer := botHTTP.NewServer(repo, linkStravaUC, processStravaUC, waService.GetClient(), cfg)
+	httpServer := botHTTP.NewServer(repo, linkStravaUC, processStravaUC, disconnectStravaUC, waService.GetClient(), cfg)
 	mux := http.NewServeMux()
 	httpServer.RegisterHandlers(mux)
 

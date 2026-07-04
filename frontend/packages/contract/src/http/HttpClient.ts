@@ -66,4 +66,12 @@ export class HttpClient {
     });
     return this.handleResponse<T>(response);
   }
+
+  protected async delete<T>(path: string): Promise<T> {
+    const response = await fetch(`${this.baseURL}${path}`, {
+      method: "DELETE",
+      headers: { ...this.authHeaders() },
+    });
+    return this.handleResponse<T>(response);
+  }
 }
