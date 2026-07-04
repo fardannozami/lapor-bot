@@ -131,3 +131,21 @@ func (c *Client) GetActivity(accessToken string, activityID int64) (*Activity, e
 
 	return &activity, nil
 }
+
+func (c *Client) Deauthorize(accessToken string) error {
+	data := url.Values{}
+	data.Set("access_token", accessToken)
+
+	resp, err := c.httpClient.PostForm("https://www.strava.com/oauth/deauthorize", data)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("strava deauthorize error: %s", string(body))
+	}
+
+	return nil
+}

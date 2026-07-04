@@ -65,7 +65,7 @@ func main() {
 	stravaClient := strava.NewClient(cfg)
 	linkStravaUC := usecase.NewLinkStravaUsecase(repo, stravaClient, cfg)
 	processStravaUC := usecase.NewProcessStravaWebhookUsecase(repo, stravaClient, reportUC, cfg.GroupID)
-	disconnectStravaUC := usecase.NewDisconnectStravaUsecase(repo)
+	disconnectStravaUC := usecase.NewDisconnectStravaUsecase(repo, stravaClient)
 
 	handleMessageUC := usecase.NewHandleMessageUsecase(
 		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, cancelUC, updateNameUC, linkStravaUC, disconnectStravaUC, broadcastUpdateUC, motivationUC, helpUC,
