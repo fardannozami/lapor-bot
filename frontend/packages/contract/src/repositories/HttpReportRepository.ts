@@ -75,6 +75,23 @@ export class HttpReportRepository
 		return this.get<EnrichedReport>("/api/user");
 	}
 
+	async createReport(
+		message: string,
+	): Promise<{ success: boolean; message: string }> {
+		return this.post<{ success: boolean; message: string }>("/api/report", {
+			message,
+		});
+	}
+
+	async createSidequestReport(
+		activities: string[],
+	): Promise<{ success: boolean; message: string }> {
+		return this.post<{ success: boolean; message: string }>(
+			"/api/report/sidequest",
+			{ activities },
+		);
+	}
+
 	async getStravaStatus(): Promise<StravaStatus> {
 		return this.get<StravaStatus>("/api/user/strava");
 	}

@@ -68,7 +68,7 @@ func main() {
 	disconnectStravaUC := usecase.NewDisconnectStravaUsecase(repo, stravaClient)
 
 	handleMessageUC := usecase.NewHandleMessageUsecase(
-		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, cancelUC, updateNameUC, linkStravaUC, disconnectStravaUC, broadcastUpdateUC, motivationUC, helpUC,
+		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, cancelUC, updateNameUC, linkStravaUC, disconnectStravaUC, broadcastUpdateUC, motivationUC, helpUC, dailyQuestUC,
 	)
 
 	// 5. WhatsApp Service
@@ -543,7 +543,7 @@ func main() {
 	log.Printf("Starting HTTP server on port %s", cfg.Port)
 
 	// 12. HTTP server (Healthcheck + Strava + Leaderboard API)
-	httpServer := botHTTP.NewServer(repo, linkStravaUC, processStravaUC, disconnectStravaUC, waService.GetClient(), cfg)
+	httpServer := botHTTP.NewServer(repo, linkStravaUC, processStravaUC, reportUC, dailyQuestUC, disconnectStravaUC, waService.GetClient(), cfg)
 	mux := http.NewServeMux()
 	httpServer.RegisterHandlers(mux)
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Award, Shield, Heart, Zap, Swords, Flame, Trophy, Compass } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import type { EnrichedReport } from '@lapor-bot/shared';
 import { getJobColor, clampAttribute } from '@lapor-bot/shared';
 interface ProfileModalProps {
@@ -8,6 +9,18 @@ interface ProfileModalProps {
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) => {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!hunter) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    closeRef.current?.focus();
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [hunter, onClose]);
+
   if (!hunter) return null;
 
   const xpPercent = Math.min(
@@ -44,6 +57,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
             <p className="text-xs text-gray-500 font-mono mt-1">ID: {hunter.user_id}</p>
           </div>
           <button
+            ref={closeRef}
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-white rounded-lg bg-gray-800/40 hover:bg-gray-800 transition-colors"
           >

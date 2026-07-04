@@ -18,3 +18,10 @@ https://eslint.org/docs/latest/use/configure/migration-guide
 If you still have problems after following the migration guide, please stop by
 https://eslint.org/chat/help to chat with the team.
 
+npm error Lifecycle script `lint` failed with error:
+npm error code 2
+npm error path /Users/kyomel/go/src/lapor-bot/frontend/packages/design-system
+npm error workspace @lapor-bot/design-system@0.0.0
+npm error location /Users/kyomel/go/src/lapor-bot/frontend/packages/design-system
+npm error command failed
+npm error command sh -c eslint .

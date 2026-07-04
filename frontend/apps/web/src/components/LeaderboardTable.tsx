@@ -341,6 +341,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
               {tableHeaders.map((header, i) => (
                 <th
                   key={`${activeTab}-${i}`}
+                  scope="col"
                   className={`py-3 px-4 text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 ${
                     i === 0
                       ? "text-center"

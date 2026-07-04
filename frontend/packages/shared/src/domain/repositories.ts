@@ -1,5 +1,10 @@
 import type { EnrichedReport, GlobalSummary, JobInfo, StravaStatus } from "../types";
 
+export interface ReportResult {
+  success: boolean;
+  message: string;
+}
+
 export interface LoginResult {
 	token: string;
 	expires_at: string;
@@ -23,6 +28,8 @@ export interface IReportRepository {
 	createStravaLink(): Promise<{ auth_url: string }>;
 	disconnectStrava(): Promise<{ success: boolean; message: string }>;
 	resetGoal?(): Promise<{ success: boolean; message: string }>;
+	createReport(message: string): Promise<ReportResult>;
+	createSidequestReport(activities: string[]): Promise<ReportResult>;
 }
 
 export interface IAuthRepository {

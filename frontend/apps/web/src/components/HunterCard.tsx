@@ -19,7 +19,15 @@ export const HunterCard: React.FC<HunterCardProps> = ({ hunter, onClick }) => {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={`relative glass p-5 rounded-2xl cursor-pointer transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1 flex flex-col justify-between overflow-hidden group ${getRankGlow(
         hunter.rank_name
       )}`}
@@ -27,6 +35,7 @@ export const HunterCard: React.FC<HunterCardProps> = ({ hunter, onClick }) => {
       {/* Active today pulse indicator */}
       {hunter.is_active_today && (
         <span className="absolute top-3 right-3 flex h-2.5 w-2.5">
+          <span className="sr-only">Active today</span>
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-system-green opacity-75"></span>
           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-system-green"></span>
         </span>
