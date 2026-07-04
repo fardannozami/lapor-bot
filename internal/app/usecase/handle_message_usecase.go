@@ -70,7 +70,7 @@ func NewHandleMessageUsecase(
 	}
 }
 
-func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, message string) (MessageResponse, error) {
+func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, message string, isGroup bool) (MessageResponse, error) {
 	trimmedMessage := strings.TrimSpace(message)
 	msg := strings.ToLower(trimmedMessage)
 
@@ -202,9 +202,16 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 	// }
 
 	if hasCommand(msg, "/strava") {
+		if isGroup {
+			waLink, ok := uc.linkStravaUC.GetWhatsAppStartURL("/strava")
+			if ok {
+				text := fmt.Sprintf("🚴‍♂️ *Integrasi Strava* 🏃‍♂️\n\nUntuk menghubungkan Strava, silakan chat saya di private.\nKlik link di bawah ini:\n\n%s\n\nLalu kirim *%s* di chat private.", waLink, "/strava")
+				return MessageResponse{Text: text}, nil
+			}
+		}
 		authURL := uc.linkStravaUC.GetAuthURL(userID, name)
 		text := fmt.Sprintf("🚴‍♂️ *Integrasi Strava* 🏃‍♂️\n\nKlik link di bawah ini untuk menghubungkan akun Strava kamu:\n\n%s\n\nSetelah berhasil, aktivitas larimu akan otomatis dilaporkan! 🎉", authURL)
-		return MessageResponse{Text: text, IsPrivate: true}, nil
+		return MessageResponse{Text: text}, nil
 	}
 
 	if hasCommand(msg, "/disconnect-strava") || hasCommand(msg, "/disconnectstrava") {

@@ -106,7 +106,8 @@ func main() {
 	waService.SetMessageHandler(func(ctx context.Context, client *whatsmeow.Client, evt *events.Message) {
 		fmt.Printf("[DEBUG] Incoming message from Chat ID: %s\n", evt.Info.Chat.String())
 
-		if cfg.GroupID != "" && evt.Info.Chat.String() != cfg.GroupID {
+		isGroupMsg := evt.Info.Chat.Server == "g.us"
+		if cfg.GroupID != "" && isGroupMsg && evt.Info.Chat.String() != cfg.GroupID {
 			return
 		}
 
@@ -215,7 +216,7 @@ func main() {
 			return
 		}
 
-		response, err := handleMessageUC.Execute(ctx, userID, pushName, msg)
+		response, err := handleMessageUC.Execute(ctx, userID, pushName, msg, isGroupMsg)
 		if err != nil {
 			log.Printf("Error handling message: %v", err)
 			return

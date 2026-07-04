@@ -16,6 +16,7 @@ type LinkStravaUsecase struct {
 	stravaClient *strava.Client
 	clientID     string
 	redirectURI  string
+	botPhone     string
 }
 
 func NewLinkStravaUsecase(repo domain.ReportRepository, stravaClient *strava.Client, cfg config.Config) *LinkStravaUsecase {
@@ -24,6 +25,7 @@ func NewLinkStravaUsecase(repo domain.ReportRepository, stravaClient *strava.Cli
 		stravaClient: stravaClient,
 		clientID:     cfg.StravaClientID,
 		redirectURI:  fmt.Sprintf("%s/strava/callback", cfg.AppBaseURL),
+		botPhone:     cfg.BotPhone,
 	}
 }
 
@@ -37,6 +39,27 @@ func (uc *LinkStravaUsecase) GetAuthURL(userID, userName string) string {
 	params.Set("state", fmt.Sprintf("%s|%s", userID, userName))
 
 	return fmt.Sprintf("%s?%s", baseURL, params.Encode())
+}
+
+func (uc *LinkStravaUsecase) GetWhatsAppStartURL(command string) (string, bool) {
+	phone := whatsappPhoneDigits(uc.botPhone)
+	if phone == "" {
+		return "", false
+	}
+
+	params := url.Values{}
+	params.Set("text", command)
+	return fmt.Sprintf("https://wa.me/%s?%s", phone, params.Encode()), true
+}
+
+func whatsappPhoneDigits(phone string) string {
+	var digits strings.Builder
+	for _, r := range phone {
+		if r >= '0' && r <= '9' {
+			digits.WriteRune(r)
+		}
+	}
+	return digits.String()
 }
 
 func (uc *LinkStravaUsecase) HandleCallback(ctx context.Context, code, state string) error {
