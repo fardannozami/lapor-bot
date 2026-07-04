@@ -26,17 +26,21 @@ type Server struct {
 	repo           domain.ReportRepository
 	linkUC         *usecase.LinkStravaUsecase
 	processUC      *usecase.ProcessStravaWebhookUsecase
+	reportUC       *usecase.ReportActivityUsecase
+	dailyQuestUC   *usecase.DailyQuestUsecase
 	waClient       *whatsmeow.Client
 	verifyToken    string
 	jwtSecret      string
 	jwtExpiryHours int
 }
 
-func NewServer(repo domain.ReportRepository, linkUC *usecase.LinkStravaUsecase, processUC *usecase.ProcessStravaWebhookUsecase, waClient *whatsmeow.Client, cfg config.Config) *Server {
+func NewServer(repo domain.ReportRepository, linkUC *usecase.LinkStravaUsecase, processUC *usecase.ProcessStravaWebhookUsecase, reportUC *usecase.ReportActivityUsecase, dailyQuestUC *usecase.DailyQuestUsecase, waClient *whatsmeow.Client, cfg config.Config) *Server {
 	return &Server{
 		repo:           repo,
 		linkUC:         linkUC,
 		processUC:      processUC,
+		reportUC:       reportUC,
+		dailyQuestUC:   dailyQuestUC,
 		waClient:       waClient,
 		verifyToken:    cfg.StravaVerifyToken,
 		jwtSecret:      cfg.JWTSecret,
@@ -62,6 +66,9 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/user/name", s.AuthMiddleware(s.HandleUpdateName))
 	mux.HandleFunc("PATCH /api/user/job", s.AuthMiddleware(s.HandleSelectJob))
 	mux.HandleFunc("PATCH /api/user/goal", s.AuthMiddleware(s.HandleSetGoal))
+
+	mux.HandleFunc("POST /api/report", s.AuthMiddleware(s.HandleCreateReport))
+	mux.HandleFunc("POST /api/report/sidequest", s.AuthMiddleware(s.HandleCreateSidequestReport))
 }
 
 func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {

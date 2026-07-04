@@ -23,6 +23,8 @@ import {
   clampAttribute,
   attributeBarWidth,
 } from "@lapor-bot/shared";
+import { QuickReport } from "@lapor-bot/ui";
+import type { QuickReportCallbacks } from "@lapor-bot/ui";
 import type {
   DailyActivity,
   EnrichedReport,
@@ -199,6 +201,21 @@ export function PersonalPage({
     (quest) => quest.progress >= quest.target,
   ).length;
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayActivity = dailyActivity.find((d) => d.date === todayStr);
+  const reportCount = todayActivity?.count ?? 0;
+
+  const quickReportCallbacks: QuickReportCallbacks = {
+    createReport: (msg) =>
+      repo.createReport
+        ? repo.createReport(msg)
+        : Promise.reject(new Error("createReport not available")),
+    createSidequestReport: (activities) =>
+      repo.createSidequestReport
+        ? repo.createSidequestReport(activities)
+        : Promise.reject(new Error("createSidequestReport not available")),
+  };
+
   return (
     <div className="min-h-[60vh] px-3 sm:px-4 py-6 sm:py-8 overflow-hidden">
       <div className="max-w-6xl mx-auto">
@@ -340,6 +357,14 @@ export function PersonalPage({
             </div>
           </div>
         </section>
+
+        {/* Quick Report Widget */}
+        <QuickReport
+          onReported={refreshUser}
+          callbacks={quickReportCallbacks}
+          dailyCount={reportCount}
+          maxDaily={3}
+        />
 
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <StatCard
@@ -934,6 +959,7 @@ export function PersonalPage({
                     hint: "Strength / Gym",
                     value: clampAttribute(localUser.str),
                     color: "text-system-red",
+                    bar: "bg-gradient-to-r from-system-red to-amber-500",
                   },
                   {
                     icon: Zap,
@@ -941,6 +967,7 @@ export function PersonalPage({
                     hint: "Stamina / Run",
                     value: clampAttribute(localUser.sta),
                     color: "text-system-blue",
+                    bar: "bg-gradient-to-r from-amber-500 to-system-gold",
                   },
                   {
                     icon: Shield,
@@ -948,6 +975,7 @@ export function PersonalPage({
                     hint: "Agility / Sport",
                     value: clampAttribute(localUser.agi),
                     color: "text-system-purple",
+                    bar: "bg-gradient-to-r from-system-blue to-system-green",
                   },
                   {
                     icon: Heart,
@@ -955,6 +983,7 @@ export function PersonalPage({
                     hint: "Vitality / Recovery",
                     value: clampAttribute(localUser.vit),
                     color: "text-system-green",
+                    bar: "bg-gradient-to-r from-system-green to-system-blue",
                   },
                 ].map((stat) => {
                   const Icon = stat.icon;
@@ -979,7 +1008,7 @@ export function PersonalPage({
                       </div>
                       <div className="h-2 rounded-full bg-gray-950 border border-gray-800 overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-current opacity-80"
+                          className={`h-full rounded-full ${stat.bar} transition-all duration-500`}
                           style={{ width: `${width}%` }}
                         />
                       </div>

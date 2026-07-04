@@ -67,7 +67,7 @@ func main() {
 	processStravaUC := usecase.NewProcessStravaWebhookUsecase(repo, stravaClient, reportUC, cfg.GroupID)
 
 	handleMessageUC := usecase.NewHandleMessageUsecase(
-		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, cancelUC, updateNameUC, linkStravaUC, broadcastUpdateUC, motivationUC, helpUC,
+		reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, cancelUC, updateNameUC, linkStravaUC, broadcastUpdateUC, motivationUC, helpUC, dailyQuestUC,
 	)
 
 	// 5. WhatsApp Service
@@ -468,7 +468,7 @@ func main() {
 	log.Printf("Starting HTTP server on port %s", cfg.Port)
 
 	// 12. HTTP server (Healthcheck + Strava + Leaderboard API)
-	httpServer := botHTTP.NewServer(repo, linkStravaUC, processStravaUC, waService.GetClient(), cfg)
+	httpServer := botHTTP.NewServer(repo, linkStravaUC, processStravaUC, reportUC, dailyQuestUC, waService.GetClient(), cfg)
 	mux := http.NewServeMux()
 	httpServer.RegisterHandlers(mux)
 

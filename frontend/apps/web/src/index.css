@@ -66,6 +66,17 @@
       radial-gradient(at 100% 100%, rgba(249, 115, 22, 0.12) 0, transparent 45%);
     background-size: 42px 42px, auto, auto;
     background-attachment: fixed;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* iOS Safari input zoom: prevent viewport zoom on focus by using 16px+ font-size on narrow screens. */
+  @media (max-width: 639px) {
+    input, select, textarea {
+      font-size: 16px;
+    }
   }
 }
 

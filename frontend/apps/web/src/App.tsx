@@ -95,6 +95,12 @@ function App() {
 
   return (
     <div className="min-h-screen pb-16 px-4 md:px-8">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-xl focus:bg-system-green focus:text-gray-950 focus:font-bold focus:font-mono focus:text-sm focus:outline-none"
+      >
+        Skip to main content
+      </a>
       {/* HUD System Top Bar */}
       <header className="max-w-7xl mx-auto pt-8 pb-6 border-b border-gray-850 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
@@ -117,7 +123,7 @@ function App() {
             <div className="flex items-center bg-gray-950 p-1 rounded-xl border border-gray-800">
               <button
                 onClick={() => setViewMode("table")}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors ${
                   viewMode === "table"
                     ? "bg-gray-800 text-system-blue"
                     : "text-gray-500 hover:text-gray-300"
@@ -131,7 +137,7 @@ function App() {
                   setViewMode("cards");
                   setCardPage(1);
                 }}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors ${
                   viewMode === "cards"
                     ? "bg-gray-800 text-system-blue"
                     : "text-gray-500 hover:text-gray-300"
@@ -146,7 +152,7 @@ function App() {
               type="button"
               aria-pressed={theme === "dark"}
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors"
+              className="flex items-center gap-2 min-h-[44px] px-3 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors"
               title="Toggle light/dark theme"
             >
               {theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}
@@ -156,7 +162,7 @@ function App() {
             <button
               onClick={() => refresh()}
               disabled={loading || refreshing}
-              className="flex items-center gap-2 px-4.5 py-2 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors disabled:opacity-50"
             >
               <RefreshCw
                 size={12}
@@ -201,7 +207,7 @@ function App() {
       </header>
 
       {/* Main Content Dashboard Frame */}
-      <main className="max-w-7xl mx-auto">
+      <main id="main-content" className="max-w-7xl mx-auto">
         {page === "login" && (
           <LoginPage
             onLoginSuccess={(user) => {

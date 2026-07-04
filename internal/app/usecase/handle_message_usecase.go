@@ -46,6 +46,7 @@ func NewHandleMessageUsecase(
 	broadcastUpdateUC *BroadcastUpdateUsecase,
 	motivationUC *GetMotivationUsecase,
 	helpUC *GetHelpUsecase,
+	dailyQuestUC *DailyQuestUsecase,
 ) *HandleMessageUsecase {
 	return &HandleMessageUsecase{
 		reportUC:            reportUC,
@@ -62,7 +63,7 @@ func NewHandleMessageUsecase(
 		helpUC:              helpUC,
 		jobUC:               NewJobUsecase(leaderboardUC.repo),
 		goalUC:              NewGoalUsecase(leaderboardUC.repo),
-		dailyQuestUC:        NewDailyQuestUsecase(leaderboardUC.repo),
+		dailyQuestUC:        dailyQuestUC,
 	}
 }
 

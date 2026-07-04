@@ -73,4 +73,21 @@ export class HttpReportRepository
 	async fetchUser(): Promise<EnrichedReport> {
 		return this.get<EnrichedReport>("/api/user");
 	}
+
+	async createReport(
+		message: string,
+	): Promise<{ success: boolean; message: string }> {
+		return this.post<{ success: boolean; message: string }>("/api/report", {
+			message,
+		});
+	}
+
+	async createSidequestReport(
+		activities: string[],
+	): Promise<{ success: boolean; message: string }> {
+		return this.post<{ success: boolean; message: string }>(
+			"/api/report/sidequest",
+			{ activities },
+		);
+	}
 }

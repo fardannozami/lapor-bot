@@ -1,5 +1,10 @@
 import type { EnrichedReport, GlobalSummary, JobInfo } from "../types";
 
+export interface ReportResult {
+  success: boolean;
+  message: string;
+}
+
 export interface LoginResult {
 	token: string;
 	expires_at: string;
@@ -20,6 +25,8 @@ export interface IReportRepository {
 	listJobs(): Promise<JobInfo[]>;
 	fetchUser(): Promise<EnrichedReport>;
 	resetGoal?(): Promise<{ success: boolean; message: string }>;
+	createReport(message: string): Promise<ReportResult>;
+	createSidequestReport(activities: string[]): Promise<ReportResult>;
 }
 
 export interface IAuthRepository {

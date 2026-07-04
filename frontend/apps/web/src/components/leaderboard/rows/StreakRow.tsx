@@ -29,7 +29,7 @@ export const StreakRow: React.FC<StreakRowProps> = ({
   return (
     <tr
       key={hunter.user_id}
-      onClick={() => onSelectHunter(hunter)}
+      tabIndex={0} role="button" onClick={() => onSelectHunter(hunter)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectHunter(hunter); } }}
       className={rowClass}
     >
       <td className="py-4 pl-4 text-center font-mono align-middle">
