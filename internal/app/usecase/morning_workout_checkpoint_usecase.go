@@ -93,13 +93,6 @@ func splitReportsByToday(reports []*domain.Report, now time.Time) (activeToday, 
 	return activeToday, pendingToday
 }
 
-func formatReportNames(reports []*domain.Report) string {
-	names := make([]string, 0, len(reports))
-	for _, report := range reports {
-		names = append(names, reportDisplayName(report))
-	}
-	return strings.Join(names, ", ")
-}
 
 func reportDisplayName(report *domain.Report) string {
 	if report == nil {

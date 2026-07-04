@@ -25,6 +25,7 @@ import {
 } from "@lapor-bot/shared";
 import { QuickReport } from "@lapor-bot/ui";
 import type { QuickReportCallbacks } from "@lapor-bot/ui";
+import { StravaConnectPanel } from "@lapor-bot/ui";
 import type {
   DailyActivity,
   EnrichedReport,
@@ -902,6 +903,8 @@ export function PersonalPage({
 
           {/* Right aside — attributes and achievements post incoming */}
           <aside className="space-y-6">
+            <StravaConnectPanel onMessage={showToast} />
+
             {/* Job Profile — same layout as public leaderboard click (ProfileModal) */}
             <section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
               <h3 className="text-xs text-system-gold font-mono font-bold uppercase tracking-widest mb-3">

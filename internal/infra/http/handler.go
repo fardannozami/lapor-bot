@@ -28,19 +28,21 @@ type Server struct {
 	processUC      *usecase.ProcessStravaWebhookUsecase
 	reportUC       *usecase.ReportActivityUsecase
 	dailyQuestUC   *usecase.DailyQuestUsecase
+	disconnectUC   *usecase.DisconnectStravaUsecase
 	waClient       *whatsmeow.Client
 	verifyToken    string
 	jwtSecret      string
 	jwtExpiryHours int
 }
 
-func NewServer(repo domain.ReportRepository, linkUC *usecase.LinkStravaUsecase, processUC *usecase.ProcessStravaWebhookUsecase, reportUC *usecase.ReportActivityUsecase, dailyQuestUC *usecase.DailyQuestUsecase, waClient *whatsmeow.Client, cfg config.Config) *Server {
+func NewServer(repo domain.ReportRepository, linkUC *usecase.LinkStravaUsecase, processUC *usecase.ProcessStravaWebhookUsecase, reportUC *usecase.ReportActivityUsecase, dailyQuestUC *usecase.DailyQuestUsecase, disconnectUC *usecase.DisconnectStravaUsecase, waClient *whatsmeow.Client, cfg config.Config) *Server {
 	return &Server{
 		repo:           repo,
 		linkUC:         linkUC,
 		processUC:      processUC,
 		reportUC:       reportUC,
 		dailyQuestUC:   dailyQuestUC,
+		disconnectUC:   disconnectUC,
 		waClient:       waClient,
 		verifyToken:    cfg.StravaVerifyToken,
 		jwtSecret:      cfg.JWTSecret,
@@ -69,6 +71,9 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /api/report", s.AuthMiddleware(s.HandleCreateReport))
 	mux.HandleFunc("POST /api/report/sidequest", s.AuthMiddleware(s.HandleCreateSidequestReport))
+	mux.HandleFunc("GET /api/user/strava", s.AuthMiddleware(s.HandleGetStravaStatus))
+	mux.HandleFunc("POST /api/user/strava/link", s.AuthMiddleware(s.HandleCreateStravaLink))
+	mux.HandleFunc("DELETE /api/user/strava", s.AuthMiddleware(s.HandleDisconnectStrava))
 }
 
 func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +117,20 @@ func (s *Server) HandleStravaCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, "<h2>Success!</h2><p>Akun Strava kamu sudah terhubung dengan Bot Lapor. Kamu bisa menutup halaman ini.</p>")
+	fmt.Fprintf(w, `<!doctype html>
+<html lang="id">
+<head><meta charset="utf-8"><title>Strava Terhubung</title></head>
+<body style="font-family: system-ui, sans-serif; padding: 2rem; background: #05070a; color: #f8fafc;">
+<h2>Strava terhubung</h2>
+<p>Akun Strava kamu sudah terhubung dengan Bot Lapor. Kamu bisa menutup halaman ini.</p>
+<script>
+if (window.opener) {
+  window.opener.postMessage({ type: "lapor-bot:strava-connected" }, "*");
+  window.close();
+}
+</script>
+</body>
+</html>`)
 }
 
 func (s *Server) HandleStravaWebhook(w http.ResponseWriter, r *http.Request) {
@@ -1033,7 +1051,7 @@ func (s *Server) HandleGetUserByPhone(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.WriteHeader(http.StatusNoContent)
 		return

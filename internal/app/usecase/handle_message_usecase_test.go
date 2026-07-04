@@ -226,7 +226,7 @@ func TestHandleMessage_LaporCommand(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -239,7 +239,7 @@ func TestHandleMessage_LaporCommand(t *testing.T) {
 	}
 
 	// Test /lapor command
-	msg, err := handleUC.Execute(ctx, "user123", "TestUser", "/lapor")
+	msg, err := handleUC.Execute(ctx, "user123", "TestUser", "/lapor", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -267,7 +267,7 @@ func TestHandleMessage_LaporCaseInsensitive(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -278,7 +278,7 @@ func TestHandleMessage_LaporCaseInsensitive(t *testing.T) {
 			"user1": {UserID: "user1", Name: "User", JobClass: "fighter", LastReportDate: time.Now().AddDate(0, 0, -7)},
 		}
 
-		msg, err := handleUC.Execute(ctx, "user1", "User", cmd)
+		msg, err := handleUC.Execute(ctx, "user1", "User", cmd, false)
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", cmd, err)
 		}
@@ -296,12 +296,12 @@ func TestHandleMessage_LaporWithTrailingText(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
 	// Command with trailing text should still work
-	msg, err := handleUC.Execute(ctx, "user1", "User", "/lapor hari ini olahraga lari")
+	msg, err := handleUC.Execute(ctx, "user1", "User", "/lapor hari ini olahraga lari", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestHandleMessage_LeaderboardCommand(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -331,7 +331,7 @@ func TestHandleMessage_LeaderboardCommand(t *testing.T) {
 	}
 
 	// /leaderboard command is currently disabled — should be silent
-	msg, err := handleUC.Execute(ctx, "user1", "User", "/leaderboard")
+	msg, err := handleUC.Execute(ctx, "user1", "User", "/leaderboard", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -349,13 +349,13 @@ func TestHandleMessage_LeaderboardCaseInsensitive(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
 	testCases := []string{"/LEADERBOARD", "/Leaderboard", "/LeaderBoard", "/leaderboard"}
 	for _, cmd := range testCases {
-		msg, err := handleUC.Execute(ctx, "user1", "User", cmd)
+		msg, err := handleUC.Execute(ctx, "user1", "User", cmd, false)
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", cmd, err)
 		}
@@ -379,11 +379,11 @@ func TestHandleMessage_WeeklyLeaderboardCommand(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
-	msg, err := handleUC.Execute(ctx, "user1", "User", "/leaderboard-weekly")
+	msg, err := handleUC.Execute(ctx, "user1", "User", "/leaderboard-weekly", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -400,7 +400,7 @@ func TestHandleMessage_NonCommand_ReturnsNoResponse(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -413,7 +413,7 @@ func TestHandleMessage_NonCommand_ReturnsNoResponse(t *testing.T) {
 	}
 
 	for _, msgText := range testCases {
-		result, err := handleUC.Execute(ctx, "user1", "User", msgText)
+		result, err := handleUC.Execute(ctx, "user1", "User", msgText, false)
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", msgText, err)
 		}
@@ -431,7 +431,7 @@ func TestHandleMessage_HashCommand_WorksLikeSlash(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -459,7 +459,7 @@ func TestHandleMessage_HashCommand_WorksLikeSlash(t *testing.T) {
 			repo.reports["user1"] = &domain.Report{UserID: "user1", Name: "User", JobClass: "fighter", LastReportDate: time.Now().AddDate(0, 0, -7)}
 		}
 
-		result, err := handleUC.Execute(ctx, "user1", "User", tt.input)
+		result, err := handleUC.Execute(ctx, "user1", "User", tt.input, false)
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", tt.input, err)
 		}
@@ -481,7 +481,7 @@ func TestHandleMessage_UnknownHashCommand_Silent(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -492,7 +492,7 @@ func TestHandleMessage_UnknownHashCommand_Silent(t *testing.T) {
 		"#olahraga",
 	}
 	for _, msgText := range tests {
-		result, err := handleUC.Execute(ctx, "user1", "User", msgText)
+		result, err := handleUC.Execute(ctx, "user1", "User", msgText, false)
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", msgText, err)
 		}
@@ -510,13 +510,13 @@ func TestHandleMessage_UnknownSlashCommand_Silent(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
 	testCases := []string{"/invalid", "/mystats", "/laporhalo", "/leaderboard"}
 	for _, msgText := range testCases {
-		result, err := handleUC.Execute(ctx, "user1", "User", msgText)
+		result, err := handleUC.Execute(ctx, "user1", "User", msgText, false)
 		if err != nil {
 			t.Fatalf("Unexpected error for '%s': %v", msgText, err)
 		}
@@ -534,7 +534,7 @@ func TestHandleMessage_WhitespaceHandling(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -551,7 +551,7 @@ func TestHandleMessage_WhitespaceHandling(t *testing.T) {
 		repo.reports = map[string]*domain.Report{
 			"user1": {UserID: "user1", Name: "User", JobClass: "fighter"},
 		}
-		msg, err := handleUC.Execute(ctx, "user1", "User", cmd)
+		msg, err := handleUC.Execute(ctx, "user1", "User", cmd, false)
 		if err != nil {
 			t.Fatalf("Test %d: Unexpected error for '%q': %v", i, cmd, err)
 		}
@@ -569,11 +569,11 @@ func TestHandleMessage_EmptyMessage(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
-	result, err := handleUC.Execute(ctx, "user1", "User", "")
+	result, err := handleUC.Execute(ctx, "user1", "User", "", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -590,7 +590,7 @@ func TestHandleMessage_GamificationCommands(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -606,7 +606,7 @@ func TestHandleMessage_GamificationCommands(t *testing.T) {
 	}
 
 	// /mystats is now disabled — should get fallback
-	msg, err := handleUC.Execute(ctx, "user1", "Gamer", "/mystats")
+	msg, err := handleUC.Execute(ctx, "user1", "Gamer", "/mystats", false)
 	if err != nil {
 		t.Fatalf("Unexpected error for /mystats: %v", err)
 	}
@@ -615,7 +615,7 @@ func TestHandleMessage_GamificationCommands(t *testing.T) {
 	}
 
 	// /achievements is now disabled — should get fallback
-	msg, err = handleUC.Execute(ctx, "user1", "Gamer", "/achievements")
+	msg, err = handleUC.Execute(ctx, "user1", "Gamer", "/achievements", false)
 	if err != nil {
 		t.Fatalf("Unexpected error for /achievements: %v", err)
 	}
@@ -632,12 +632,12 @@ func TestHandleMessage_JobCommands(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
 	// /jobs command is now disabled — should be silent
-	msg, err := handleUC.Execute(ctx, "user1", "Hunter", "/jobs")
+	msg, err := handleUC.Execute(ctx, "user1", "Hunter", "/jobs", false)
 	if err != nil {
 		t.Fatalf("unexpected error for /jobs: %v", err)
 	}
@@ -652,7 +652,7 @@ func TestHandleMessage_JobCommands(t *testing.T) {
 	}
 
 	// /job command is now disabled — should be silent
-	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "/job ranger")
+	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "/job ranger", false)
 	if err != nil {
 		t.Fatalf("unexpected error for /job: %v", err)
 	}
@@ -664,7 +664,7 @@ func TestHandleMessage_JobCommands(t *testing.T) {
 	repo.reports["user1"].JobClass = "ranger"
 
 	// /mystats doesn't show job anymore since mystats is disabled
-	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "/mystats")
+	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "/mystats", false)
 	if err != nil {
 		t.Fatalf("unexpected error for /mystats: %v", err)
 	}
@@ -673,7 +673,7 @@ func TestHandleMessage_JobCommands(t *testing.T) {
 	}
 
 	// /lapor still works and should show the job
-	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "/lapor")
+	msg, err = handleUC.Execute(ctx, "user1", "Hunter", "/lapor", false)
 	if err != nil {
 		t.Fatalf("unexpected error for /lapor: %v", err)
 	}
@@ -690,12 +690,12 @@ func TestHandleMessage_SetNameCommand(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
 	// /setname command is now disabled — should get fallback
-	msg, err := handleUC.Execute(ctx, "userVip", "OldName", "/setname King Budi")
+	msg, err := handleUC.Execute(ctx, "userVip", "OldName", "/setname King Budi", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -703,7 +703,7 @@ func TestHandleMessage_SetNameCommand(t *testing.T) {
 		t.Errorf("Disabled /setname should be silently ignored, got: %s", msg.Text)
 	}
 
-	msg, err = handleUC.Execute(ctx, "userVip", "King Budi", "/setname Budi Solo")
+	msg, err = handleUC.Execute(ctx, "userVip", "King Budi", "/setname Budi Solo", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -720,20 +720,20 @@ func TestHandleMessage_LaporDoesNotUpdateName(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
 	// Pre-set a report with a job so attribute resolution works with no activity text.
 	repo.reports["user1"] = &domain.Report{
-		UserID:   "user1",
-		Name:     "InitialPushName",
-		JobClass: "fighter",
+		UserID:         "user1",
+		Name:           "InitialPushName",
+		JobClass:       "fighter",
 		LastReportDate: time.Now().AddDate(0, 0, -14),
 	}
 
 	// setname is disabled — PushName is used directly in /lapor instead
-	_, _ = handleUC.Execute(ctx, "user1", "InitialPushName", "/lapor")
+	_, _ = handleUC.Execute(ctx, "user1", "InitialPushName", "/lapor", false)
 
 	r := repo.reports["user1"]
 	if r == nil || r.Name != "InitialPushName" {
@@ -741,7 +741,7 @@ func TestHandleMessage_LaporDoesNotUpdateName(t *testing.T) {
 	}
 
 	// Report again with different PushName — names don't auto-update either
-	_, err := handleUC.Execute(ctx, "user1", "DifferentPushName", "/lapor")
+	_, err := handleUC.Execute(ctx, "user1", "DifferentPushName", "/lapor", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -762,7 +762,7 @@ func TestHandleMessage_LaporWithNonWhitespaceChars_ReturnsNoResponse(t *testing.
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -775,7 +775,7 @@ func TestHandleMessage_LaporWithNonWhitespaceChars_ReturnsNoResponse(t *testing.
 
 	for i, cmd := range testCases {
 		repo.reports = make(map[string]*domain.Report)
-		msg, err := handleUC.Execute(ctx, "user1", "User", cmd)
+		msg, err := handleUC.Execute(ctx, "user1", "User", cmd, false)
 		if err != nil {
 			t.Fatalf("Test %d: unexpected error for %q: %v", i, cmd, err)
 		}
@@ -798,7 +798,7 @@ func TestHandleMessage_LaporCommandPriority(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -811,7 +811,7 @@ func TestHandleMessage_LaporCommandPriority(t *testing.T) {
 	}
 
 	t.Run("/lapor-kemarin still routes to yesterday handler", func(t *testing.T) {
-		msg, err := handleUC.Execute(ctx, "user1", "User", "/lapor-kemarin lari pagi")
+		msg, err := handleUC.Execute(ctx, "user1", "User", "/lapor-kemarin lari pagi", false)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -824,7 +824,7 @@ func TestHandleMessage_LaporCommandPriority(t *testing.T) {
 	})
 
 	t.Run("/lapor sidequest still routes to sidequest handler", func(t *testing.T) {
-		msg, err := handleUC.Execute(ctx, "user1", "User", "/lapor sidequest push up 20x")
+		msg, err := handleUC.Execute(ctx, "user1", "User", "/lapor sidequest push up 20x", false)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -843,7 +843,7 @@ func TestHandleMessage_MySideQuestCommand(t *testing.T) {
 	achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 	comebackUC := usecase.NewComebackChallengeUsecase(repo)
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
-	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
 	ctx := context.Background()
 
@@ -857,7 +857,7 @@ func TestHandleMessage_MySideQuestCommand(t *testing.T) {
 	}
 
 	// /mysidequest command is now disabled — should be silent
-	msg, err := handleUC.Execute(ctx, "user123", "TestUser", "/mysidequest")
+	msg, err := handleUC.Execute(ctx, "user123", "TestUser", "/mysidequest", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -901,9 +901,9 @@ func TestHandleMessage_CancelSideQuestCommandsRouteToSideQuestCancel(t *testing.
 			achievementsUC := usecase.NewGetAchievementsUsecase(repo)
 			comebackUC := usecase.NewComebackChallengeUsecase(repo)
 			updateNameUC := usecase.NewUpdateNameUsecase(repo)
-			handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
+			handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
-			msg, err := handleUC.Execute(context.Background(), "user1", "User", input)
+			msg, err := handleUC.Execute(context.Background(), "user1", "User", input, false)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

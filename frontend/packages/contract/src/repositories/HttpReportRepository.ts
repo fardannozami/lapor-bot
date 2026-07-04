@@ -3,6 +3,7 @@ import type {
 	EnrichedReport,
 	GlobalSummary,
 	JobInfo,
+	StravaStatus,
 } from "@lapor-bot/shared";
 import { HttpClient } from "../http/HttpClient";
 import type { GetTokenFn, OnUnauthorizedFn } from "../http/HttpClient";
@@ -89,5 +90,17 @@ export class HttpReportRepository
 			"/api/report/sidequest",
 			{ activities },
 		);
+	}
+
+	async getStravaStatus(): Promise<StravaStatus> {
+		return this.get<StravaStatus>("/api/user/strava");
+	}
+
+	async createStravaLink(): Promise<{ auth_url: string }> {
+		return this.post<{ auth_url: string }>("/api/user/strava/link", {});
+	}
+
+	async disconnectStrava(): Promise<{ success: boolean; message: string }> {
+		return this.delete<{ success: boolean; message: string }>("/api/user/strava");
 	}
 }

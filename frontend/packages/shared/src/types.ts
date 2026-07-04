@@ -103,6 +103,13 @@ export interface QuestTask {
   reward_points: number;
 }
 
+export interface StravaStatus {
+  linked: boolean;
+  athlete_id?: number;
+  name?: string;
+  expires_at?: string;
+}
+
 export interface GlobalSummary {
   total_participants: number;
   active_streak_count: number;

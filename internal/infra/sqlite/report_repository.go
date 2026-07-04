@@ -1542,6 +1542,18 @@ func (r *ReportRepository) GetStravaAccountByUserID(ctx context.Context, userID 
 	return &account, nil
 }
 
+func (r *ReportRepository) DeleteStravaAccount(ctx context.Context, userID string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM strava_accounts WHERE user_id = ?`, userID)
+	return err
+}
+
+func (r *ReportRepository) CountStravaAccounts(ctx context.Context) (int, error) {
+	query := `SELECT COUNT(*) FROM strava_accounts`
+	var count int
+	err := r.db.QueryRowContext(ctx, query).Scan(&count)
+	return count, err
+}
+
 func (r *ReportRepository) SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error {
 	query := `
 		INSERT INTO daily_quests (user_id, quest_date, tasks_json)
@@ -1592,4 +1604,18 @@ func (r *ReportRepository) GetJobClass(ctx context.Context, id string) (*domain.
 		return nil, err
 	}
 	return &j, nil
+}
+
+func (r *ReportRepository) HasMigration(ctx context.Context, name string) (bool, error) {
+	var exists int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sys_migrations WHERE name = ?", name).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists > 0, nil
+}
+
+func (r *ReportRepository) SaveMigration(ctx context.Context, name string) error {
+	_, err := r.db.ExecContext(ctx, "INSERT INTO sys_migrations (name) VALUES (?)", name)
+	return err
 }

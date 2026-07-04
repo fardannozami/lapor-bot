@@ -179,7 +179,7 @@ func (uc *GetLeaderboardUsecase) ExecuteLifetime(ctx context.Context) (string, e
 	active := domain.FilterReports(reports, domain.HasAnyActivity)
 
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("⭐ *Lifetime XP Leaderboard*\n"))
+	sb.WriteString("⭐ *Lifetime XP Leaderboard*\n")
 	sb.WriteString(fmt.Sprintf("Season %d — total EXP sejak bergabung\n\n", seasonNumber))
 
 	if len(active) == 0 {
