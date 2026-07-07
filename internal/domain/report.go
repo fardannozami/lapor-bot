@@ -94,6 +94,35 @@ func ClampedAttribute(v int) int {
 	return v
 }
 
+// EnsureAttributeBaseline lifts any attribute below MinAttributeValue up to
+// MinAttributeValue. Call this before persisting a Report so the stored data
+// starts at 1 (not 0) — matching the displayed baseline. This is the
+// persistence-side enforcement of the "start from 1" invariant; ClampedAttribute
+// handles the display side.
+func (r *Report) EnsureAttributeBaseline() {
+	if r == nil {
+		return
+	}
+	if r.Str < MinAttributeValue {
+		r.Str = MinAttributeValue
+	}
+	if r.Sta < MinAttributeValue {
+		r.Sta = MinAttributeValue
+	}
+	if r.Agi < MinAttributeValue {
+		r.Agi = MinAttributeValue
+	}
+	if r.Vit < MinAttributeValue {
+		r.Vit = MinAttributeValue
+	}
+	if r.End < MinAttributeValue {
+		r.End = MinAttributeValue
+	}
+	if r.Luk < MinAttributeValue {
+		r.Luk = MinAttributeValue
+	}
+}
+
 var attributeKeywordSets = []struct {
 	attr     AttributeType
 	keywords []string

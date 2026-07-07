@@ -67,6 +67,10 @@ func (r *ReportRepository) GetReport(ctx context.Context, userID string) (*domai
 }
 
 func upsertReport(ctx context.Context, execer execContexter, report *domain.Report) error {
+	// Enforce the "start from 1" invariant at the persistence boundary so
+	// stored attribute data never falls below MinAttributeValue, regardless
+	// of which usecase produced the Report.
+	report.EnsureAttributeBaseline()
 	query := `
 		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, level, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes, goals_completed, total_side_quests, seasonal_side_quests, str, sta, agi, vit, endurance, luk)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -603,12 +607,21 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN goals_completed INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN total_side_quests INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_side_quests INTEGER DEFAULT 0")
-	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN str INTEGER DEFAULT 0")
-	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN sta INTEGER DEFAULT 0")
-	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN agi INTEGER DEFAULT 0")
-	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN vit INTEGER DEFAULT 0")
-	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN endurance INTEGER DEFAULT 0")
-	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN luk INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN str INTEGER DEFAULT 1")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN sta INTEGER DEFAULT 1")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN agi INTEGER DEFAULT 1")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN vit INTEGER DEFAULT 1")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN endurance INTEGER DEFAULT 1")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN luk INTEGER DEFAULT 1")
+	// Backfill: legacy rows may store 0 for attributes added before the
+	// "start from 1" invariant. Lift any below-baseline values to 1 so the
+	// stored data matches the displayed baseline. Idempotent.
+	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET str = 1 WHERE str < 1`)
+	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET sta = 1 WHERE sta < 1`)
+	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET agi = 1 WHERE agi < 1`)
+	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET vit = 1 WHERE vit < 1`)
+	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET endurance = 1 WHERE endurance < 1`)
+	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET luk = 1 WHERE luk < 1`)
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN report_count INTEGER NOT NULL DEFAULT 1")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN regular_report_count INTEGER NOT NULL DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN sidequest_count INTEGER NOT NULL DEFAULT 0")

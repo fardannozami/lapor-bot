@@ -99,6 +99,45 @@ func TestReportRepository_UpsertReport_Insert(t *testing.T) {
 	}
 }
 
+// TestReportRepository_UpsertReport_AttributeBaseline verifies the "start from 1"
+// invariant: a new Report with zero-valued attributes is persisted with each
+// attribute at MinAttributeValue (1), not 0.
+func TestReportRepository_UpsertReport_AttributeBaseline(t *testing.T) {
+	_, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	report := &domain.Report{
+		UserID:         "baseline-user",
+		Name:           "Baseline",
+		Streak:         1,
+		ActivityCount:  1,
+		LastReportDate: time.Now().Truncate(time.Second),
+		// Attributes intentionally left at Go zero value (0).
+	}
+
+	if err := repo.UpsertReport(ctx, report); err != nil {
+		t.Fatalf("Failed to insert report: %v", err)
+	}
+
+	got, err := repo.GetReport(ctx, "baseline-user")
+	if err != nil || got == nil {
+		t.Fatalf("Failed to get report: %v", err)
+	}
+
+	for _, attr := range []struct {
+		name string
+		val  int
+	}{
+		{"Str", got.Str}, {"Sta", got.Sta}, {"Agi", got.Agi},
+		{"Vit", got.Vit}, {"End", got.End}, {"Luk", got.Luk},
+	} {
+		if attr.val != domain.MinAttributeValue {
+			t.Errorf("%s: expected baseline %d, got %d", attr.name, domain.MinAttributeValue, attr.val)
+		}
+	}
+}
+
 func TestReportRepository_UpsertReportWithActivityEvent_WritesLedgerAndProjections(t *testing.T) {
 	db, repo, cleanup := setupTestDB(t)
 	defer cleanup()
