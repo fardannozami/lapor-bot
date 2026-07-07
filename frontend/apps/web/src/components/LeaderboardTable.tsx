@@ -56,6 +56,8 @@ const ATTRIBUTE_SUB_TABS: { id: AttributeTab; label: string }[] = [
   { id: "sta", label: "STA" },
   { id: "agi", label: "AGI" },
   { id: "vit", label: "VIT" },
+  { id: "end", label: "END" },
+  { id: "luk", label: "LUK" },
 ];
 
 const STREAK_SUB_TABS: { id: StreakTab; label: string }[] = [
@@ -115,6 +117,8 @@ const TABLE_HEADERS: Record<LeaderboardTab, string[]> = {
     "STA",
     "AGI",
     "VIT",
+    "END",
+    "LUK",
     "Level",
   ],
 };

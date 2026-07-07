@@ -47,6 +47,12 @@ const (
 
 	// SortByAttributeVIT ranks by VIT attribute value.
 	SortByAttributeVIT LeaderboardSortKey = "attribute_vit"
+
+	// SortByAttributeEND ranks by END (Endurance) attribute value.
+	SortByAttributeEND LeaderboardSortKey = "attribute_end"
+
+	// SortByAttributeLUK ranks by LUK (Luck/Resilience) attribute value.
+	SortByAttributeLUK LeaderboardSortKey = "attribute_luk"
 )
 
 // TotalActiveDays returns the lifetime count of active days, accounting for
@@ -55,15 +61,16 @@ func (r *Report) TotalActiveDays() int {
 	return r.CenturionCycles*100 + r.ActivityCount
 }
 
-// AttributeAverage returns the rounded average of all four RPG attributes.
+// AttributeAverage returns the rounded average of all RPG attributes.
 // Values are clamped to MinAttributeValue before averaging so the baseline
-// (start from 1) invariant holds.
+// (start from 1) invariant holds. Iterates over AllAttributes so new
+// attributes are included automatically.
 func (r *Report) AttributeAverage() int {
-	total := ClampedAttribute(r.Str) +
-		ClampedAttribute(r.Sta) +
-		ClampedAttribute(r.Agi) +
-		ClampedAttribute(r.Vit)
-	return total / 4
+	total := 0
+	for _, attr := range AllAttributes {
+		total += ClampedAttribute(r.AttributeValue(attr))
+	}
+	return total / len(AllAttributes)
 }
 
 // AttributeValue returns the raw attribute value for the given type.
@@ -71,13 +78,17 @@ func (r *Report) AttributeAverage() int {
 func (r *Report) AttributeValue(attr AttributeType) int {
 	switch attr {
 	case AttrStr:
-		return ClampedAttribute(r.Str)
+		return r.Str
 	case AttrSta:
-		return ClampedAttribute(r.Sta)
+		return r.Sta
 	case AttrAgi:
-		return ClampedAttribute(r.Agi)
+		return r.Agi
 	case AttrVit:
-		return ClampedAttribute(r.Vit)
+		return r.Vit
+	case AttrEnd:
+		return r.End
+	case AttrLuk:
+		return r.Luk
 	default:
 		return r.AttributeAverage()
 	}
@@ -100,7 +111,7 @@ func CompareReports(a, b *Report, key LeaderboardSortKey) bool {
 		return compareWeeklyActivity(a, b)
 	case SortByAttributeOverall:
 		return compareAttributeOverall(a, b)
-	case SortByAttributeSTR, SortByAttributeSTA, SortByAttributeAGI, SortByAttributeVIT:
+	case SortByAttributeSTR, SortByAttributeSTA, SortByAttributeAGI, SortByAttributeVIT, SortByAttributeEND, SortByAttributeLUK:
 		return compareAttribute(a, b, key)
 	default:
 		return compareSeasonRank(a, b)
@@ -165,9 +176,9 @@ func HasStreakActivity(r *Report) bool {
 }
 
 // HasAttributeActivity returns true if a report has at least one attribute
-// point across any of the four RPG attributes.
+// point across any of the RPG attributes.
 func HasAttributeActivity(r *Report) bool {
-	return r.Str > 0 || r.Sta > 0 || r.Agi > 0 || r.Vit > 0
+	return r.Str > 0 || r.Sta > 0 || r.Agi > 0 || r.Vit > 0 || r.End > 0 || r.Luk > 0
 }
 
 // FilterReports returns a new slice containing only reports that pass the predicate.
@@ -279,12 +290,16 @@ func compareAttribute(a, b *Report, key LeaderboardSortKey) bool {
 		attr = AttrAgi
 	case SortByAttributeVIT:
 		attr = AttrVit
+	case SortByAttributeEND:
+		attr = AttrEnd
+	case SortByAttributeLUK:
+		attr = AttrLuk
 	default:
 		attr = AttrStr
 	}
 
-	aVal := a.AttributeValue(attr)
-	bVal := b.AttributeValue(attr)
+	aVal := ClampedAttribute(a.AttributeValue(attr))
+	bVal := ClampedAttribute(b.AttributeValue(attr))
 	if aVal != bVal {
 		return aVal > bVal
 	}
@@ -313,6 +328,10 @@ func AttributeSortKeyFromType(attr AttributeType) LeaderboardSortKey {
 		return SortByAttributeAGI
 	case AttrVit:
 		return SortByAttributeVIT
+	case AttrEnd:
+		return SortByAttributeEND
+	case AttrLuk:
+		return SortByAttributeLUK
 	default:
 		return SortByAttributeOverall
 	}

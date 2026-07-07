@@ -1,6 +1,6 @@
-import React from 'react';
-import { Users, Flame, Activity, Shield } from 'lucide-react';
-import type { GlobalSummary } from '@lapor-bot/shared';
+import React from "react";
+import { Users, Flame, Activity, Shield } from "lucide-react";
+import type { GlobalSummary } from "@lapor-bot/shared";
 
 interface StatsOverviewProps {
   summary: GlobalSummary | null;
@@ -26,12 +26,15 @@ const TONE_STYLES: Record<StatTone, { text: string; glow: string }> = {
   gold: { text: "text-system-gold", glow: "glass-glow-gold" },
 };
 
-export const StatsOverview: React.FC<StatsOverviewProps> = ({ summary, loading }) => {
+export const StatsOverview: React.FC<StatsOverviewProps> = ({
+  summary,
+  loading,
+}) => {
   const stats: StatItem[] = [
     {
       key: "hunters",
       label: "Total Hunters Active",
-      value: loading ? "..." : summary?.total_participants ?? 0,
+      value: loading ? "..." : (summary?.total_participants ?? 0),
       icon: Users,
       tone: "blue",
       description: "Hunters who reported this season",
@@ -48,7 +51,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ summary, loading }
     {
       key: "workouts",
       label: "Total Workouts Logged",
-      value: loading ? "..." : summary?.total_workouts_logged ?? 0,
+      value: loading ? "..." : (summary?.total_workouts_logged ?? 0),
       icon: Activity,
       tone: "green",
       description: "Total workouts in lifetime history",
@@ -56,7 +59,9 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ summary, loading }
     {
       key: "season",
       label: "System Current State",
-      value: loading ? "..." : `Season ${summary?.current_season ?? 1} - Day ${summary?.current_day ?? 1}`,
+      value: loading
+        ? "..."
+        : `Season ${summary?.current_season ?? 1} - Day ${summary?.current_day ?? 1}`,
       icon: Shield,
       tone: "gold",
       description: "Active campaign stage progress",
@@ -75,16 +80,22 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ summary, loading }
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-gray-400 text-sm font-medium">{stat.label}</p>
+                <p className="text-gray-400 text-sm font-medium">
+                  {stat.label}
+                </p>
                 <h3 className="text-3xl font-bold font-orbitron tracking-wide mt-2 text-white">
                   {stat.value}
                 </h3>
               </div>
-              <div className={`p-3 rounded-xl bg-gray-900/60 ${tone.text} ${stat.pulse ? "animate-pulse" : ""}`}>
+              <div
+                className={`p-3 rounded-xl bg-gray-900/60 ${tone.text} ${stat.pulse ? "animate-pulse" : ""}`}
+              >
                 <Icon size={24} />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-4 font-mono">{stat.description}</p>
+            <p className="text-xs text-gray-500 mt-4 font-mono">
+              {stat.description}
+            </p>
           </div>
         );
       })}

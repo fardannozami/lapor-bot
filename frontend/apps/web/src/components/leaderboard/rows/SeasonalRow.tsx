@@ -21,7 +21,19 @@ export const SeasonalRow: React.FC<SeasonalRowProps> = ({
   rowClass,
   onSelectHunter,
 }) => (
-  <tr key={hunter.user_id} tabIndex={0} role="button" onClick={() => onSelectHunter(hunter)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectHunter(hunter); } }} className={rowClass}>
+  <tr
+    key={hunter.user_id}
+    tabIndex={0}
+    role="button"
+    onClick={() => onSelectHunter(hunter)}
+    onKeyDown={(e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onSelectHunter(hunter);
+      }
+    }}
+    className={rowClass}
+  >
     <td className="py-4 pl-4 text-center font-mono align-middle">
       <div className="flex justify-center">
         <RankBadge rank={rank} />
@@ -46,7 +58,9 @@ export const SeasonalRow: React.FC<SeasonalRowProps> = ({
     </td>
     <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-400">
       <div className="flex flex-col items-center gap-1">
-        <span className="font-bold text-gray-300">{hunter.seasonal_max_streak}</span>
+        <span className="font-bold text-gray-300">
+          {hunter.seasonal_max_streak}
+        </span>
         <span className="text-[10px] text-gray-500">best streak</span>
       </div>
     </td>

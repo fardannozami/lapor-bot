@@ -31,7 +31,9 @@ export function hasStreakActivity(h: EnrichedReport): boolean {
 
 /** User has at least one attribute above the minimum baseline (1). */
 export function hasAttributeActivity(h: EnrichedReport): boolean {
-  return h.str > 1 || h.sta > 1 || h.agi > 1 || h.vit > 1;
+  return (
+    h.str > 1 || h.sta > 1 || h.agi > 1 || h.vit > 1 || h.end > 1 || h.luk > 1
+  );
 }
 
 /** User has logged at least one day this week. */

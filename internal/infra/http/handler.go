@@ -210,6 +210,8 @@ type EnrichedReport struct {
 	Sta                   int                         `json:"sta"`
 	Agi                   int                         `json:"agi"`
 	Vit                   int                         `json:"vit"`
+	End                   int                         `json:"end"`
+	Luk                   int                         `json:"luk"`
 	RankName              string                      `json:"rank_name"`
 	RankIcon              string                      `json:"rank_icon"`
 	SeasonRankProgress    TierProgress                `json:"season_rank_progress"`
@@ -594,6 +596,8 @@ func enrichReportWithMasking(r *domain.Report, today time.Time, weekActivity []b
 		Sta:                   domain.ClampedAttribute(r.Sta),
 		Agi:                   domain.ClampedAttribute(r.Agi),
 		Vit:                   domain.ClampedAttribute(r.Vit),
+		End:                   domain.ClampedAttribute(r.End),
+		Luk:                   domain.ClampedAttribute(r.Luk),
 		RankName:              rank.Name,
 		RankIcon:              rank.Icon,
 		SeasonRankProgress:    buildSeasonRankProgress(r.SeasonalPoints, rank),

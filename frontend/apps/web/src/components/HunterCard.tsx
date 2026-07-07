@@ -1,7 +1,7 @@
-import React from 'react';
-import { Flame, Trophy, Activity, ArrowUpRight } from 'lucide-react';
-import type { EnrichedReport } from '@lapor-bot/shared';
-import { getJobColor } from '@lapor-bot/shared';
+import React from "react";
+import { Flame, Trophy, Activity, ArrowUpRight } from "lucide-react";
+import type { EnrichedReport } from "@lapor-bot/shared";
+import { getJobColor } from "@lapor-bot/shared";
 
 interface HunterCardProps {
   hunter: EnrichedReport;
@@ -9,12 +9,14 @@ interface HunterCardProps {
 }
 
 export const HunterCard: React.FC<HunterCardProps> = ({ hunter, onClick }) => {
-
   const getRankGlow = (rankName: string) => {
-    if (rankName.includes('S-Rank') || rankName.includes('Monarch')) return 'glass-glow-gold hover:shadow-neon-gold';
-    if (rankName.includes('A-Rank')) return 'glass-glow-purple hover:shadow-neon-purple';
-    if (rankName.includes('B-Rank')) return 'glass-glow-blue hover:shadow-neon-blue';
-    return 'hover:border-gray-700';
+    if (rankName.includes("S-Rank") || rankName.includes("Monarch"))
+      return "glass-glow-gold hover:shadow-neon-gold";
+    if (rankName.includes("A-Rank"))
+      return "glass-glow-purple hover:shadow-neon-purple";
+    if (rankName.includes("B-Rank"))
+      return "glass-glow-blue hover:shadow-neon-blue";
+    return "hover:border-gray-700";
   };
 
   return (
@@ -23,13 +25,13 @@ export const HunterCard: React.FC<HunterCardProps> = ({ hunter, onClick }) => {
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onClick();
         }
       }}
       className={`relative glass p-5 rounded-2xl cursor-pointer transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1 flex flex-col justify-between overflow-hidden group ${getRankGlow(
-        hunter.rank_name
+        hunter.rank_name,
       )}`}
     >
       {/* Active today pulse indicator */}
@@ -57,11 +59,15 @@ export const HunterCard: React.FC<HunterCardProps> = ({ hunter, onClick }) => {
         <h3 className="text-lg font-bold text-white tracking-wide truncate group-hover:text-system-blue transition-colors mb-1 pr-6">
           {hunter.name}
         </h3>
-        <p className="text-[10px] text-gray-500 font-mono mb-4">{hunter.user_id}</p>
+        <p className="text-[10px] text-gray-500 font-mono mb-4">
+          {hunter.user_id}
+        </p>
 
         {/* Job Class Badge */}
         <div className="mb-4">
-          <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full border ${getJobColor(hunter.job_class)}`}>
+          <span
+            className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full border ${getJobColor(hunter.job_class)}`}
+          >
             {hunter.job_icon} {hunter.job_name}
           </span>
         </div>
@@ -71,7 +77,10 @@ export const HunterCard: React.FC<HunterCardProps> = ({ hunter, onClick }) => {
       <div className="border-t border-gray-900/60 pt-3 flex justify-between items-center text-xs font-mono">
         {/* Streak */}
         <div className="flex items-center gap-1 text-system-red">
-          <Flame size={12} className={hunter.streak > 0 ? "animate-pulse" : ""} />
+          <Flame
+            size={12}
+            className={hunter.streak > 0 ? "animate-pulse" : ""}
+          />
           <span className="font-bold">{hunter.streak}w</span>
         </div>
 

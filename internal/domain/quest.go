@@ -92,6 +92,7 @@ func questOptionsForJob(jobClass string, mediumBonus, hardBonus int) ([]QuestTas
 			{ID: "stepups", Name: "Step-up", Difficulty: "medium", Target: 16 + mediumBonus*2, Unit: "x", RewardPoints: 5},
 			{ID: "jumpingjacks", Name: "Jumping Jacks", Difficulty: "medium", Target: 25 + mediumBonus*3, Unit: "x", RewardPoints: 5},
 			{ID: "skipping", Name: "Skipping / Rope Jump", Difficulty: "medium", Target: 2 + mediumBonus, Unit: "menit", RewardPoints: 5},
+			{ID: "briskwalk", Name: "Jalan Cepat / Brisk Walk", Difficulty: "medium", Target: 15 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
 		},
 		AttrAgi: {
 			{ID: "highknees", Name: "High Knees (Marching)", Difficulty: "medium", Target: 1 + mediumBonus, Unit: "menit", RewardPoints: 5},
@@ -105,6 +106,18 @@ func questOptionsForJob(jobClass string, mediumBonus, hardBonus int) ([]QuestTas
 			{ID: "deepbreathing", Name: "Deep Breathing", Difficulty: "medium", Target: 3 + mediumBonus, Unit: "menit", RewardPoints: 5},
 			{ID: "birddog", Name: "Bird Dog", Difficulty: "medium", Target: 12 + mediumBonus*2, Unit: "x", RewardPoints: 5},
 			{ID: "balance", Name: "Balance Drill", Difficulty: "medium", Target: 2 + mediumBonus, Unit: "menit", RewardPoints: 5},
+		},
+		AttrEnd: {
+			{ID: "hiking", Name: "Hiking / Jalan Alam", Difficulty: "medium", Target: 20 + mediumBonus*5, Unit: "menit", RewardPoints: 5},
+			{ID: "longwalk", Name: "Jalan Jauh / Long Walk", Difficulty: "medium", Target: 20 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
+			{ID: "trail", Name: "Trail Walk / Trekking Ringan", Difficulty: "medium", Target: 15 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
+			{ID: "powerwalk", Name: "Power Walk", Difficulty: "medium", Target: 15 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
+		},
+		AttrLuk: {
+			{ID: "coldshower", Name: "Cold Shower", Difficulty: "medium", Target: 2 + mediumBonus, Unit: "menit", RewardPoints: 5},
+			{ID: "discipline", Name: "Discipline Challenge (Bangun Pagi)", Difficulty: "medium", Target: 1 + mediumBonus, Unit: "hari", RewardPoints: 5},
+			{ID: "mentalreset", Name: "Mental Reset / Meditasi Fokus", Difficulty: "medium", Target: 5 + mediumBonus, Unit: "menit", RewardPoints: 5},
+			{ID: "digitaldetox", Name: "Digital Detox", Difficulty: "medium", Target: 30 + mediumBonus*10, Unit: "menit", RewardPoints: 5},
 		},
 	}
 
@@ -134,6 +147,18 @@ func questOptionsForJob(jobClass string, mediumBonus, hardBonus int) ([]QuestTas
 			{ID: "deepbreathing", Name: "Deep Breathing", Difficulty: "hard", Target: 6 + hardBonus, Unit: "menit", RewardPoints: 5},
 			{ID: "balance", Name: "Balance Drill", Difficulty: "hard", Target: 4 + hardBonus, Unit: "menit", RewardPoints: 5},
 		},
+		AttrEnd: {
+			{ID: "hiking", Name: "Hiking Trekking", Difficulty: "hard", Target: 45 + hardBonus*5, Unit: "menit", RewardPoints: 5},
+			{ID: "longwalk", Name: "Jalan Jauh 5km+", Difficulty: "hard", Target: 45 + hardBonus*5, Unit: "menit", RewardPoints: 5},
+			{ID: "uphill", Name: "Naik Bukit / Uphill Walk", Difficulty: "hard", Target: 20 + hardBonus*3, Unit: "menit", RewardPoints: 5},
+			{ID: "endurancewalk", Name: "Endurance Walk (daya tahan)", Difficulty: "hard", Target: 40 + hardBonus*5, Unit: "menit", RewardPoints: 5},
+		},
+		AttrLuk: {
+			{ID: "icebath", Name: "Ice Bath / Cold Plunge", Difficulty: "hard", Target: 3 + hardBonus, Unit: "menit", RewardPoints: 5},
+			{ID: "coldexposure", Name: "Cold Exposure (Wim Hof Style)", Difficulty: "hard", Target: 5 + hardBonus, Unit: "menit", RewardPoints: 5},
+			{ID: "fasting", Name: "Fasting Window 16 jam", Difficulty: "hard", Target: 16 + hardBonus, Unit: "jam", RewardPoints: 5},
+			{ID: "dopaminedetox", Name: "Dopamine Detox", Difficulty: "hard", Target: 4 + hardBonus, Unit: "jam", RewardPoints: 5},
+		},
 	}
 
 	primary := JobClassPrimaryAttribute(jobClass)
@@ -141,9 +166,11 @@ func questOptionsForJob(jobClass string, mediumBonus, hardBonus int) ([]QuestTas
 		return mediumByAttr[primary], hardByAttr[primary]
 	}
 
+	// Mage (or unknown job with no single primary): mix quests from all
+	// attributes so the daily quest reflects Mage's versatile playstyle.
 	var mediumOptions []QuestTask
 	var hardOptions []QuestTask
-	for _, attr := range []AttributeType{AttrStr, AttrSta, AttrAgi, AttrVit} {
+	for _, attr := range AllAttributes {
 		mediumOptions = append(mediumOptions, mediumByAttr[attr]...)
 		hardOptions = append(hardOptions, hardByAttr[attr]...)
 	}
@@ -190,6 +217,21 @@ var questTaskKeywords = map[string][]string{
 	"deadbug":         {"dead bug", "deadbug"},
 	"birddog":         {"bird dog", "birddog"},
 	"balance":         {"balance", "balance drill", "keseimbangan"},
+	"briskwalk":       {"brisk walk", "jalan cepat", "power walk", "powerwalk"},
+	"hiking":          {"hiking", "trekking", "jalan alam", "trail", "naik bukit", "uphill"},
+	"longwalk":        {"jalan jauh", "long walk", "long distance", "jarak jauh", "endurance walk", "endurancewalk"},
+	"trail":           {"trail", "trail walk", "trekking ringan"},
+	"powerwalk":       {"power walk", "powerwalk", "jalan santai pagi"},
+	"coldshower":      {"cold shower", "mandi dingin", "cold plunge"},
+	"discipline":      {"discipline", "disiplin", "bangun pagi", "discipline challenge"},
+	"mentalreset":     {"mental reset", "mental training", "mental", "meditasi fokus"},
+	"digitaldetox":    {"digital detox", "dopamine detox", "dopaminedetox"},
+	"icebath":         {"ice bath", "icebath", "cold plunge", "cold plunge tub"},
+	"coldexposure":    {"cold exposure", "wim hof", "coldexposure"},
+	"fasting":         {"fasting", "puasa", "intermittent fasting", "fasting window"},
+	"dopaminedetox":   {"dopamine detox", "dopaminedetox", "digital detox"},
+	"uphill":          {"uphill", "naik bukit", "uphill walk"},
+	"endurancewalk":   {"endurance walk", "endurancewalk", "daya tahan", "endurance"},
 }
 
 // MatchTask checks if input contains keywords matching a specific task ID.

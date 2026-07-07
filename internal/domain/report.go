@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -36,6 +37,8 @@ type Report struct {
 	Sta                   int       `json:"sta" db:"sta"`
 	Agi                   int       `json:"agi" db:"agi"`
 	Vit                   int       `json:"vit" db:"vit"`
+	End                   int       `json:"end" db:"end"`
+	Luk                   int       `json:"luk" db:"luk"`
 }
 
 type ActivityLeaderboardEntry struct {
@@ -66,7 +69,16 @@ const (
 	AttrSta AttributeType = "STA"
 	AttrAgi AttributeType = "AGI"
 	AttrVit AttributeType = "VIT"
+	AttrEnd AttributeType = "END"
+	AttrLuk AttributeType = "LUK"
 )
+
+// AllAttributes lists every RPG attribute in canonical display order.
+// Use this instead of hardcoding the attribute list so adding a new
+// attribute only requires extending this slice. This is the single
+// source of truth for iteration over attributes (Mage fallback,
+// attribute average, quest generation, etc.).
+var AllAttributes = []AttributeType{AttrStr, AttrSta, AttrAgi, AttrVit, AttrEnd, AttrLuk}
 
 // MinAttributeValue is the floor for any displayed attribute.
 // A hunter starts at 1 (not 0) so the dashboard always shows a positive baseline.
@@ -96,7 +108,12 @@ var attributeKeywordSets = []struct {
 	{AttrSta, []string{
 		"lari", "berlari", "run", "running", "jogging", "marathon", "sepeda", "bersepeda",
 		"cycle", "cycling", "bike", "kardio", "cardio", "renang", "berenang", "swim",
-		"swimming", "hiking", "trekking", "jalan jauh", "stairs", "tangga", "naik turun tangga",
+		"swimming",
+		// Walking is a low-intensity cardiovascular activity (Harvard/AHA classify it
+		// as moderate-intensity aerobic exercise), so it boosts STA — giving Rangers
+		// and anyone doing low-intensity cardio a valid stat gain.
+		"walk", "walking", "jalan kaki", "jalan cepat", "brisk walk", "jalan pagi",
+		"stairs", "tangga", "naik turun tangga",
 		"jumping jacks", "jumpingjacks", "step up", "stepup", "skipping", "rope jump",
 		"mountain climber", "mountainclimber",
 	}},
@@ -110,9 +127,27 @@ var attributeKeywordSets = []struct {
 	}},
 	{AttrVit, []string{
 		"yoga", "pilates", "stretching", "stretch", "peregangan", "mobility", "recovery",
-		"walk", "walking", "jalan kaki", "jalan santai", "meditasi", "meditation", "meditate",
-		"napas", "breathing", "deep breathing", "pemulihan", "mobility flow", "bird dog",
-		"balance", "keseimbangan", "shoulder mobility", "neck mobility",
+		"meditasi", "meditation", "meditate", "napas", "breathing", "deep breathing",
+		"pemulihan", "mobility flow", "bird dog", "balance", "keseimbangan",
+		"shoulder mobility", "neck mobility",
+	}},
+	{AttrEnd, []string{
+		// Sustained, low-to-moderate intensity activities that build long-term
+		// endurance — the Tank's specialty. Distinct from STA (fast cardio) by
+		// duration and intensity profile.
+		"hiking", "trekking", "jalan jauh", "jalan santai", "long walk", "long distance",
+		"jarak jauh", "endurance", "daya tahan", "trail", "uphill", "naik bukit",
+		"jalan santai pagi", "power walk",
+	}},
+	{AttrLuk, []string{
+		// Resilience and discipline practices — the Necromancer's specialty.
+		// These are real activities that build mental fortitude and the capacity
+		// to come back stronger after setbacks, mirroring the Necromancer's
+		// "bangkit dari kegagalan" theme.
+		"cold shower", "cold exposure", "ice bath", "cold plunge", "mandi dingin",
+		"wim hof", "fasting", "puasa", "intermittent fasting", "discipline", "disiplin",
+		"mental training", "mental", "comeback", "restart", "bangkit", "resilience",
+		"digital detox", "dopamine detox",
 	}},
 }
 
@@ -151,7 +186,7 @@ func ResolveReportAttributes(text string, jobClass string) ([]AttributeType, boo
 			return []AttributeType{primary}, true
 		}
 		// Mage has no single primary attribute — give all attributes.
-		return []AttributeType{AttrStr, AttrSta, AttrAgi, AttrVit}, true
+		return slices.Clone(AllAttributes), true
 	}
 
 	// No job selected — user needs to pick one.

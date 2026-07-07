@@ -28,7 +28,8 @@ const selectColumns = `user_id, name, COALESCE(job_class, ''), streak, activity_
 	COALESCE(seasonal_max_streak, 0), COALESCE(seasonal_achievements, ''),
 	COALESCE(streak_freezes, 0), COALESCE(goals_completed, 0),
 	COALESCE(total_side_quests, 0), COALESCE(seasonal_side_quests, 0),
-	COALESCE(str, 0), COALESCE(sta, 0), COALESCE(agi, 0), COALESCE(vit, 0)`
+	COALESCE(str, 0), COALESCE(sta, 0), COALESCE(agi, 0), COALESCE(vit, 0),
+	COALESCE(endurance, 0), COALESCE(luk, 0)`
 
 func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, error) {
 	var report domain.Report
@@ -42,6 +43,7 @@ func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, e
 		&report.StreakFreezes, &report.GoalsCompleted,
 		&report.TotalSideQuests, &report.SeasonalSideQuests,
 		&report.Str, &report.Sta, &report.Agi, &report.Vit,
+		&report.End, &report.Luk,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -66,8 +68,8 @@ func (r *ReportRepository) GetReport(ctx context.Context, userID string) (*domai
 
 func upsertReport(ctx context.Context, execer execContexter, report *domain.Report) error {
 	query := `
-		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, level, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes, goals_completed, total_side_quests, seasonal_side_quests, str, sta, agi, vit)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, level, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes, goals_completed, total_side_quests, seasonal_side_quests, str, sta, agi, vit, endurance, luk)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			name = excluded.name,
 			job_class = excluded.job_class,
@@ -91,7 +93,9 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 			str = excluded.str,
 			sta = excluded.sta,
 			agi = excluded.agi,
-			vit = excluded.vit
+			vit = excluded.vit,
+			endurance = excluded.endurance,
+			luk = excluded.luk
 	`
 	_, err := execer.ExecContext(ctx, query,
 		report.UserID, report.Name, report.JobClass, report.Streak, report.ActivityCount,
@@ -101,6 +105,7 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 		report.SeasonalAchievements, report.StreakFreezes, report.GoalsCompleted,
 		report.TotalSideQuests, report.SeasonalSideQuests,
 		report.Str, report.Sta, report.Agi, report.Vit,
+		report.End, report.Luk,
 	)
 	return err
 }
@@ -602,6 +607,8 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN sta INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN agi INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN vit INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN endurance INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN luk INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN report_count INTEGER NOT NULL DEFAULT 1")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN regular_report_count INTEGER NOT NULL DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN sidequest_count INTEGER NOT NULL DEFAULT 0")
@@ -694,13 +701,13 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 			sort_order  INTEGER NOT NULL DEFAULT 0
 		);
 		INSERT OR IGNORE INTO job_classes (id, name, icon, description, trait, sort_order) VALUES
-		  ('fighter','Fighter','⚔️','Melee hunter yang mengandalkan disiplin, stamina, dan daya tahan.','cocok untuk yang suka latihan strength/functional',0),
-		  ('tank','Tanker','🛡️','Frontliner yang kuat bertahan dan konsisten menjaga formasi.','cocok untuk yang fokus konsistensi dan habit jangka panjang',1),
-		  ('assassin','Assassin','🗡️','Hunter cepat, gesit, dan tajam mengeksekusi sesi singkat tapi intens.','cocok untuk HIIT, sprint, atau workout cepat',2),
-		  ('mage','Mage','🔥','Damage dealer jarak jauh dengan energi eksplosif dan variasi latihan.','cocok untuk yang suka eksplor banyak jenis olahraga',3),
-		  ('ranger','Ranger','🏹','Hunter presisi yang unggul di endurance, pace, dan jarak.','cocok untuk lari, sepeda, jalan jauh, hiking',4),
-		  ('healer','Healer','💚','Support hunter yang menjaga recovery, mobilitas, dan kesehatan jangka panjang.','cocok untuk yoga, mobility, recovery, pola hidup sehat',5),
-		  ('necromancer','Necromancer','🌑','Hidden job yang bangkit dari kegagalan dan mengubah comeback jadi kekuatan.','cocok untuk comeback setelah absen dan bangun sistem baru',6);
+		  ('fighter','Fighter','⚔️','Melee hunter yang mengandalkan kekuatan, disiplin, dan tenaga raw.','cocok untuk yang suka latihan strength/functional — STR',0),
+		  ('tank','Tanker','🛡️','Frontliner yang kuat bertahan dan konsisten menjaga formasi jarak jauh.','cocok untuk yang fokus endurance, hiking, trekking, dan habit jangka panjang — END',1),
+		  ('assassin','Assassin','🗡️','Hunter cepat, gesit, dan tajam mengeksekusi sesi singkat tapi intens.','cocok untuk HIIT, sprint, olahraga raket, atau workout cepat — AGI',2),
+		  ('mage','Mage','🔥','Damage dealer jarak jauh dengan energi eksplosif dan variasi latihan.','cocok untuk yang suka eksplor banyak jenis olahraga — ALL attributes',3),
+		  ('ranger','Ranger','🏹','Hunter presisi yang unggul di stamina, pace, dan jarak.','cocok untuk lari, sepeda, jalan kaki, renang, kardio — STA',4),
+		  ('healer','Healer','💚','Support hunter yang menjaga recovery, mobilitas, dan kesehatan jangka panjang.','cocok untuk yoga, mobility, recovery, meditasi, pola hidup sehat — VIT',5),
+		  ('necromancer','Necromancer','🌑','Hidden job yang bangkit dari kegagalan dan mengubah comeback jadi kekuatan.','cocok untuk comeback, cold exposure, discipline training, mental resilience — LUK',6);
 	`
 	_, err = r.db.ExecContext(ctx, jobClassesQuery)
 	if err != nil {

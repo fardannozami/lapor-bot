@@ -4,6 +4,8 @@ import {
   Swords,
   Zap,
   Heart,
+  Mountain,
+  Moon,
   LogOut,
   ScrollText,
   CheckCircle2,
@@ -985,7 +987,7 @@ export function PersonalPage({
                   {
                     icon: Zap,
                     label: "STA",
-                    hint: "Stamina / Run",
+                    hint: "Stamina / Cardio",
                     value: clampAttribute(localUser.sta),
                     color: "text-system-blue",
                     bar: "bg-gradient-to-r from-amber-500 to-system-gold",
@@ -1005,6 +1007,22 @@ export function PersonalPage({
                     value: clampAttribute(localUser.vit),
                     color: "text-system-green",
                     bar: "bg-gradient-to-r from-system-green to-system-blue",
+                  },
+                  {
+                    icon: Mountain,
+                    label: "END",
+                    hint: "Endurance / Hiking",
+                    value: clampAttribute(localUser.end),
+                    color: "text-system-gold",
+                    bar: "bg-gradient-to-r from-system-gold to-amber-500",
+                  },
+                  {
+                    icon: Moon,
+                    label: "LUK",
+                    hint: "Luck / Resilience",
+                    value: clampAttribute(localUser.luk),
+                    color: "text-gray-400",
+                    bar: "bg-gradient-to-r from-gray-500 to-gray-700",
                   },
                 ].map((stat) => {
                   const Icon = stat.icon;

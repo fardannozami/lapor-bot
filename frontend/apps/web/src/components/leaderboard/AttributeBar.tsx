@@ -4,7 +4,7 @@ import { attributeBarWidth } from "@lapor-bot/shared";
 interface AttributeBarProps {
   value: number;
   label: string;
-  tone?: "str" | "sta" | "agi" | "vit";
+  tone?: "str" | "sta" | "agi" | "vit" | "end" | "luk";
 }
 
 const TONE_GRADIENTS: Record<NonNullable<AttributeBarProps["tone"]>, string> = {
@@ -12,6 +12,8 @@ const TONE_GRADIENTS: Record<NonNullable<AttributeBarProps["tone"]>, string> = {
   sta: "from-system-gold to-system-red",
   agi: "from-system-blue to-system-green",
   vit: "from-system-green to-system-blue",
+  end: "from-amber-500 to-system-gold",
+  luk: "from-gray-500 to-gray-700",
 };
 
 export const AttributeBar: React.FC<AttributeBarProps> = ({
@@ -20,7 +22,9 @@ export const AttributeBar: React.FC<AttributeBarProps> = ({
   tone,
 }) => {
   const width = attributeBarWidth(value);
-  const gradient = tone ? TONE_GRADIENTS[tone] : "from-system-blue to-system-purple";
+  const gradient = tone
+    ? TONE_GRADIENTS[tone]
+    : "from-system-blue to-system-purple";
 
   return (
     <div className="min-w-[120px]">
