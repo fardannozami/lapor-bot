@@ -2,6 +2,14 @@ package usecase
 
 import "fmt"
 
+const attributeHelpContent = "Setiap laporan valid menaikkan satu attribute +1. Kata kunci aktivitas menentukan kandidat; jika beberapa cocok, specialty job diprioritaskan. Jika tidak ada yang cocok, specialty job menjadi fallback. Semua attribute dimulai dari 1.\n\n" +
+	"💪 *STR (Strength)*: gym, latihan beban/resistance, push-up, pull-up, squat, deadlift, plank\n" +
+	"🏃‍♂️ *STA (Stamina)*: lari/jogging, sepeda, cardio/aerobik, renang, jalan cepat, tangga, skipping\n" +
+	"⚡ *AGI (Agility)*: futsal, basket, badminton, tenis/padel, sprint, HIIT, boxing, dance, balance/coordination drill\n" +
+	"🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, mobility, active recovery, breathing\n" +
+	"🏔️ *END (Endurance)*: marathon/long run, long ride, hiking, trekking, rucking, jalan jauh, trail/uphill\n" +
+	"🌑 *LUK (Luck/Resilience)*: orienteering, obstacle course, exploration/adventure walk, comeback workout, new movement challenge"
+
 var helpSections = []struct {
 	emoji   string
 	title   string
@@ -35,7 +43,7 @@ var helpSections = []struct {
 	{
 		emoji:   "⚔️",
 		title:   "Status RPG (Attributes)",
-		content: "Bot membaca laporan `/lapor` atau `#lapor` dengan daftar kata kunci yang sama untuk semua user. Setiap attribute yang cocok naik +1 per laporan valid.\n\n💪 *STR (Strength)*: gym, beban, push-up, pull-up, squat, plank, lunges, glute bridge, calf raises\n🏃‍♂️ *STA (Stamina)*: lari, jogging, sepeda, cardio, renang, hiking, tangga, jumping jacks, skipping\n⚡ *AGI (Agility)*: futsal/sepak bola, basket, badminton, tenis/padel, sprint, HIIT/tabata, boxing/muay thai, high knees, lateral shuffle\n🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, mobility, recovery, jalan santai, meditasi, breathing, balance\n\nJika tidak ada kata kunci spesifik, laporan otomatis masuk *VIT*.",
+		content: attributeHelpContent,
 	},
 }
 
@@ -63,14 +71,7 @@ func (uc *GetHelpUsecase) Execute() string {
 }
 
 func (uc *GetHelpUsecase) ExecuteAttributes() string {
-	msg := "⚔️ *Status RPG (Attributes)* ⚔️\n\n"
-	msg += "Setiap `/lapor` valid memberi +1 ke setiap attribute yang cocok. Aturannya sama untuk semua user; XP, level, streak, dan bonus tidak mengubah nilai attribute.\n\n"
-	msg += "💪 *STR (Strength)*: gym, beban, push-up, pull-up, squat, plank, lunges, glute bridge, calf raises\n"
-	msg += "🏃‍♂️ *STA (Stamina)*: lari/jogging, sepeda, cardio, renang, hiking, tangga, jumping jacks, skipping\n"
-	msg += "⚡ *AGI (Agility)*: futsal/sepak bola, basket, badminton, tenis/padel, sprint, HIIT/tabata, boxing/muay thai, high knees, lateral shuffle\n"
-	msg += "🧘‍♂️ *VIT (Vitality)*: yoga, pilates, stretching, mobility, recovery, jalan santai, meditasi, breathing, balance\n\n"
-	msg += "💡 *Tips:* Jika tidak ada kata kunci di atas yang cocok, laporan otomatis masuk *VIT*."
-	return msg
+	return "⚔️ *Status RPG (Attributes)* ⚔️\n\n" + attributeHelpContent
 }
 
 func (uc *GetHelpUsecase) ExecuteTutorial() string {

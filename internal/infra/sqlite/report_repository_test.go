@@ -441,6 +441,28 @@ func TestReportRepository_InitTable_Idempotent(t *testing.T) {
 	}
 }
 
+func TestReportRepository_InitTable_RefreshesJobMetadata(t *testing.T) {
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, `UPDATE job_classes SET trait = 'stale' WHERE id = 'necromancer'`); err != nil {
+		t.Fatalf("seed stale job metadata: %v", err)
+	}
+	if err := repo.InitTable(ctx); err != nil {
+		t.Fatalf("refresh job metadata: %v", err)
+	}
+
+	const want = "cocok untuk movement challenge, exploration, comeback workout, dan adaptability — LUK"
+	var got string
+	if err := db.QueryRowContext(ctx, `SELECT trait FROM job_classes WHERE id = 'necromancer'`).Scan(&got); err != nil {
+		t.Fatalf("read refreshed job metadata: %v", err)
+	}
+	if got != want {
+		t.Fatalf("necromancer trait = %q, want %q", got, want)
+	}
+}
+
 func TestReportRepository_DatePersistence(t *testing.T) {
 	_, repo, cleanup := setupTestDB(t)
 	defer cleanup()

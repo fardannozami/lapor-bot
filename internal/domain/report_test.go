@@ -19,7 +19,10 @@ func TestDetermineAttributes(t *testing.T) {
 		{"agility badminton", "main bulu tangkis dan padel", []AttributeType{AttrAgi}},
 		{"vitality recovery", "yoga stretching mobility", []AttributeType{AttrVit}},
 		{"hiking is endurance", "hiking jalan jauh", []AttributeType{AttrEnd}},
+		{"long run is stamina and endurance", "lari half marathon", []AttributeType{AttrSta, AttrEnd}},
 		{"walking is stamina", "jalan kaki pagi", []AttributeType{AttrSta}},
+		{"balance is agility", "balance dan coordination drill", []AttributeType{AttrAgi}},
+		{"resilience challenge is luck", "orienteering dan obstacle course", []AttributeType{AttrLuk}},
 		{"multi attr stable order", "gym lalu lari dan stretching", []AttributeType{AttrStr, AttrSta, AttrVit}},
 		{"legacy does not match leg", "belajar legacy code", nil},
 		{"rundown does not match run", "rundown meeting pagi", nil},
@@ -54,6 +57,8 @@ func TestSelectReportAttribute(t *testing.T) {
 		{"job wins among multiple matches (fighter→STR)", []AttributeType{AttrSta, AttrStr, AttrVit}, "fighter", "", AttrStr},
 		{"job wins among multiple matches (ranger→STA)", []AttributeType{AttrStr, AttrSta, AttrVit}, "ranger", "", AttrSta},
 		{"job wins among multiple matches (healer→VIT)", []AttributeType{AttrSta, AttrAgi, AttrVit}, "healer", "", AttrVit},
+		{"job wins among multiple matches (tank→END)", []AttributeType{AttrSta, AttrEnd}, "tank", "", AttrEnd},
+		{"job wins among multiple matches (necromancer→LUK)", []AttributeType{AttrAgi, AttrLuk}, "necromancer", "", AttrLuk},
 		// When the job's specialty is NOT among the matches, the first matched
 		// attribute wins (deterministic, no arbitrary preference).
 		{"job not among matches falls back to first", []AttributeType{AttrSta, AttrVit}, "fighter", "", AttrSta},

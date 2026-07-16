@@ -123,7 +123,7 @@ var AllJobClasses = []JobClass{
 	{ID: "mage", Name: "Mage", Icon: "🔥", Description: "Damage dealer jarak jauh dengan energi eksplosif dan variasi latihan.", Trait: "cocok untuk yang suka eksplor banyak jenis olahraga — ALL attributes"},
 	{ID: "ranger", Name: "Ranger", Icon: "🏹", Description: "Hunter presisi yang unggul di stamina, pace, dan jarak.", Trait: "cocok untuk lari, sepeda, jalan kaki, renang, kardio — STA"},
 	{ID: "healer", Name: "Healer", Icon: "💚", Description: "Support hunter yang menjaga recovery, mobilitas, dan kesehatan jangka panjang.", Trait: "cocok untuk yoga, mobility, recovery, meditasi, pola hidup sehat — VIT"},
-	{ID: "necromancer", Name: "Necromancer", Icon: "🌑", Description: "Hidden job yang bangkit dari kegagalan dan mengubah comeback jadi kekuatan.", Trait: "cocok untuk comeback, cold exposure, discipline training, mental resilience — LUK"},
+	{ID: "necromancer", Name: "Necromancer", Icon: "🌑", Description: "Hidden job yang bangkit dari kegagalan dan mengubah comeback jadi kekuatan.", Trait: "cocok untuk movement challenge, exploration, comeback workout, dan adaptability — LUK"},
 }
 
 // GetLevel returns the current level for the given total points.

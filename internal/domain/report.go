@@ -128,55 +128,55 @@ var attributeKeywordSets = []struct {
 	keywords []string
 }{
 	{AttrStr, []string{
-		"beban", "weight", "weightlifting", "strength", "gym", "angkat", "powerlifting",
-		"push up", "pushup", "pull up", "pullup", "squat", "chair squat", "sit to stand",
-		"push day", "pull day", "push workout", "pull workout", "deadlift", "bench press",
-		"row", "leg day", "plank", "desk plank", "lunges", "lunge", "glute bridge",
-		"calf raises", "calf raise", "jinjit", "reverse crunch", "wall sit", "dead bug", "core",
+		"beban", "weight", "weights", "weightlifting", "strength", "latihan kekuatan", "gym",
+		"angkat beban", "resistance training", "bodyweight", "powerlifting", "barbell", "dumbbell",
+		"kettlebell", "push up", "pushup", "pull up", "pullup", "squat", "chair squat",
+		"sit to stand", "push day", "pull day", "push workout", "pull workout", "deadlift",
+		"bench press", "chest press", "shoulder press", "overhead press", "row", "leg day",
+		"bicep curl", "tricep extension", "hip thrust", "plank", "desk plank", "lunges", "lunge",
+		"glute bridge", "calf raises", "calf raise", "jinjit", "reverse crunch", "wall sit",
+		"dead bug", "core workout",
 	}},
 	{AttrSta, []string{
-		"lari", "berlari", "run", "running", "jogging", "marathon", "sepeda", "bersepeda",
-		"cycle", "cycling", "bike", "kardio", "cardio", "renang", "berenang", "swim",
-		"swimming",
-		// Walking is a low-intensity cardiovascular activity (Harvard/AHA classify it
-		// as moderate-intensity aerobic exercise), so it boosts STA — giving Rangers
-		// and anyone doing low-intensity cardio a valid stat gain.
-		"walk", "walking", "jalan kaki", "jalan cepat", "brisk walk", "jalan pagi",
-		"stairs", "tangga", "naik turun tangga",
+		// General rhythmic aerobic activity maps to cardiorespiratory stamina.
+		"lari", "berlari", "run", "running", "jogging", "sepeda", "bersepeda", "cycle",
+		"cycling", "bike", "kardio", "cardio", "aerobik", "aerobic", "renang", "berenang",
+		"swim", "swimming", "elliptical", "rowing machine", "walk", "walking", "jalan kaki",
+		"jalan cepat", "brisk walk", "jalan pagi", "stairs", "tangga", "naik turun tangga",
 		"jumping jacks", "jumpingjacks", "step up", "stepup", "skipping", "rope jump",
-		"mountain climber", "mountainclimber",
 	}},
 	{AttrAgi, []string{
+		// Sports and neuromotor drills emphasize speed, balance, coordination, and direction changes.
 		"bola", "sepak bola", "soccer", "football", "futsal", "basket", "basketball",
 		"bulutangkis", "bulu tangkis", "badminton", "tenis", "tennis", "padel", "padle",
 		"pickleball", "sprint", "hiit", "tabata", "muay thai", "muaythai", "boxing",
 		"tinju", "shadow boxing", "shadowboxing", "calisthenics", "voli", "volleyball",
-		"high knees", "highknees", "mountain climber", "mountainclimber", "lateral shuffle",
-		"lateralshuffle", "squat jump", "jump squat", "ladder drill", "shuttle run",
+		"dance", "dancing", "menari", "zumba", "balance", "keseimbangan", "coordination",
+		"koordinasi", "high knees", "highknees", "mountain climber", "mountainclimber",
+		"lateral shuffle", "lateralshuffle", "squat jump", "jump squat", "ladder drill",
+		"shuttle run",
 	}},
 	{AttrVit, []string{
+		// Flexibility, mobility, and active recovery support vitality.
 		"yoga", "pilates", "stretching", "stretch", "peregangan", "mobility", "recovery",
 		"meditasi", "meditation", "meditate", "napas", "breathing", "deep breathing",
-		"pemulihan", "mobility flow", "bird dog", "balance", "keseimbangan",
-		"shoulder mobility", "neck mobility",
+		"pemulihan", "mobility flow", "recovery flow", "bird dog", "shoulder mobility",
+		"neck mobility", "foam rolling", "active recovery",
 	}},
 	{AttrEnd, []string{
-		// Sustained, low-to-moderate intensity activities that build long-term
-		// endurance — the Tank's specialty. Distinct from STA (fast cardio) by
-		// duration and intensity profile.
-		"hiking", "trekking", "jalan jauh", "jalan santai", "long walk", "long distance",
-		"jarak jauh", "endurance", "daya tahan", "trail", "uphill", "naik bukit",
-		"jalan santai pagi", "power walk",
+		// Explicit long-duration efforts map to endurance; generic aerobic terms remain STA.
+		"marathon", "half marathon", "ultramarathon", "ultra marathon", "long run", "long ride",
+		"century ride", "hiking", "trekking", "rucking", "jalan jauh", "jalan santai",
+		"long walk", "long distance", "jarak jauh", "endurance", "daya tahan", "trail",
+		"trail run", "uphill", "naik bukit", "jalan santai pagi", "power walk",
 	}},
 	{AttrLuk, []string{
-		// Resilience and discipline practices — the Necromancer's specialty.
-		// These are real activities that build mental fortitude and the capacity
-		// to come back stronger after setbacks, mirroring the Necromancer's
-		// "bangkit dari kegagalan" theme.
-		"cold shower", "cold exposure", "ice bath", "cold plunge", "mandi dingin",
-		"wim hof", "fasting", "puasa", "intermittent fasting", "discipline", "disiplin",
-		"mental training", "mental", "comeback", "restart", "bangkit", "resilience",
-		"digital detox", "dopamine detox",
+		// LUK is a game-specific adaptability/resilience stat, not a clinical fitness component.
+		// Keep explicit matches to safe physical challenges; ordinary unmatched reports still
+		// fall back to the Necromancer specialty through JobClassPrimaryAttribute.
+		"orienteering", "obstacle course", "adventure walk", "exploration walk", "comeback walk",
+		"comeback workout", "return to training", "new movement", "movement challenge",
+		"adaptability drill", "resilience circuit",
 	}},
 }
 
