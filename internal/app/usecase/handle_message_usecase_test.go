@@ -298,15 +298,19 @@ func TestHandleMessage_LaporWithTrailingText(t *testing.T) {
 	updateNameUC := usecase.NewUpdateNameUsecase(repo)
 	handleUC := usecase.NewHandleMessageUsecase(reportUC, leaderboardUC, myStatsUC, achievementsUC, comebackUC, usecase.NewCancelReportUsecase(repo), updateNameUC, nil, nil, usecase.NewBroadcastUpdateUsecase(), usecase.NewGetMotivationUsecase(), usecase.NewGetHelpUsecase(), usecase.NewDailyQuestUsecase(repo))
 
-	ctx := context.Background()
-
-	// Command with trailing text should still work
-	msg, err := handleUC.Execute(ctx, "user1", "User", "/lapor hari ini olahraga lari", false)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	testCases := []string{
+		"/lapor hari ini olahraga lari",
+		"olahraga hari ini /lapor",
+		"setelah melakukan cardio #lapor",
 	}
-	if msg.Text == "" {
-		t.Error("/lapor with trailing text should still be recognized")
+	for _, input := range testCases {
+		msg, err := handleUC.Execute(context.Background(), input, "User", input, false)
+		if err != nil {
+			t.Fatalf("Execute(%q): %v", input, err)
+		}
+		if !containsSubstring(msg.Text, "Laporan diterima") {
+			t.Errorf("Execute(%q) should create a report, got %q", input, msg.Text)
+		}
 	}
 }
 
@@ -443,6 +447,7 @@ func TestHandleMessage_HashCommand_WorksLikeSlash(t *testing.T) {
 		{"#lapor", "Laporan diterima"},
 		{"#lapor Push Day", "Laporan diterima"},
 		{"#lapor sidequest", "belum terdaftar"},
+		{"jalan kaki 4000 #lapor sidequest", "belum terdaftar"},
 		{"#help", "Lapor Bot"},
 		{"#tutorial", "Panduan"},
 		{"#cancel", "belum pernah"},
