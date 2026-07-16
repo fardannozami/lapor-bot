@@ -113,14 +113,17 @@ var AllSeasonRanks = []Rank{
 
 // AllJobClasses defines jobs inspired by Solo Leveling hunter roles and common
 // RPG archetypes. Jobs are cosmetic profile flavor and do not reset per season.
+// Each job maps to a unique primary attribute (see JobClassPrimaryAttribute) so
+// that specializations are diverse — no two jobs share the same primary stat,
+// except Mage which stays mixed across all attributes.
 var AllJobClasses = []JobClass{
-	{ID: "fighter", Name: "Fighter", Icon: "⚔️", Description: "Melee hunter yang mengandalkan disiplin, stamina, dan daya tahan.", Trait: "cocok untuk yang suka latihan strength/functional"},
-	{ID: "tank", Name: "Tanker", Icon: "🛡️", Description: "Frontliner yang kuat bertahan dan konsisten menjaga formasi.", Trait: "cocok untuk yang fokus konsistensi dan habit jangka panjang"},
-	{ID: "assassin", Name: "Assassin", Icon: "🗡️", Description: "Hunter cepat, gesit, dan tajam mengeksekusi sesi singkat tapi intens.", Trait: "cocok untuk HIIT, sprint, atau workout cepat"},
-	{ID: "mage", Name: "Mage", Icon: "🔥", Description: "Damage dealer jarak jauh dengan energi eksplosif dan variasi latihan.", Trait: "cocok untuk yang suka eksplor banyak jenis olahraga"},
-	{ID: "ranger", Name: "Ranger", Icon: "🏹", Description: "Hunter presisi yang unggul di endurance, pace, dan jarak.", Trait: "cocok untuk lari, sepeda, jalan jauh, hiking"},
-	{ID: "healer", Name: "Healer", Icon: "💚", Description: "Support hunter yang menjaga recovery, mobilitas, dan kesehatan jangka panjang.", Trait: "cocok untuk yoga, mobility, recovery, pola hidup sehat"},
-	{ID: "necromancer", Name: "Necromancer", Icon: "🌑", Description: "Hidden job yang bangkit dari kegagalan dan mengubah comeback jadi kekuatan.", Trait: "cocok untuk comeback setelah absen dan bangun sistem baru"},
+	{ID: "fighter", Name: "Fighter", Icon: "⚔️", Description: "Melee hunter yang mengandalkan kekuatan, disiplin, dan tenaga raw.", Trait: "cocok untuk yang suka latihan strength/functional — STR"},
+	{ID: "tank", Name: "Tanker", Icon: "🛡️", Description: "Frontliner yang kuat bertahan dan konsisten menjaga formasi jarak jauh.", Trait: "cocok untuk yang fokus endurance, hiking, trekking, dan habit jangka panjang — END"},
+	{ID: "assassin", Name: "Assassin", Icon: "🗡️", Description: "Hunter cepat, gesit, dan tajam mengeksekusi sesi singkat tapi intens.", Trait: "cocok untuk HIIT, sprint, olahraga raket, atau workout cepat — AGI"},
+	{ID: "mage", Name: "Mage", Icon: "🔥", Description: "Damage dealer jarak jauh dengan energi eksplosif dan variasi latihan.", Trait: "cocok untuk yang suka eksplor banyak jenis olahraga — ALL attributes"},
+	{ID: "ranger", Name: "Ranger", Icon: "🏹", Description: "Hunter presisi yang unggul di stamina, pace, dan jarak.", Trait: "cocok untuk lari, sepeda, jalan kaki, renang, kardio — STA"},
+	{ID: "healer", Name: "Healer", Icon: "💚", Description: "Support hunter yang menjaga recovery, mobilitas, dan kesehatan jangka panjang.", Trait: "cocok untuk yoga, mobility, recovery, meditasi, pola hidup sehat — VIT"},
+	{ID: "necromancer", Name: "Necromancer", Icon: "🌑", Description: "Hidden job yang bangkit dari kegagalan dan mengubah comeback jadi kekuatan.", Trait: "cocok untuk movement challenge, exploration, comeback workout, dan adaptability — LUK"},
 }
 
 // GetLevel returns the current level for the given total points.
@@ -171,7 +174,18 @@ func FormatJobClass(id string) string {
 }
 
 // JobClassPrimaryAttribute returns the attribute specialty used for daily
-// side-quest rotation. Mage stays mixed by returning an empty attribute.
+// side-quest rotation and report fallback. Each job has a unique primary
+// attribute so specializations are diverse:
+//
+//	fighter     → STR (raw strength)
+//	ranger      → STA (cardio/stamina)
+//	assassin    → AGI (agility/speed)
+//	tank        → END (endurance/sustained effort)
+//	healer      → VIT (vitality/recovery)
+//	necromancer → LUK (luck/resilience/comeback)
+//	mage        → ""  (mixed — all attributes)
+//
+// Mage stays mixed by returning an empty attribute.
 func JobClassPrimaryAttribute(jobClass string) AttributeType {
 	switch strings.ToLower(strings.TrimSpace(jobClass)) {
 	case "fighter":
@@ -180,8 +194,12 @@ func JobClassPrimaryAttribute(jobClass string) AttributeType {
 		return AttrSta
 	case "assassin":
 		return AttrAgi
-	case "tank", "healer", "necromancer":
+	case "tank":
+		return AttrEnd
+	case "healer":
 		return AttrVit
+	case "necromancer":
+		return AttrLuk
 	default:
 		return ""
 	}

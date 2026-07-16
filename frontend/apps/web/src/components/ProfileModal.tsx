@@ -1,39 +1,56 @@
-import React from 'react';
-import { X, Award, Shield, Heart, Zap, Swords, Flame, Trophy, Compass } from 'lucide-react';
-import { useEffect, useRef } from 'react';
-import type { EnrichedReport } from '@lapor-bot/shared';
-import { getJobColor, clampAttribute } from '@lapor-bot/shared';
+import React from "react";
+import {
+  X,
+  Award,
+  Shield,
+  Heart,
+  Zap,
+  Swords,
+  Flame,
+  Trophy,
+  Compass,
+  Mountain,
+  Moon,
+} from "lucide-react";
+import { useEffect, useRef } from "react";
+import type { EnrichedReport } from "@lapor-bot/shared";
+import { getJobColor, clampAttribute } from "@lapor-bot/shared";
 interface ProfileModalProps {
   hunter: EnrichedReport | null;
   onClose: () => void;
 }
 
-export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) => {
+export const ProfileModal: React.FC<ProfileModalProps> = ({
+  hunter,
+  onClose,
+}) => {
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!hunter) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     };
-    document.addEventListener('keydown', handleKey);
+    document.addEventListener("keydown", handleKey);
     closeRef.current?.focus();
-    return () => document.removeEventListener('keydown', handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
   }, [hunter, onClose]);
 
   if (!hunter) return null;
 
   const xpPercent = Math.min(
     100,
-    Math.round((hunter.xp_progress.CurrentXP / hunter.xp_progress.RequiredXP) * 100)
+    Math.round(
+      (hunter.xp_progress.CurrentXP / hunter.xp_progress.RequiredXP) * 100,
+    ),
   );
 
-
   const getRankGlow = (rankName: string) => {
-    if (rankName.includes('S-Rank') || rankName.includes('Monarch')) return 'glass-glow-gold';
-    if (rankName.includes('A-Rank')) return 'glass-glow-purple';
-    if (rankName.includes('B-Rank')) return 'glass-glow-blue';
-    return '';
+    if (rankName.includes("S-Rank") || rankName.includes("Monarch"))
+      return "glass-glow-gold";
+    if (rankName.includes("A-Rank")) return "glass-glow-purple";
+    if (rankName.includes("B-Rank")) return "glass-glow-blue";
+    return "";
   };
 
   return (
@@ -42,7 +59,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
       <div className="absolute inset-0" onClick={onClose}></div>
 
       {/* Modal Container */}
-      <div className={`relative w-full max-w-2xl overflow-hidden glass rounded-3xl p-6 md:p-8 z-10 max-h-[90vh] overflow-y-auto ${getRankGlow(hunter.rank_name)}`}>
+      <div
+        className={`relative w-full max-w-2xl overflow-hidden glass rounded-3xl p-6 md:p-8 z-10 max-h-[90vh] overflow-y-auto ${getRankGlow(hunter.rank_name)}`}
+      >
         {/* Header */}
         <div className="flex items-start justify-between mb-6 border-b border-gray-800 pb-4">
           <div>
@@ -50,11 +69,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
               <h2 className="text-2xl md:text-3xl font-extrabold font-orbitron text-white tracking-wide">
                 {hunter.name}
               </h2>
-              <span className={`text-xs px-2.5 py-1 rounded-full border font-mono ${getJobColor(hunter.job_class)}`}>
+              <span
+                className={`text-xs px-2.5 py-1 rounded-full border font-mono ${getJobColor(hunter.job_class)}`}
+              >
                 {hunter.job_icon} {hunter.job_name}
               </span>
             </div>
-            <p className="text-xs text-gray-500 font-mono mt-1">ID: {hunter.user_id}</p>
+            <p className="text-xs text-gray-500 font-mono mt-1">
+              ID: {hunter.user_id}
+            </p>
           </div>
           <button
             ref={closeRef}
@@ -80,11 +103,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
                     <span className="text-3xl font-black font-orbitron text-white">
                       Lv.{hunter.level}
                     </span>
-                    <span className="text-xs text-gray-400 font-mono">({hunter.level_name} {hunter.level_icon})</span>
+                    <span className="text-xs text-gray-400 font-mono">
+                      ({hunter.level_name} {hunter.level_icon})
+                    </span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-gray-400 font-mono block">Lifetime XP</span>
+                  <span className="text-xs text-gray-400 font-mono block">
+                    Lifetime XP
+                  </span>
                   <span className="text-sm font-bold font-orbitron text-white mt-1 block">
                     {hunter.total_points} PTS
                   </span>
@@ -93,7 +120,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
 
               {/* Progress Bar */}
               <div className="w-full bg-gray-800 h-3.5 rounded-full overflow-hidden p-[2px]">
-                <div 
+                <div
                   className="bg-gradient-to-r from-system-blue to-system-purple h-full rounded-full transition-all duration-500 ease-out shadow-neon-blue"
                   style={{ width: `${xpPercent}%` }}
                 ></div>
@@ -112,17 +139,56 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
               </h3>
               <div className="space-y-3">
                 {[
-                  { icon: Swords, label: 'STR (Strength/Gym)', value: clampAttribute(hunter.str), color: 'text-system-red' },
-                  { icon: Zap, label: 'STA (Stamina/Run)', value: clampAttribute(hunter.sta), color: 'text-system-blue' },
-                  { icon: Shield, label: 'AGI (Agility/Sport)', value: clampAttribute(hunter.agi), color: 'text-system-purple' },
-                  { icon: Heart, label: 'VIT (Vitality/Yoga)', value: clampAttribute(hunter.vit), color: 'text-system-green' },
+                  {
+                    icon: Swords,
+                    label: "STR (Strength/Gym)",
+                    value: clampAttribute(hunter.str),
+                    color: "text-system-red",
+                  },
+                  {
+                    icon: Zap,
+                    label: "STA (Stamina/Cardio)",
+                    value: clampAttribute(hunter.sta),
+                    color: "text-system-blue",
+                  },
+                  {
+                    icon: Shield,
+                    label: "AGI (Agility/Sport)",
+                    value: clampAttribute(hunter.agi),
+                    color: "text-system-purple",
+                  },
+                  {
+                    icon: Heart,
+                    label: "VIT (Vitality/Recovery)",
+                    value: clampAttribute(hunter.vit),
+                    color: "text-system-green",
+                  },
+                  {
+                    icon: Mountain,
+                    label: "END (Endurance/Hiking)",
+                    value: clampAttribute(hunter.end),
+                    color: "text-system-gold",
+                  },
+                  {
+                    icon: Moon,
+                    label: "LUK (Luck/Resilience)",
+                    value: clampAttribute(hunter.luk),
+                    color: "text-gray-400",
+                  },
                 ].map(({ icon: Icon, label, value, color }) => (
-                  <div key={label} className="flex items-center justify-between">
+                  <div
+                    key={label}
+                    className="flex items-center justify-between"
+                  >
                     <div className={`flex items-center gap-2 ${color}`}>
                       <Icon size={16} />
-                      <span className="text-xs font-mono font-semibold">{label}</span>
+                      <span className="text-xs font-mono font-semibold">
+                        {label}
+                      </span>
                     </div>
-                    <span className="text-sm font-bold font-orbitron text-white">{value}</span>
+                    <span className="text-sm font-bold font-orbitron text-white">
+                      {value}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -131,18 +197,26 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
             {/* Campaign Metrics */}
             <div className="bg-gray-900/50 border border-gray-800 p-4 rounded-2xl grid grid-cols-2 gap-4">
               <div className="text-center p-3 bg-gray-950/40 rounded-xl">
-                <span className="text-[10px] text-gray-500 font-mono block">Side Quests</span>
+                <span className="text-[10px] text-gray-500 font-mono block">
+                  Side Quests
+                </span>
                 <span className="text-xl font-bold font-orbitron text-system-blue mt-1 block">
                   {hunter.total_side_quests}
                 </span>
-                <span className="text-[9px] text-gray-500 font-mono block">({hunter.seasonal_side_quests} this season)</span>
+                <span className="text-[9px] text-gray-500 font-mono block">
+                  ({hunter.seasonal_side_quests} this season)
+                </span>
               </div>
               <div className="text-center p-3 bg-gray-950/40 rounded-xl">
-                <span className="text-[10px] text-gray-500 font-mono block">Goals Done</span>
+                <span className="text-[10px] text-gray-500 font-mono block">
+                  Goals Done
+                </span>
                 <span className="text-xl font-bold font-orbitron text-system-gold mt-1 block">
                   {hunter.goals_completed}
                 </span>
-                <span className="text-[9px] text-gray-500 font-mono block">Weekly Goals</span>
+                <span className="text-[9px] text-gray-500 font-mono block">
+                  Weekly Goals
+                </span>
               </div>
             </div>
           </div>
@@ -159,7 +233,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
               </p>
               {hunter.job_trait && (
                 <div className="mt-3 p-2.5 rounded-lg bg-gray-950/50 border border-gray-800 text-xs text-gray-400 font-mono">
-                  <span className="text-system-gold font-bold">Trait:</span> {hunter.job_trait}
+                  <span className="text-system-gold font-bold">Trait:</span>{" "}
+                  {hunter.job_trait}
                 </div>
               )}
             </div>
@@ -171,22 +246,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
               </h3>
               <div className="grid grid-cols-3 gap-3">
                 <div className="flex flex-col items-center p-3 bg-gray-950/50 rounded-xl border border-gray-800/80">
-                  <Flame size={18} className="text-system-red mb-1 animate-pulse" />
-                  <span className="text-[9px] text-gray-500 font-mono uppercase">Streak</span>
+                  <Flame
+                    size={18}
+                    className="text-system-red mb-1 animate-pulse"
+                  />
+                  <span className="text-[9px] text-gray-500 font-mono uppercase">
+                    Streak
+                  </span>
                   <span className="text-lg font-bold font-orbitron text-white mt-1">
                     {hunter.streak}w
                   </span>
                 </div>
                 <div className="flex flex-col items-center p-3 bg-gray-950/50 rounded-xl border border-gray-800/80">
                   <Trophy size={18} className="text-system-gold mb-1" />
-                  <span className="text-[9px] text-gray-500 font-mono uppercase">Max</span>
+                  <span className="text-[9px] text-gray-500 font-mono uppercase">
+                    Max
+                  </span>
                   <span className="text-lg font-bold font-orbitron text-white mt-1">
                     {hunter.max_streak}w
                   </span>
                 </div>
                 <div className="flex flex-col items-center p-3 bg-gray-950/50 rounded-xl border border-gray-800/80">
                   <Compass size={18} className="text-system-blue mb-1" />
-                  <span className="text-[9px] text-gray-500 font-mono uppercase">Active Days</span>
+                  <span className="text-[9px] text-gray-500 font-mono uppercase">
+                    Active Days
+                  </span>
                   <span className="text-lg font-bold font-orbitron text-white mt-1">
                     {hunter.seasonal_activity_count}d
                   </span>
@@ -199,25 +283,38 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ hunter, onClose }) =
               <h3 className="text-xs text-system-blue font-mono font-bold uppercase tracking-widest mb-3">
                 Rank & Badge Collection
               </h3>
-              
+
               {/* Season Rank Box */}
               <div className="flex items-center gap-3 p-3 bg-gray-950/60 rounded-xl border border-gray-800 mb-4">
                 <div className="text-2xl">{hunter.rank_icon}</div>
                 <div>
-                  <span className="text-[10px] text-gray-500 font-mono">SEASON RANK</span>
-                  <p className="text-sm font-bold font-orbitron text-white mt-0.5">{hunter.rank_name}</p>
+                  <span className="text-[10px] text-gray-500 font-mono">
+                    SEASON RANK
+                  </span>
+                  <p className="text-sm font-bold font-orbitron text-white mt-0.5">
+                    {hunter.rank_name}
+                  </p>
                 </div>
                 <div className="ml-auto text-right">
-                  <span className="text-[10px] text-gray-500 font-mono block">Seasonal Points</span>
-                  <span className="text-sm font-bold font-orbitron text-system-gold">{hunter.seasonal_points} PTS</span>
+                  <span className="text-[10px] text-gray-500 font-mono block">
+                    Seasonal Points
+                  </span>
+                  <span className="text-sm font-bold font-orbitron text-system-gold">
+                    {hunter.seasonal_points} PTS
+                  </span>
                 </div>
               </div>
 
               {/* Achievements Badges */}
-              <span className="text-[10px] text-gray-400 font-mono font-bold mb-2 block">Badges Earned:</span>
+              <span className="text-[10px] text-gray-400 font-mono font-bold mb-2 block">
+                Badges Earned:
+              </span>
               <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto pr-1">
-                {hunter.achievements.length === 0 && hunter.seasonal_achievements.length === 0 ? (
-                  <p className="text-xs text-gray-600 font-mono italic">No badges acquired yet.</p>
+                {hunter.achievements.length === 0 &&
+                hunter.seasonal_achievements.length === 0 ? (
+                  <p className="text-xs text-gray-600 font-mono italic">
+                    No badges acquired yet.
+                  </p>
                 ) : (
                   <>
                     {/* Lifetime Badges */}

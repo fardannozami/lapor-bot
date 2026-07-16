@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -36,6 +37,8 @@ type Report struct {
 	Sta                   int       `json:"sta" db:"sta"`
 	Agi                   int       `json:"agi" db:"agi"`
 	Vit                   int       `json:"vit" db:"vit"`
+	End                   int       `json:"end" db:"end"`
+	Luk                   int       `json:"luk" db:"luk"`
 }
 
 type ActivityLeaderboardEntry struct {
@@ -66,7 +69,16 @@ const (
 	AttrSta AttributeType = "STA"
 	AttrAgi AttributeType = "AGI"
 	AttrVit AttributeType = "VIT"
+	AttrEnd AttributeType = "END"
+	AttrLuk AttributeType = "LUK"
 )
+
+// AllAttributes lists every RPG attribute in canonical display order.
+// Use this instead of hardcoding the attribute list so adding a new
+// attribute only requires extending this slice. This is the single
+// source of truth for iteration over attributes (Mage fallback,
+// attribute average, quest generation, etc.).
+var AllAttributes = []AttributeType{AttrStr, AttrSta, AttrAgi, AttrVit, AttrEnd, AttrLuk}
 
 // MinAttributeValue is the floor for any displayed attribute.
 // A hunter starts at 1 (not 0) so the dashboard always shows a positive baseline.
@@ -82,37 +94,89 @@ func ClampedAttribute(v int) int {
 	return v
 }
 
+// EnsureAttributeBaseline lifts any attribute below MinAttributeValue up to
+// MinAttributeValue. Call this before persisting a Report so the stored data
+// starts at 1 (not 0) — matching the displayed baseline. This is the
+// persistence-side enforcement of the "start from 1" invariant; ClampedAttribute
+// handles the display side.
+func (r *Report) EnsureAttributeBaseline() {
+	if r == nil {
+		return
+	}
+	if r.Str < MinAttributeValue {
+		r.Str = MinAttributeValue
+	}
+	if r.Sta < MinAttributeValue {
+		r.Sta = MinAttributeValue
+	}
+	if r.Agi < MinAttributeValue {
+		r.Agi = MinAttributeValue
+	}
+	if r.Vit < MinAttributeValue {
+		r.Vit = MinAttributeValue
+	}
+	if r.End < MinAttributeValue {
+		r.End = MinAttributeValue
+	}
+	if r.Luk < MinAttributeValue {
+		r.Luk = MinAttributeValue
+	}
+}
+
 var attributeKeywordSets = []struct {
 	attr     AttributeType
 	keywords []string
 }{
 	{AttrStr, []string{
-		"beban", "weight", "weightlifting", "strength", "gym", "angkat", "powerlifting",
-		"push up", "pushup", "pull up", "pullup", "squat", "chair squat", "sit to stand",
-		"push day", "pull day", "push workout", "pull workout", "deadlift", "bench press",
-		"row", "leg day", "plank", "desk plank", "lunges", "lunge", "glute bridge",
-		"calf raises", "calf raise", "jinjit", "reverse crunch", "wall sit", "dead bug", "core",
+		"beban", "weight", "weights", "weightlifting", "strength", "latihan kekuatan", "gym",
+		"angkat beban", "resistance training", "bodyweight", "powerlifting", "barbell", "dumbbell",
+		"kettlebell", "push up", "pushup", "pull up", "pullup", "squat", "chair squat",
+		"sit to stand", "push day", "pull day", "push workout", "pull workout", "deadlift",
+		"bench press", "chest press", "shoulder press", "overhead press", "row", "leg day",
+		"bicep curl", "tricep extension", "hip thrust", "plank", "desk plank", "lunges", "lunge",
+		"glute bridge", "calf raises", "calf raise", "jinjit", "reverse crunch", "wall sit",
+		"dead bug", "core workout",
 	}},
 	{AttrSta, []string{
-		"lari", "berlari", "run", "running", "jogging", "marathon", "sepeda", "bersepeda",
-		"cycle", "cycling", "bike", "kardio", "cardio", "renang", "berenang", "swim",
-		"swimming", "hiking", "trekking", "jalan jauh", "stairs", "tangga", "naik turun tangga",
+		// General rhythmic aerobic activity maps to cardiorespiratory stamina.
+		"lari", "berlari", "run", "running", "jogging", "sepeda", "bersepeda", "cycle",
+		"cycling", "bike", "kardio", "cardio", "aerobik", "aerobic", "renang", "berenang",
+		"swim", "swimming", "elliptical", "rowing machine", "walk", "walking", "jalan kaki",
+		"jalan cepat", "brisk walk", "jalan pagi", "stairs", "tangga", "naik turun tangga",
 		"jumping jacks", "jumpingjacks", "step up", "stepup", "skipping", "rope jump",
-		"mountain climber", "mountainclimber",
 	}},
 	{AttrAgi, []string{
+		// Sports and neuromotor drills emphasize speed, balance, coordination, and direction changes.
 		"bola", "sepak bola", "soccer", "football", "futsal", "basket", "basketball",
 		"bulutangkis", "bulu tangkis", "badminton", "tenis", "tennis", "padel", "padle",
 		"pickleball", "sprint", "hiit", "tabata", "muay thai", "muaythai", "boxing",
 		"tinju", "shadow boxing", "shadowboxing", "calisthenics", "voli", "volleyball",
-		"high knees", "highknees", "mountain climber", "mountainclimber", "lateral shuffle",
-		"lateralshuffle", "squat jump", "jump squat", "ladder drill", "shuttle run",
+		"dance", "dancing", "menari", "zumba", "balance", "keseimbangan", "coordination",
+		"koordinasi", "high knees", "highknees", "mountain climber", "mountainclimber",
+		"lateral shuffle", "lateralshuffle", "squat jump", "jump squat", "ladder drill",
+		"shuttle run",
 	}},
 	{AttrVit, []string{
+		// Flexibility, mobility, and active recovery support vitality.
 		"yoga", "pilates", "stretching", "stretch", "peregangan", "mobility", "recovery",
-		"walk", "walking", "jalan kaki", "jalan santai", "meditasi", "meditation", "meditate",
-		"napas", "breathing", "deep breathing", "pemulihan", "mobility flow", "bird dog",
-		"balance", "keseimbangan", "shoulder mobility", "neck mobility",
+		"meditasi", "meditation", "meditate", "napas", "breathing", "deep breathing",
+		"pemulihan", "mobility flow", "recovery flow", "bird dog", "shoulder mobility",
+		"neck mobility", "foam rolling", "active recovery",
+	}},
+	{AttrEnd, []string{
+		// Explicit long-duration efforts map to endurance; generic aerobic terms remain STA.
+		"marathon", "half marathon", "ultramarathon", "ultra marathon", "long run", "long ride",
+		"century ride", "hiking", "trekking", "rucking", "jalan jauh", "jalan santai",
+		"long walk", "long distance", "jarak jauh", "endurance", "daya tahan", "trail",
+		"trail run", "uphill", "naik bukit", "jalan santai pagi", "power walk",
+	}},
+	{AttrLuk, []string{
+		// LUK is a game-specific adaptability/resilience stat, not a clinical fitness component.
+		// Keep explicit matches to safe physical challenges; ordinary unmatched reports still
+		// fall back to the Necromancer specialty through JobClassPrimaryAttribute.
+		"orienteering", "obstacle course", "adventure walk", "exploration walk", "comeback walk",
+		"comeback workout", "return to training", "new movement", "movement challenge",
+		"adaptability drill", "resilience circuit",
 	}},
 }
 
@@ -151,7 +215,7 @@ func ResolveReportAttributes(text string, jobClass string) ([]AttributeType, boo
 			return []AttributeType{primary}, true
 		}
 		// Mage has no single primary attribute — give all attributes.
-		return []AttributeType{AttrStr, AttrSta, AttrAgi, AttrVit}, true
+		return slices.Clone(AllAttributes), true
 	}
 
 	// No job selected — user needs to pick one.

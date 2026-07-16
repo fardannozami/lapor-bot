@@ -1,6 +1,9 @@
-import React, { createContext, useContext } from 'react';
-import type { ReactNode } from 'react';
-import type { IReportRepository, IAuthRepository } from '../domain/repositories';
+import React, { createContext, useContext } from "react";
+import type { ReactNode } from "react";
+import type {
+  IReportRepository,
+  IAuthRepository,
+} from "../domain/repositories";
 
 export interface RepositoryContextType {
   reports: IReportRepository;
@@ -14,7 +17,10 @@ export interface RepositoryProviderProps {
   children: ReactNode;
 }
 
-export const RepositoryProvider: React.FC<RepositoryProviderProps> = ({ repositories, children }) => {
+export const RepositoryProvider: React.FC<RepositoryProviderProps> = ({
+  repositories,
+  children,
+}) => {
   return (
     <RepositoryContext.Provider value={repositories}>
       {children}
@@ -25,7 +31,7 @@ export const RepositoryProvider: React.FC<RepositoryProviderProps> = ({ reposito
 export const useRepositories = (): RepositoryContextType => {
   const context = useContext(RepositoryContext);
   if (!context) {
-    throw new Error('useRepositories must be used within a RepositoryProvider');
+    throw new Error("useRepositories must be used within a RepositoryProvider");
   }
   return context;
 };

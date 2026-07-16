@@ -52,6 +52,8 @@ export interface EnrichedReport {
   sta: number;
   agi: number;
   vit: number;
+  end: number;
+  luk: number;
   rank_name: string;
   rank_icon: string;
   season_rank_progress: TierProgress;
@@ -136,7 +138,14 @@ export type LeaderboardTab =
   | "week"
   | "attributes";
 
-export type AttributeTab = "overall" | "str" | "sta" | "agi" | "vit";
+export type AttributeTab =
+  | "overall"
+  | "str"
+  | "sta"
+  | "agi"
+  | "vit"
+  | "end"
+  | "luk";
 
 export type StreakTab = "weekly" | "daily";
 
@@ -150,4 +159,6 @@ export type LeaderboardSortKey =
   | "attribute_str"
   | "attribute_sta"
   | "attribute_agi"
-  | "attribute_vit";
+  | "attribute_vit"
+  | "attribute_end"
+  | "attribute_luk";

@@ -1,17 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
-import { useRepositories } from '../providers/RepositoryProvider';
-import type { EnrichedReport, GlobalSummary } from '../types';
+import { useQuery } from "@tanstack/react-query";
+import { useRepositories } from "../providers/RepositoryProvider";
+import type { EnrichedReport, GlobalSummary } from "../types";
 
 export const useReports = () => {
   const { reports } = useRepositories();
 
   const summaryQuery = useQuery<GlobalSummary, Error>({
-    queryKey: ['summary'],
+    queryKey: ["summary"],
     queryFn: () => reports.getSummary(),
   });
 
   const leaderboardQuery = useQuery<EnrichedReport[], Error>({
-    queryKey: ['leaderboard'],
+    queryKey: ["leaderboard"],
     queryFn: () => reports.getLeaderboard(),
   });
 

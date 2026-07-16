@@ -18,12 +18,12 @@ export const typography = {
   fontFamily: {
     orbitron: ["Orbitron", "sans-serif"],
     inter: ["Inter", "sans-serif"],
-  }
+  },
 };
 
 export const shadows = {
-  'neon-blue': '0 0 15px rgba(59, 130, 246, 0.35)',
-  'neon-purple': '0 0 15px rgba(139, 92, 246, 0.35)',
-  'neon-red': '0 0 15px rgba(239, 68, 68, 0.35)',
-  'neon-gold': '0 0 15px rgba(245, 158, 11, 0.35)',
+  "neon-blue": "0 0 15px rgba(59, 130, 246, 0.35)",
+  "neon-purple": "0 0 15px rgba(139, 92, 246, 0.35)",
+  "neon-red": "0 0 15px rgba(239, 68, 68, 0.35)",
+  "neon-gold": "0 0 15px rgba(245, 158, 11, 0.35)",
 };

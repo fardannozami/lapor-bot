@@ -381,6 +381,8 @@ func TestCancelReport_DeletesOnlyRegularReportKind(t *testing.T) {
 			TotalSideQuests:    2,
 			SeasonalSideQuests: 2,
 			Str:                7,
+			End:                4,
+			Luk:                2,
 		},
 		datesByKind: map[string][]time.Time{
 			domain.ActivityKindRegularReport: {today},
@@ -408,6 +410,9 @@ func TestCancelReport_DeletesOnlyRegularReportKind(t *testing.T) {
 	}
 	if repo.upsertedReport.JobClass != "fighter" || repo.upsertedReport.Str != 7 {
 		t.Fatalf("non-report fields should be preserved, got job=%q str=%d", repo.upsertedReport.JobClass, repo.upsertedReport.Str)
+	}
+	if repo.upsertedReport.End != 4 || repo.upsertedReport.Luk != 2 {
+		t.Fatalf("END/LUK should be preserved, got end=%d luk=%d", repo.upsertedReport.End, repo.upsertedReport.Luk)
 	}
 }
 

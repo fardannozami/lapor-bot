@@ -1,20 +1,32 @@
-import type { IAuthRepository, LoginResult, EnrichedReport } from '@lapor-bot/shared';
-import { HttpClient } from '../http/HttpClient';
-import type { GetTokenFn, OnUnauthorizedFn } from '../http/HttpClient';
+import type {
+  IAuthRepository,
+  LoginResult,
+  EnrichedReport,
+} from "@lapor-bot/shared";
+import { HttpClient } from "../http/HttpClient";
+import type { GetTokenFn, OnUnauthorizedFn } from "../http/HttpClient";
 
 export class HttpAuthRepository extends HttpClient implements IAuthRepository {
-  constructor(baseURL: string = '', getToken: GetTokenFn = () => null, onUnauthorized?: OnUnauthorizedFn) {
+  constructor(
+    baseURL: string = "",
+    getToken: GetTokenFn = () => null,
+    onUnauthorized?: OnUnauthorizedFn,
+  ) {
     super(baseURL, getToken, onUnauthorized);
   }
 
   async login(phone: string): Promise<LoginResult> {
-    const res = await this.post<{ token: string; expires_at: string; user: { phone: string; name: string } }>(
-      '/api/auth/login',
-      { phone },
-    );
+    const res = await this.post<{
+      token: string;
+      expires_at: string;
+      user: { phone: string; name: string };
+    }>("/api/auth/login", { phone });
 
     // Fetch full profile using the new token
-    const profile = await this.getWithToken<EnrichedReport>('/api/user', res.token);
+    const profile = await this.getWithToken<EnrichedReport>(
+      "/api/user",
+      res.token,
+    );
 
     return { ...res, profile };
   }

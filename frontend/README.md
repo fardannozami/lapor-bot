@@ -7,12 +7,16 @@ This is the cross-platform frontend monorepo for Lapor Bot, built with Turborepo
 This monorepo uses npm workspaces and strictly enforces a "Packages-First" architecture:
 
 ### Apps
+
 The `apps/` directory should **ONLY** contain build configurations, routing/bootstrap files, and thin wrappers. **NO** business logic, view logic, or API calls are allowed here.
+
 - `apps/web`: The web application entry point (Vite/React).
 - `apps/mobile`: The mobile application entry point (React Native/Expo).
 
 ### Packages
+
 All feature implementation, view logic, and API calls **MUST** reside within the `packages/` directory. Even platform-specific components must be placed here (e.g., inside platform-specific subdirectories or dedicated packages).
+
 - `packages/ui`: UI components and view logic (both shared and platform-specific).
 - `packages/design-system`: Design tokens, themes, and foundational styles.
 - `packages/contract`: API contracts and schemas shared between the frontend and the backend.

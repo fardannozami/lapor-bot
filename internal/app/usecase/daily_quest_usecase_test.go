@@ -154,6 +154,47 @@ func TestDailyQuestViewAndComplete(t *testing.T) {
 	}
 }
 
+func TestDailyQuestUpdateProgress_CompletesOnlySpecificQuest(t *testing.T) {
+	now := time.Date(2026, 6, 15, 7, 0, 0, 0, time.UTC)
+	todayStr := domain.GetToday(now).Format("2006-01-02")
+	tasks := []domain.QuestTask{
+		{ID: "easycardio", Name: "Jalan Kaki", Difficulty: "easy", Target: 4000, Unit: "langkah", RewardPoints: 2},
+		{ID: "explorationwalk", Name: "Exploration Walk", Difficulty: "medium", Target: 15, Unit: "menit", RewardPoints: 5},
+	}
+	tasksJSON, err := json.Marshal(tasks)
+	if err != nil {
+		t.Fatalf("marshal tasks: %v", err)
+	}
+
+	repo := &mockQuestRepo{
+		report: &domain.Report{
+			UserID:         "user1",
+			Name:           "Alice",
+			JobClass:       "necromancer",
+			TotalPoints:    100,
+			LastReportDate: now.AddDate(0, 0, -1),
+		},
+		quests: map[string]string{"user1:" + todayStr: string(tasksJSON)},
+	}
+	questUC := NewDailyQuestUsecase(repo)
+	reportUC := NewReportActivityUsecase(repo)
+
+	if _, err := questUC.UpdateProgress(context.Background(), "user1", "Alice", []string{"exploration walk 4000"}, reportUC, now); err != nil {
+		t.Fatalf("UpdateProgress: %v", err)
+	}
+
+	var saved []domain.QuestTask
+	if err := json.Unmarshal([]byte(repo.quests["user1:"+todayStr]), &saved); err != nil {
+		t.Fatalf("unmarshal saved tasks: %v", err)
+	}
+	if saved[0].Progress != 0 || saved[1].Progress != saved[1].Target {
+		t.Fatalf("quest progress = easy:%d specific:%d, want easy:0 specific:%d", saved[0].Progress, saved[1].Progress, saved[1].Target)
+	}
+	if repo.upsertedReport.TotalSideQuests != 1 {
+		t.Fatalf("completed sidequests = %d, want 1", repo.upsertedReport.TotalSideQuests)
+	}
+}
+
 type fakeMessageClient struct {
 	sentJID types.JID
 	sentMsg *waE2E.Message
@@ -236,5 +277,22 @@ func TestSendDailyQuests(t *testing.T) {
 	}
 	if !strings.Contains(text, "2 hunter") {
 		t.Errorf("expected only users with job to be counted, got: %s", text)
+	}
+}
+
+func TestParseLineFloat_StripsUnitsAfterTarget(t *testing.T) {
+	tests := []struct {
+		input     string
+		wantName  string
+		wantValue float64
+	}{
+		{"resilience circuit 3 ronde", "resilience circuit", 3},
+		{"Jalan Jauh / Long Walk 45 menit", "Jalan Jauh / Long Walk", 45},
+	}
+	for _, tt := range tests {
+		name, value := parseLineFloat(tt.input)
+		if name != tt.wantName || value != tt.wantValue {
+			t.Errorf("parseLineFloat(%q) = (%q, %v), want (%q, %v)", tt.input, name, value, tt.wantName, tt.wantValue)
+		}
 	}
 }

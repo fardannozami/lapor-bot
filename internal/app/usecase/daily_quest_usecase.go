@@ -184,6 +184,20 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 		return "", err
 	}
 
+	// Evaluate specific quests before the broad easy-cardio matcher. Otherwise
+	// an input such as "exploration walk 4000" can complete both quests.
+	taskOrder := make([]int, 0, len(tasks))
+	for idx, task := range tasks {
+		if task.ID != "easycardio" {
+			taskOrder = append(taskOrder, idx)
+		}
+	}
+	for idx, task := range tasks {
+		if task.ID == "easycardio" {
+			taskOrder = append(taskOrder, idx)
+		}
+	}
+
 	var completedTasks []string
 	var rejected []string
 	totalSideQuestPoints := 0
@@ -195,7 +209,11 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 		}
 
 		matched := false
-		for idx, task := range tasks {
+		for _, idx := range taskOrder {
+			task := tasks[idx]
+			if task.ID == "easycardio" && matched {
+				continue
+			}
 			if domain.MatchTask(namePart, task.ID) {
 				matched = true
 				added := 0
@@ -226,6 +244,7 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 				tasks[idx].Progress = task.Target
 				completedTasks = append(completedTasks, task.Name)
 				totalSideQuestPoints += sideQuestPoints(task.Difficulty)
+				break
 			}
 		}
 		if !matched {
@@ -335,7 +354,7 @@ func parseLineFloat(line string) (string, float64) {
 	numStr := matches[1]
 	namePart := strings.Replace(line, numStr, "", 1)
 	namePart = strings.TrimSpace(namePart)
-	for _, suffix := range []string{"x", "menit", "km", "m", "detik", "langkah", "steps", "ml"} {
+	for _, suffix := range []string{"x", "menit", "km", "m", "detik", "langkah", "steps", "ml", "ronde", "round"} {
 		namePart = strings.TrimSuffix(namePart, suffix)
 	}
 	namePart = strings.TrimSpace(namePart)

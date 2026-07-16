@@ -341,16 +341,17 @@ func TestReport_AttributeAverage(t *testing.T) {
 	tests := []struct {
 		name               string
 		str, sta, agi, vit int
+		end, luk           int
 		want               int
 	}{
-		{"all zero clamps to 1", 0, 0, 0, 0, 1},
-		{"all ten", 10, 10, 10, 10, 10},
-		{"mixed values", 40, 20, 10, 30, 25},
-		{"one high", 100, 1, 1, 1, 25},
+		{"all zero clamps to 1", 0, 0, 0, 0, 0, 0, 1},
+		{"all ten", 10, 10, 10, 10, 10, 10, 10},
+		{"mixed values", 40, 20, 10, 30, 15, 5, 20},
+		{"one high", 100, 1, 1, 1, 1, 1, 17},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &Report{Str: tt.str, Sta: tt.sta, Agi: tt.agi, Vit: tt.vit}
+			r := &Report{Str: tt.str, Sta: tt.sta, Agi: tt.agi, Vit: tt.vit, End: tt.end, Luk: tt.luk}
 			if got := r.AttributeAverage(); got != tt.want {
 				t.Errorf("AttributeAverage() = %v, want %v", got, tt.want)
 			}

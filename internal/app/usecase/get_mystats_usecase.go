@@ -73,12 +73,14 @@ func (uc *GetMyStatsUsecase) Execute(ctx context.Context, userID, name string) (
 	}
 	sb.WriteString(fmt.Sprintf("🎖️ Level: Lv.%d • %s (lifetime)\n", report.Level, domain.FormatLevel(report.TotalPoints)))
 	sb.WriteString(fmt.Sprintf("🧭 Job: %s\n", domain.FormatJobClass(report.JobClass)))
-	
+
 	sb.WriteString("\n💪 Attributes:\n")
-	sb.WriteString(fmt.Sprintf("STR (Strength) : %d pts\n", domain.ClampedAttribute(report.Str)))
-	sb.WriteString(fmt.Sprintf("STA (Stamina)  : %d pts\n", domain.ClampedAttribute(report.Sta)))
-	sb.WriteString(fmt.Sprintf("AGI (Agility)  : %d pts\n", domain.ClampedAttribute(report.Agi)))
-	sb.WriteString(fmt.Sprintf("VIT (Vitality) : %d pts\n\n", domain.ClampedAttribute(report.Vit)))
+	sb.WriteString(fmt.Sprintf("STR (Strength)   : %d pts\n", domain.ClampedAttribute(report.Str)))
+	sb.WriteString(fmt.Sprintf("STA (Stamina)    : %d pts\n", domain.ClampedAttribute(report.Sta)))
+	sb.WriteString(fmt.Sprintf("AGI (Agility)    : %d pts\n", domain.ClampedAttribute(report.Agi)))
+	sb.WriteString(fmt.Sprintf("VIT (Vitality)   : %d pts\n", domain.ClampedAttribute(report.Vit)))
+	sb.WriteString(fmt.Sprintf("END (Endurance)  : %d pts\n", domain.ClampedAttribute(report.End)))
+	sb.WriteString(fmt.Sprintf("LUK (Luck)       : %d pts\n\n", domain.ClampedAttribute(report.Luk)))
 
 	sb.WriteString(fmt.Sprintf("📈 %s\n", domain.FormatNumericLevelProgressBar(report.TotalPoints)))
 	sb.WriteString(fmt.Sprintf("📊 %s\n\n", domain.FormatProgressBar(report.TotalPoints)))

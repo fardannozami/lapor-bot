@@ -58,7 +58,8 @@ func TestGenerateDailyQuest_JobAttributeSpecialists(t *testing.T) {
 		{"ranger", AttrSta},
 		{"assassin", AttrAgi},
 		{"healer", AttrVit},
-		{"tank", AttrVit},
+		{"tank", AttrEnd},
+		{"necromancer", AttrLuk},
 	}
 
 	for _, tt := range tests {

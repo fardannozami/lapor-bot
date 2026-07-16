@@ -1,7 +1,14 @@
-import { useState, type FormEvent } from 'react';
-import { LogIn, ArrowLeft, Phone, User, AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '@lapor-bot/shared';
-import type { EnrichedReport } from '@lapor-bot/shared';
+import { useState, type FormEvent } from "react";
+import {
+  LogIn,
+  ArrowLeft,
+  Phone,
+  User,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
+import { useAuth } from "@lapor-bot/shared";
+import type { EnrichedReport } from "@lapor-bot/shared";
 
 interface LoginPageProps {
   onLoginSuccess: (user: EnrichedReport) => void;
@@ -9,8 +16,8 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
-  const [countryCode, setCountryCode] = useState('62');
-  const [phone, setPhone] = useState('');
+  const [countryCode, setCountryCode] = useState("62");
+  const [phone, setPhone] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const { login, loading, error: authError } = useAuth();
 
@@ -21,17 +28,17 @@ export function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     setValidationError(null);
 
     if (!countryCode || !/^\d+$/.test(countryCode)) {
-      setValidationError('Kode negara wajib diisi (angka saja).');
+      setValidationError("Kode negara wajib diisi (angka saja).");
       return;
     }
 
-    const digits = phone.replace(/\D/g, '');
+    const digits = phone.replace(/\D/g, "");
     if (!digits) {
-      setValidationError('Nomor telepon wajib diisi.');
+      setValidationError("Nomor telepon wajib diisi.");
       return;
     }
     if (digits.length < 6 || digits.length > 14) {
-      setValidationError('Nomor harus 6-14 digit (tanpa kode negara).');
+      setValidationError("Nomor harus 6-14 digit (tanpa kode negara).");
       return;
     }
 
@@ -76,7 +83,9 @@ export function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                 <input
                   type="text"
                   value={countryCode}
-                  onChange={(e) => setCountryCode(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) =>
+                    setCountryCode(e.target.value.replace(/\D/g, ""))
+                  }
                   placeholder="62"
                   maxLength={3}
                   className="w-16 pl-6 pr-2 py-2.5 rounded-xl bg-gray-950 border border-gray-800 text-white text-sm font-mono focus:outline-none focus:border-system-blue transition-colors"
@@ -84,11 +93,14 @@ export function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                 />
               </div>
               <div className="relative flex-1">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                <Phone
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                  size={14}
+                />
                 <input
                   type="text"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                   placeholder="8xxxxxx"
                   maxLength={14}
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-gray-950 border border-gray-800 text-white text-sm font-mono focus:outline-none focus:border-system-blue transition-colors"
@@ -101,7 +113,10 @@ export function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
           {error && (
             <div className="p-3 rounded-xl bg-system-red/10 border border-system-red/35 flex items-start gap-2">
-              <AlertCircle className="text-system-red mt-0.5 shrink-0" size={14} />
+              <AlertCircle
+                className="text-system-red mt-0.5 shrink-0"
+                size={14}
+              />
               <p className="text-xs text-red-300 font-mono">{error}</p>
             </div>
           )}
@@ -116,7 +131,7 @@ export function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
             ) : (
               <LogIn size={16} />
             )}
-            {loading ? 'Mencari...' : 'Masuk'}
+            {loading ? "Mencari..." : "Masuk"}
           </button>
         </form>
 

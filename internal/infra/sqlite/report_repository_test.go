@@ -99,6 +99,45 @@ func TestReportRepository_UpsertReport_Insert(t *testing.T) {
 	}
 }
 
+// TestReportRepository_UpsertReport_AttributeBaseline verifies the "start from 1"
+// invariant: a new Report with zero-valued attributes is persisted with each
+// attribute at MinAttributeValue (1), not 0.
+func TestReportRepository_UpsertReport_AttributeBaseline(t *testing.T) {
+	_, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	report := &domain.Report{
+		UserID:         "baseline-user",
+		Name:           "Baseline",
+		Streak:         1,
+		ActivityCount:  1,
+		LastReportDate: time.Now().Truncate(time.Second),
+		// Attributes intentionally left at Go zero value (0).
+	}
+
+	if err := repo.UpsertReport(ctx, report); err != nil {
+		t.Fatalf("Failed to insert report: %v", err)
+	}
+
+	got, err := repo.GetReport(ctx, "baseline-user")
+	if err != nil || got == nil {
+		t.Fatalf("Failed to get report: %v", err)
+	}
+
+	for _, attr := range []struct {
+		name string
+		val  int
+	}{
+		{"Str", got.Str}, {"Sta", got.Sta}, {"Agi", got.Agi},
+		{"Vit", got.Vit}, {"End", got.End}, {"Luk", got.Luk},
+	} {
+		if attr.val != domain.MinAttributeValue {
+			t.Errorf("%s: expected baseline %d, got %d", attr.name, domain.MinAttributeValue, attr.val)
+		}
+	}
+}
+
 func TestReportRepository_UpsertReportWithActivityEvent_WritesLedgerAndProjections(t *testing.T) {
 	db, repo, cleanup := setupTestDB(t)
 	defer cleanup()
@@ -399,6 +438,28 @@ func TestReportRepository_InitTable_Idempotent(t *testing.T) {
 	}
 	if got == nil {
 		t.Error("Report should exist")
+	}
+}
+
+func TestReportRepository_InitTable_RefreshesJobMetadata(t *testing.T) {
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, `UPDATE job_classes SET trait = 'stale' WHERE id = 'necromancer'`); err != nil {
+		t.Fatalf("seed stale job metadata: %v", err)
+	}
+	if err := repo.InitTable(ctx); err != nil {
+		t.Fatalf("refresh job metadata: %v", err)
+	}
+
+	const want = "cocok untuk movement challenge, exploration, comeback workout, dan adaptability — LUK"
+	var got string
+	if err := db.QueryRowContext(ctx, `SELECT trait FROM job_classes WHERE id = 'necromancer'`).Scan(&got); err != nil {
+		t.Fatalf("read refreshed job metadata: %v", err)
+	}
+	if got != want {
+		t.Fatalf("necromancer trait = %q, want %q", got, want)
 	}
 }
 

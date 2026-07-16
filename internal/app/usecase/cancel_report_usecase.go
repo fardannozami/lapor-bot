@@ -208,6 +208,8 @@ func preserveNonReportFields(next, current *domain.Report) {
 	next.Sta = current.Sta
 	next.Agi = current.Agi
 	next.Vit = current.Vit
+	next.End = current.End
+	next.Luk = current.Luk
 }
 
 func removeRepeatReportPoints(report *domain.Report) {

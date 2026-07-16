@@ -38,7 +38,7 @@ const (
 	weeklyStreakBonusPerStep = 2
 	weeklyStreakBonusCap     = 10 // max +20 pts per report from weekly streak
 	dailyStreakBonusPerStep  = 1
-	dailyStreakBonusCap      = 5  // max +5 pts per report from daily streak
+	dailyStreakBonusCap      = 5 // max +5 pts per report from daily streak
 )
 
 type typedActivityRepository interface {
@@ -1020,6 +1020,12 @@ func applyAttributeGains(report *domain.Report, attrs []domain.AttributeType, st
 		case domain.AttrVit:
 			report.Vit = domain.ClampedAttribute(report.Vit) + statPoints
 			statGains = append(statGains, fmt.Sprintf("VIT +%d", statPoints))
+		case domain.AttrEnd:
+			report.End = domain.ClampedAttribute(report.End) + statPoints
+			statGains = append(statGains, fmt.Sprintf("END +%d", statPoints))
+		case domain.AttrLuk:
+			report.Luk = domain.ClampedAttribute(report.Luk) + statPoints
+			statGains = append(statGains, fmt.Sprintf("LUK +%d", statPoints))
 		}
 	}
 	return statGains
@@ -1034,10 +1040,12 @@ func formatJobSetupNotice() string {
 }
 
 func formatCurrentAttributes(report *domain.Report) string {
-	return fmt.Sprintf("🛡️ Stats: STR %d | STA %d | AGI %d | VIT %d",
+	return fmt.Sprintf("🛡️ Stats: STR %d | STA %d | AGI %d | VIT %d | END %d | LUK %d",
 		domain.ClampedAttribute(report.Str),
 		domain.ClampedAttribute(report.Sta),
 		domain.ClampedAttribute(report.Agi),
 		domain.ClampedAttribute(report.Vit),
+		domain.ClampedAttribute(report.End),
+		domain.ClampedAttribute(report.Luk),
 	)
 }

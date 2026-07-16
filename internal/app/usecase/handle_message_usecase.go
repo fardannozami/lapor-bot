@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
 )
@@ -79,6 +80,24 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 		return MessageResponse{}, nil
 	}
 
+	// Report commands may appear before or after the activity text. Parse the
+	// more specific sidequest command first so it cannot fall through to the
+	// generic /lapor handler.
+	if activityText, ok := extractSideQuestReport(trimmedMessage); ok {
+		if activityText == "" {
+			text, err := uc.dailyQuestUC.ViewQuest(ctx, userID, name, time.Now())
+			return MessageResponse{Text: text}, err
+		}
+		text, err := uc.dailyQuestUC.UpdateProgress(ctx, userID, name, []string{activityText}, uc.reportUC, time.Now())
+		return MessageResponse{Text: text}, err
+	}
+
+	if activityText, ok := extractCommandArgument(trimmedMessage, "/lapor"); ok {
+		workout := domain.ParseHevy(activityText)
+		text, err := uc.reportUC.ExecuteWithMessage(ctx, userID, name, activityText, workout)
+		return MessageResponse{Text: text}, err
+	}
+
 	// Normalize # → / so both prefixes work identically for backward
 	// compatibility.
 	if strings.HasPrefix(msg, "#") {
@@ -115,21 +134,6 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 	// 	text, err := uc.dailyQuestUC.ViewQuest(ctx, userID, name, time.Now())
 	// 	return MessageResponse{Text: text}, err
 	// }
-
-	if arg, ok := extractSideQuestReport(trimmedMessage); ok {
-		if arg == "" {
-			text, err := uc.dailyQuestUC.ViewQuest(ctx, userID, name, time.Now())
-			return MessageResponse{Text: text}, err
-		}
-		text, err := uc.dailyQuestUC.UpdateProgress(ctx, userID, name, []string{arg}, uc.reportUC, time.Now())
-		return MessageResponse{Text: text}, err
-	}
-
-	if hasCommand(msg, "/lapor") {
-		workout := domain.ParseHevy(trimmedMessage)
-		text, err := uc.reportUC.ExecuteWithMessage(ctx, userID, name, trimmedMessage, workout)
-		return MessageResponse{Text: text}, err
-	}
 
 	if cancelCommand, ok := parseCancelCommand(msg); ok {
 		text, err := uc.executeCancelCommand(ctx, userID, name, cancelCommand)
@@ -279,14 +283,45 @@ func parseCancelCommand(message string) (cancelCommand, bool) {
 }
 
 func extractSideQuestReport(message string) (string, bool) {
-	lower := strings.ToLower(message)
-	for _, command := range []string{"/lapor sidequest", "/lapor-sidequest"} {
-		if !hasCommand(lower, command) {
-			continue
+	return extractCommandArgument(message, "/lapor sidequest", "/lapor-sidequest")
+}
+
+// extractCommandArgument finds a slash or hash command as a standalone token
+// and returns the message with that command removed. This supports both
+// "/lapor lari" and "lari /lapor" without matching words such as /lapor123.
+func extractCommandArgument(message string, commands ...string) (string, bool) {
+	for _, command := range commands {
+		for _, prefix := range []byte{'/', '#'} {
+			candidate := string(prefix) + strings.TrimPrefix(command, "/")
+			for start := 0; start+len(candidate) <= len(message); start++ {
+				end := start + len(candidate)
+				if !strings.EqualFold(message[start:end], candidate) || !hasWhitespaceBoundary(message, start, end) {
+					continue
+				}
+
+				before := strings.TrimSpace(message[:start])
+				after := strings.TrimSpace(message[end:])
+				return strings.TrimSpace(before + " " + after), true
+			}
 		}
-		return strings.TrimSpace(message[len(command):]), true
 	}
 	return "", false
+}
+
+func hasWhitespaceBoundary(message string, start, end int) bool {
+	if start > 0 {
+		previous, _ := utf8.DecodeLastRuneInString(message[:start])
+		if !unicode.IsSpace(previous) {
+			return false
+		}
+	}
+	if end < len(message) {
+		next, _ := utf8.DecodeRuneInString(message[end:])
+		if !unicode.IsSpace(next) {
+			return false
+		}
+	}
+	return true
 }
 
 func hasCommand(message, command string) bool {

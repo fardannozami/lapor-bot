@@ -6,7 +6,10 @@ interface StreakCellProps {
   label?: string;
 }
 
-export const StreakCell: React.FC<StreakCellProps> = ({ weeks, label = "minggu" }) => (
+export const StreakCell: React.FC<StreakCellProps> = ({
+  weeks,
+  label = "minggu",
+}) => (
   <span className="flex items-center justify-center gap-1 text-system-red font-mono">
     <Flame size={14} />
     <span className="font-bold">{weeks}</span>

@@ -1,9 +1,15 @@
-import { useState } from 'react';
-import { useAuthContext } from '../providers/AuthProvider';
-import type { EnrichedReport } from '../types';
+import { useState } from "react";
+import { useAuthContext } from "../providers/AuthProvider";
+import type { EnrichedReport } from "../types";
 
 export const useAuth = () => {
-  const { login: ctxLogin, logout, user, token, isLoading: ctxLoading } = useAuthContext();
+  const {
+    login: ctxLogin,
+    logout,
+    user,
+    token,
+    isLoading: ctxLoading,
+  } = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +23,7 @@ export const useAuth = () => {
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Login failed');
+        setError("Login failed");
       }
       return null;
     } finally {

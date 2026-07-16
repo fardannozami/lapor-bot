@@ -29,7 +29,15 @@ export const AttributeRow: React.FC<AttributeRowProps> = ({
   return (
     <tr
       key={hunter.user_id}
-      tabIndex={0} role="button" onClick={() => onSelectHunter(hunter)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectHunter(hunter); } }}
+      tabIndex={0}
+      role="button"
+      onClick={() => onSelectHunter(hunter)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelectHunter(hunter);
+        }
+      }}
       className={rowClass}
     >
       <td className="py-4 pl-4 text-center font-mono align-middle">
@@ -44,7 +52,11 @@ export const AttributeRow: React.FC<AttributeRowProps> = ({
         <AttributeBar
           value={primaryValue}
           label={isOverall ? "AVG" : attributeTab.toUpperCase()}
-          tone={isOverall ? undefined : (attributeTab as "str" | "sta" | "agi" | "vit")}
+          tone={
+            isOverall
+              ? undefined
+              : (attributeTab as "str" | "sta" | "agi" | "vit" | "end" | "luk")
+          }
         />
       </td>
 
@@ -61,6 +73,12 @@ export const AttributeRow: React.FC<AttributeRowProps> = ({
           </td>
           <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
             <span className="font-bold">{hunter.vit}</span>
+          </td>
+          <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
+            <span className="font-bold">{hunter.end}</span>
+          </td>
+          <td className="py-4 pl-4 text-center align-middle font-mono text-sm text-gray-300">
+            <span className="font-bold">{hunter.luk}</span>
           </td>
         </>
       ) : (

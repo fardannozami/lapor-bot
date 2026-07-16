@@ -11,6 +11,8 @@ export const LEADERBOARD_SORT_KEYS: LeaderboardSortKey[] = [
   "attribute_sta",
   "attribute_agi",
   "attribute_vit",
+  "attribute_end",
+  "attribute_luk",
 ];
 
 export const ATTRIBUTE_SORT_KEYS: LeaderboardSortKey[] = [
@@ -19,6 +21,8 @@ export const ATTRIBUTE_SORT_KEYS: LeaderboardSortKey[] = [
   "attribute_sta",
   "attribute_agi",
   "attribute_vit",
+  "attribute_end",
+  "attribute_luk",
 ];
 
 export const ATTRIBUTE_TAB_TO_SORT_KEY: Record<
@@ -30,6 +34,8 @@ export const ATTRIBUTE_TAB_TO_SORT_KEY: Record<
   sta: "attribute_sta",
   agi: "attribute_agi",
   vit: "attribute_vit",
+  end: "attribute_end",
+  luk: "attribute_luk",
 };
 
 export function getActiveAttributeTab(key: LeaderboardSortKey): AttributeTab {
@@ -42,6 +48,10 @@ export function getActiveAttributeTab(key: LeaderboardSortKey): AttributeTab {
       return "agi";
     case "attribute_vit":
       return "vit";
+    case "attribute_end":
+      return "end";
+    case "attribute_luk":
+      return "luk";
     default:
       return "overall";
   }
@@ -65,8 +75,13 @@ function clampAttr(v: number): number {
 
 export function attributeAverage(r: EnrichedReport): number {
   const total =
-    clampAttr(r.str) + clampAttr(r.sta) + clampAttr(r.agi) + clampAttr(r.vit);
-  return Math.floor(total / 4);
+    clampAttr(r.str) +
+    clampAttr(r.sta) +
+    clampAttr(r.agi) +
+    clampAttr(r.vit) +
+    clampAttr(r.end) +
+    clampAttr(r.luk);
+  return Math.floor(total / 6);
 }
 
 export function attributeValueByKey(
@@ -82,6 +97,10 @@ export function attributeValueByKey(
       return clampAttr(r.agi);
     case "attribute_vit":
       return clampAttr(r.vit);
+    case "attribute_end":
+      return clampAttr(r.end);
+    case "attribute_luk":
+      return clampAttr(r.luk);
     default:
       return attributeAverage(r);
   }
@@ -107,7 +126,9 @@ export function hasStreakActivity(r: EnrichedReport): boolean {
 }
 
 export function hasAttributeActivity(r: EnrichedReport): boolean {
-  return r.str > 0 || r.sta > 0 || r.agi > 0 || r.vit > 0;
+  return (
+    r.str > 0 || r.sta > 0 || r.agi > 0 || r.vit > 0 || r.end > 0 || r.luk > 0
+  );
 }
 
 export function compareReports(
@@ -132,6 +153,8 @@ export function compareReports(
     case "attribute_sta":
     case "attribute_agi":
     case "attribute_vit":
+    case "attribute_end":
+    case "attribute_luk":
       return compareAttribute(a, b, key);
     default:
       return compareSeasonRank(a, b);
@@ -281,6 +304,8 @@ function filterPredicateForSortKey(
     case "attribute_sta":
     case "attribute_agi":
     case "attribute_vit":
+    case "attribute_end":
+    case "attribute_luk":
       return hasAttributeActivity;
     default:
       return hasSeasonActivity;
