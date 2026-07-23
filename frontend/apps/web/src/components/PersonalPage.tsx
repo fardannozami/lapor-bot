@@ -15,7 +15,6 @@ import {
   Award,
   TrendingUp,
   Activity,
-  CalendarDays,
   Edit2,
 } from "lucide-react";
 import { useState, useRef } from "react";
@@ -33,6 +32,8 @@ import type {
   EnrichedReport,
   QuestTask,
   JobInfo,
+  PersonalGoal,
+  GoalDay,
 } from "@lapor-bot/shared";
 import { JobPickerModal } from "./JobPickerModal";
 import { Toast } from "./Toast";
@@ -95,6 +96,57 @@ function chunkWeeks(days: DailyActivity[]) {
     weeks.push(days.slice(i, i + 7));
   }
   return weeks;
+}
+
+/** Build a best-effort optimistic PersonalGoal from form inputs.
+ *  Used for instant UI feedback while the server round-trip completes. */
+function buildOptimisticGoal(
+  targetDays: number,
+  activity: string,
+  startDate?: string,
+  startHour?: number,
+): PersonalGoal {
+  const now = new Date();
+  const start = startDate
+    ? new Date(
+        `${startDate}T${String(startHour ?? 0).padStart(2, "0")}:00:00`,
+      )
+    : new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        startHour ?? 0,
+        0,
+        0,
+      );
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+
+  const dayLabels = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+  const days: GoalDay[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const dateStr = d.toISOString().slice(0, 10);
+    days.push({
+      date: dateStr,
+      day_label: dayLabels[d.getDay()],
+      activity,
+      active: false,
+    });
+  }
+
+  return {
+    target_days: targetDays,
+    activity,
+    start_at: start.toISOString(),
+    end_at: end.toISOString(),
+    completed_days: 0,
+    remaining_days: targetDays,
+    percent: 0,
+    is_completed: false,
+    days,
+  };
 }
 
 function StatCard({
@@ -564,18 +616,29 @@ export function PersonalPage({
               </div>
 
               {!activeGoal ? (
-                <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-4 text-center">
-                  <CalendarDays
-                    className="mx-auto mb-2 text-gray-600"
-                    size={22}
+                <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-6 text-center">
+                  <Target
+                    className="mx-auto mb-3 text-gray-600"
+                    size={28}
                   />
                   <p className="text-sm text-gray-400 font-mono">
                     Belum ada goal aktif.
                   </p>
-                  <p className="text-xs text-gray-600 font-mono mt-1">
-                    Atur goal mingguanmu dari halaman ini — klik "Atur Goal" di
-                    bawah.
+                  <p className="text-xs text-gray-600 font-mono mt-1 mb-4 max-w-xs mx-auto">
+                    Tentukan target mingguanmu dan lacak konsistensimu setiap
+                    hari.
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowGoalForm(true);
+                      setGoalError(null);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-system-gold text-gray-950 text-sm font-bold hover:bg-system-gold/90 transition-colors"
+                  >
+                    <Target size={14} />
+                    Atur Goal
+                  </button>
                 </div>
               ) : (
                 <div>
@@ -793,21 +856,35 @@ export function PersonalPage({
                               activity || "Olahraga",
                               startPayload,
                             );
-                            // Goal saved — refresh to pick up active_goal.
-                            // If refresh fails the goal was still saved,
-                            // so show a retry hint instead of a hard error.
-                            try {
-                              await refreshUser();
-                            } catch {
-                              setGoalError(
-                                "Goal tersimpan, tapi gagal refresh data. Tutup form dan refresh halaman.",
-                              );
-                              return;
-                            }
+                            // Optimistic update: apply goal to local state
+                            // immediately so the UI transitions from empty→active
+                            // before the server round-trip completes.
+                            const optimisticGoal = buildOptimisticGoal(
+                              targetDays,
+                              activity || "Olahraga",
+                              startDate || undefined,
+                              startHour,
+                            );
+                            const optimisticUser: EnrichedReport = {
+                              ...localUser,
+                              active_goal: optimisticGoal,
+                            };
+                            setLocalUser(optimisticUser);
+                            onUserRefresh?.(optimisticUser);
                             setShowGoalForm(false);
                             showToast(
                               res.message || "Goal berhasil diperbarui",
                             );
+                            // Sync with server in background — on success the
+                            // server data (with real day statuses) replaces
+                            // the optimistic goal. On failure we keep the
+                            // optimistic state since the goal was saved.
+                            try {
+                              await refreshUser();
+                            } catch {
+                              // Goal saved, UI already showing it — silent
+                              // background sync failure is acceptable.
+                            }
                           } catch (e) {
                             setGoalError(
                               e instanceof Error
