@@ -1,24 +1,22 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RepositoryProvider, AuthProvider } from "@lapor-bot/shared";
+import {
+  RepositoryProvider,
+  AuthProvider,
+  loadToken,
+  handleUnauthorized,
+} from "@lapor-bot/shared";
 import { HttpReportRepository, HttpAuthRepository } from "@lapor-bot/contract";
 import "./index.css";
 import App from "./App.tsx";
 
 const queryClient = new QueryClient();
 
-const TOKEN_KEY = "lapor-bot-token";
-const getToken = () => {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-};
+const getToken = () => loadToken();
 
-const authRepo = new HttpAuthRepository("", getToken);
-const reportRepo = new HttpReportRepository("", getToken);
+const authRepo = new HttpAuthRepository("", getToken, handleUnauthorized);
+const reportRepo = new HttpReportRepository("", getToken, handleUnauthorized);
 
 const repositories = {
   reports: reportRepo,
