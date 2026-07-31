@@ -60,17 +60,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
       {/* Modal Container */}
       <div
-        className={`relative w-full max-w-2xl overflow-hidden glass rounded-3xl p-6 md:p-8 z-10 max-h-[90vh] overflow-y-auto ${getRankGlow(hunter.rank_name)}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Profil hunter ${hunter.name}`}
+        className={`relative w-full max-w-2xl overflow-hidden glass rounded-3xl p-6 md:p-8 z-10 max-h-[90vh] overflow-y-auto animate-scale-in ${getRankGlow(hunter.rank_name)}`}
       >
         {/* Header */}
-        <div className="flex items-start justify-between mb-6 border-b border-gray-800 pb-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl md:text-3xl font-extrabold font-orbitron text-white tracking-wide">
+        <div className="flex items-start justify-between gap-3 mb-6 border-b border-gray-800 pb-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-2xl md:text-3xl font-extrabold font-orbitron text-white tracking-wide break-words min-w-0">
                 {hunter.name}
               </h2>
               <span
-                className={`text-xs px-2.5 py-1 rounded-full border font-mono ${getJobColor(hunter.job_class)}`}
+                className={`text-xs px-2.5 py-1 rounded-full border font-mono whitespace-nowrap ${getJobColor(hunter.job_class)}`}
               >
                 {hunter.job_icon} {hunter.job_name}
               </span>
@@ -82,7 +85,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <button
             ref={closeRef}
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-white rounded-lg bg-gray-800/40 hover:bg-gray-800 transition-colors"
+            aria-label="Tutup profil"
+            className="shrink-0 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-white rounded-lg bg-gray-800/40 hover:bg-gray-800 transition-colors"
           >
             <X size={20} />
           </button>

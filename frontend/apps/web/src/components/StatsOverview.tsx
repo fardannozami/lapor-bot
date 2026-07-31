@@ -69,31 +69,30 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-      {stats.map((stat) => {
+    <div className="stagger-children grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mb-8">
+      {stats.map((stat, i) => {
         const Icon = stat.icon;
         const tone = TONE_STYLES[stat.tone];
         return (
           <div
             key={stat.key}
-            className={`glass p-6 rounded-2xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 ${tone.glow}`}
+            style={{ "--stagger-i": i } as React.CSSProperties}
+            className={`glass animate-fade-in-up p-4 md:p-6 rounded-2xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 ${tone.glow}`}
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-gray-400 text-sm font-medium">
-                  {stat.label}
-                </p>
-                <h3 className="text-3xl font-bold font-orbitron tracking-wide mt-2 text-white">
-                  {stat.value}
-                </h3>
-              </div>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-gray-400 text-xs md:text-sm font-medium leading-tight">
+                {stat.label}
+              </p>
               <div
-                className={`p-3 rounded-xl bg-gray-900/60 ${tone.text} ${stat.pulse ? "animate-pulse" : ""}`}
+                className={`shrink-0 p-2 md:p-3 rounded-xl bg-gray-900/60 ${tone.text} ${stat.pulse ? "animate-pulse" : ""}`}
               >
-                <Icon size={24} />
+                <Icon size={24} className="w-5 h-5 md:w-6 md:h-6" />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-4 font-mono">
+            <h3 className="text-xl md:text-3xl font-bold font-orbitron tracking-wide mt-1.5 md:mt-2 text-white break-words">
+              {stat.value}
+            </h3>
+            <p className="text-[10px] md:text-xs text-gray-500 mt-3 md:mt-4 font-mono">
               {stat.description}
             </p>
           </div>
