@@ -27,6 +27,13 @@ import {
 import { QuickReport } from "@lapor-bot/ui";
 import type { QuickReportCallbacks } from "@lapor-bot/ui";
 import { StravaConnectPanel } from "@lapor-bot/ui";
+import {
+  PersonalPageTabs,
+  ProgramTabBar,
+  ProgramOverviewTab,
+  ProgramHistoryTab,
+} from "@lapor-bot/ui";
+import type { PersonalPageTab, ProgramTab } from "@lapor-bot/ui";
 import type {
   DailyActivity,
   EnrichedReport,
@@ -108,9 +115,7 @@ function buildOptimisticGoal(
 ): PersonalGoal {
   const now = new Date();
   const start = startDate
-    ? new Date(
-        `${startDate}T${String(startHour ?? 0).padStart(2, "0")}:00:00`,
-      )
+    ? new Date(`${startDate}T${String(startHour ?? 0).padStart(2, "0")}:00:00`)
     : new Date(
         now.getFullYear(),
         now.getMonth(),
@@ -203,6 +208,11 @@ export function PersonalPage({
 
   const [localUser, setLocalUser] = useState<EnrichedReport>(user);
   const [prevUser, setPrevUser] = useState(user);
+
+  // Page-level tab: Ringkasan (default) vs Program Latihan (upcoming).
+  const [pageTab, setPageTab] = useState<PersonalPageTab>("summary");
+  // Sub-tab inside Program Latihan: active program vs history.
+  const [programTab, setProgramTab] = useState<ProgramTab>("program");
 
   // Confirmation toasts for mutation success/error feedback.
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -421,808 +431,873 @@ export function PersonalPage({
           </div>
         </section>
 
-        {/* Quick Report Widget */}
-        <QuickReport
-          onReported={refreshUser}
-          callbacks={quickReportCallbacks}
-          dailyCount={reportCount}
-          maxDaily={3}
-        />
+        {/* Page-level tabs: Ringkasan / Program Latihan */}
+        <div className="mb-6">
+          <PersonalPageTabs activeTab={pageTab} onChange={setPageTab} />
+        </div>
 
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <StatCard
-            label="Season Points"
-            value={localUser.seasonal_points}
-            tone="text-system-gold"
-          />
-          <StatCard
-            label="Daily Streak"
-            value={`${localUser.current_daily_streak ?? 0} hari`}
-            tone="text-system-red"
-          />
-          <StatCard
-            label="Weekly Streak"
-            value={`${localUser.streak} minggu`}
-            tone="text-system-green"
-          />
-          <StatCard
-            label="Active Window"
-            value={`${localUser.active_days_in_window ?? 0}/${dailyActivity.length || 35}`}
-            tone="text-system-blue"
-          />
-        </section>
+        {pageTab === "summary" && (
+          <>
+            {/* Quick Report Widget */}
+            <QuickReport
+              onReported={refreshUser}
+              callbacks={quickReportCallbacks}
+              dailyCount={reportCount}
+              maxDaily={3}
+            />
 
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-6">
-            {/* Streak Map — monthly view with day labels + weekly streak hero */}
-            <div className="glass rounded-3xl p-4 sm:p-6">
-              <div className="flex items-start justify-between gap-4 mb-5">
-                <div>
-                  <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
-                    <Flame className="text-system-red" size={18} />
-                    Streak Map
-                  </h3>
-                  <p className="text-xs text-gray-500 font-mono mt-1 leading-relaxed">
-                    <span className="text-system-green font-bold">
-                      {localUser.streak} minggu
-                    </span>{" "}
-                    berturut-turut. Harimu mendukung streak mingguanmu.
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-2xl font-black font-orbitron text-system-green">
-                    {localUser.streak}w
-                  </div>
-                  <div className="text-[10px] text-gray-500 font-mono uppercase">
-                    Weekly Streak
-                  </div>
-                  <div className="mt-1 text-[10px] text-gray-600 font-mono">
-                    Best: {localUser.longest_daily_streak ?? 0}d
-                  </div>
-                </div>
-              </div>
-
-              {/* Monthly calendar heatmap with day labels */}
-              {dailyActivity.length > 0 &&
-                (() => {
-                  const DAY_LABELS = ["M", "S", "S", "R", "K", "J", "S"];
-                  const startDate = new Date(
-                    dailyActivity[0].date + "T00:00:00",
-                  );
-                  const startDay = startDate.getDay(); // 0=Sun
-                  const rowLabels = Array.from(
-                    { length: 7 },
-                    (_, i) => DAY_LABELS[(startDay + i) % 7],
-                  );
-                  const weeks = chunkWeeks(dailyActivity);
-
-                  return (
-                    <div className="overflow-x-auto pb-2">
-                      <div
-                        className="inline-flex items-start gap-1.5 p-3 rounded-2xl bg-gray-950/70 border border-gray-800/60"
-                        aria-label="Streak map — konsistensi mingguan"
-                      >
-                        {/* Day labels column */}
-                        <div className="flex flex-col gap-[5px] pt-0 shrink-0">
-                          {rowLabels.map((label, i) => (
-                            <div
-                              key={i}
-                              className="h-[22px] w-[24px] flex items-center justify-center"
-                            >
-                              <span className="text-[10px] font-bold font-mono text-gray-500 uppercase">
-                                {label}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Week columns */}
-                        {weeks.map((week, weekIdx) => {
-                          const activeDays = week.filter(
-                            (d) => d.active,
-                          ).length;
-                          return (
-                            <div
-                              key={`week-${weekIdx}`}
-                              className="flex flex-col items-center gap-[3px]"
-                            >
-                              <div className="grid grid-rows-7 gap-[5px]">
-                                {week.map((day) => {
-                                  const intensity =
-                                    !day.active || day.count <= 0
-                                      ? "empty"
-                                      : day.count >= 3
-                                        ? "high"
-                                        : day.count === 2
-                                          ? "mid"
-                                          : "low";
-                                  const cellClass =
-                                    intensity === "high"
-                                      ? "bg-system-green border-system-green shadow-[0_0_8px_rgb(16,185,129,0.65)]"
-                                      : intensity === "mid"
-                                        ? "bg-system-green/90 border-system-green/80 shadow-[0_0_4px_rgb(16,185,129,0.5)]"
-                                        : intensity === "low"
-                                          ? "bg-system-green border-system-green/70"
-                                          : "bg-[#111418] border-gray-800/70";
-                                  return (
-                                    <span
-                                      key={day.date}
-                                      className={`h-[22px] w-[22px] rounded-[5px] border transition-all hover:scale-110 hover:brightness-110 ${cellClass}`}
-                                    />
-                                  );
-                                })}
-                              </div>
-                              {/* Per-week active count */}
-                              <span
-                                className={`text-[8px] font-mono leading-none ${activeDays > 0 ? "text-system-green/60" : "text-gray-700"}`}
-                              >
-                                {activeDays}/7
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-4 text-[10px] text-gray-500 font-mono uppercase tracking-wider">
-                <div className="text-gray-400">
-                  {dailyActivity[0] ? formatDate(dailyActivity[0].date) : "—"} →{" "}
-                  {dailyActivity.at(-1)
-                    ? formatDate(dailyActivity.at(-1)!.date)
-                    : "—"}
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-3.5 w-3.5 rounded-[3px] bg-[#111418] border border-gray-800/70" />
-                    <span>Rest</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-3.5 w-3.5 rounded-[3px] bg-system-green border border-system-green/60" />
-                    <span>Active</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Weekly Goal — atur, lacak, raih */}
-            <section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
-              <div className="flex items-start justify-between gap-4 mb-5">
-                <div>
-                  <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
-                    <Target className="text-system-gold" size={18} />
-                    Weekly Goal
-                  </h3>
-                  <p className="text-xs text-gray-500 font-mono mt-1">
-                    Goal mingguan pribadi — atur target, lacak progress, raih
-                    streak.
-                  </p>
-                </div>
-                {activeGoal && (
-                  <div className="text-right shrink-0">
-                    <div
-                      className={`text-sm font-bold font-orbitron ${activeGoal.is_completed ? "text-system-gold" : "text-white"}`}
-                    >
-                      {activeGoal.is_completed
-                        ? "✅ Selesai"
-                        : `${activeGoal.completed_days}/${activeGoal.target_days}`}
-                    </div>
-                    <div className="text-[10px] text-gray-500 font-mono uppercase">
-                      {activeGoal.is_completed ? "Goal Tercapai" : "Progress"}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {!activeGoal ? (
-                <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-6 text-center">
-                  <Target
-                    className="mx-auto mb-3 text-gray-600"
-                    size={28}
-                  />
-                  <p className="text-sm text-gray-400 font-mono">
-                    Belum ada goal aktif.
-                  </p>
-                  <p className="text-xs text-gray-600 font-mono mt-1 mb-4 max-w-xs mx-auto">
-                    Tentukan target mingguanmu dan lacak konsistensimu setiap
-                    hari.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowGoalForm(true);
-                      setGoalError(null);
-                    }}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-system-gold text-gray-950 text-sm font-bold hover:bg-system-gold/90 transition-colors"
-                  >
-                    <Target size={14} />
-                    Atur Goal
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  {/* Completed celebration banner */}
-                  {activeGoal.is_completed && (
-                    <div className="mb-4 rounded-2xl border border-system-gold/40 bg-system-gold/10 p-4 text-center">
-                      <p className="text-lg font-bold font-orbitron text-system-gold">
-                        🎉 GOAL TERCAPAI! 🎉
-                      </p>
-                      <p className="text-sm text-gray-300 font-mono mt-1">
-                        {activeGoal.target_days}x {activeGoal.activity} berhasil
-                        kamu selesaikan!
-                      </p>
-                      <p className="text-xs text-gray-500 font-mono mt-2">
-                        Konsisten itu kunci 💪 Sekarang kamu bisa set goal baru
-                        dan lanjutkan streak mingguanmu!
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Progress bar (hidden when completed — replaced by banner) */}
-                  {!activeGoal.is_completed && (
-                    <div className="mb-4 rounded-2xl border border-gray-800 bg-gray-950/50 p-4">
-                      <div className="flex items-center justify-between gap-3 mb-2">
-                        <p className="text-sm text-white font-bold font-mono">
-                          {activeGoal.target_days}x {activeGoal.activity}
-                        </p>
-                        <p className="text-xs text-system-gold font-mono">
-                          {activeGoal.percent}%
-                        </p>
-                      </div>
-                      <div className="h-3 rounded-full bg-gray-900 border border-gray-800 overflow-hidden p-[2px]">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-system-gold to-system-green"
-                          style={{ width: `${activeGoal.percent}%` }}
-                        />
-                      </div>
-                      <p className="mt-2 text-[10px] text-gray-500 font-mono uppercase">
-                        Sisa {activeGoal.remaining_days} hari lagi untuk
-                        mencapai goal.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* 7-day grid — hari dimulai dari tanggal start user */}
-                  <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                    {activeGoal.days.map((day) => (
-                      <div
-                        key={day.date}
-                        className={`rounded-xl border p-1 sm:p-2 text-center ${
-                          day.active
-                            ? activeGoal.is_completed
-                              ? "border-system-gold/50 bg-system-gold/10"
-                              : "border-system-green/50 bg-system-green/10"
-                            : "border-gray-800 bg-gray-950/50"
-                        }`}
-                        title={day.activity}
-                      >
-                        <div className="text-[10px] text-gray-500 font-mono uppercase">
-                          {day.day_label}
-                        </div>
-                        <div className="mt-1 flex justify-center">
-                          {day.active ? (
-                            <CheckCircle2
-                              size={16}
-                              className={
-                                activeGoal.is_completed
-                                  ? "text-system-gold"
-                                  : "text-system-green"
-                              }
-                            />
-                          ) : (
-                            <Circle size={16} className="text-gray-700" />
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Goal setter controls */}
-              <div className="mt-4 pt-4 border-t border-gray-800/60">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <button
-                    onClick={() => {
-                      setShowGoalForm((v) => !v);
-                      setGoalError(null);
-                      if (localUser.active_goal) {
-                        setTargetDays(localUser.active_goal.target_days || 3);
-                        setActivity(
-                          localUser.active_goal.activity || "Olahraga",
-                        );
-                      }
-                    }}
-                    className="text-xs px-3 py-1.5 rounded-xl border border-gray-700 text-gray-300 hover:text-white"
-                  >
-                    {showGoalForm
-                      ? "Tutup"
-                      : localUser.active_goal?.is_completed
-                        ? "Set Goal Baru 🎯"
-                        : "Atur / Ubah Goal"}
-                  </button>
-                  {localUser.active_goal &&
-                    !localUser.active_goal.is_completed && (
-                      <button
-                        disabled={resetLoading}
-                        onClick={async () => {
-                          setResetLoading(true);
-                          setGoalError(null);
-                          try {
-                            const res = await repo.resetGoal!();
-                            await refreshUser();
-                            showToast(res.message || "Goal berhasil direset");
-                          } catch (e) {
-                            setGoalError(
-                              e instanceof Error
-                                ? e.message
-                                : "Gagal reset goal",
-                            );
-                          } finally {
-                            setResetLoading(false);
-                          }
-                        }}
-                        className="text-xs px-3 py-1.5 rounded-xl border border-system-red/30 text-system-red hover:bg-system-red/10"
-                      >
-                        {resetLoading ? "Reset..." : "Reset Goal"}
-                      </button>
-                    )}
-                </div>
-
-                {showGoalForm && (
-                  <div className="rounded-2xl border border-gray-800 bg-gray-950/50 p-4 space-y-3">
-                    <div>
-                      <label className="block text-[10px] text-gray-500 font-mono mb-1">
-                        Target Hari (1-7)
-                      </label>
-                      <select
-                        value={targetDays}
-                        onChange={(e) =>
-                          setTargetDays(parseInt(e.target.value))
-                        }
-                        className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-sm font-mono"
-                      >
-                        {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-                          <option key={d} value={d}>
-                            {d} hari / minggu
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-gray-500 font-mono mb-1">
-                        Aktivitas
-                      </label>
-                      <input
-                        value={activity}
-                        onChange={(e) => setActivity(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-sm font-mono"
-                        placeholder="Olahraga"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] text-gray-500 font-mono mb-1">
-                          Mulai Tanggal
-                        </label>
-                        <input
-                          type="date"
-                          value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-sm font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-500 font-mono mb-1">
-                          Jam Mulai
-                        </label>
-                        <select
-                          value={startHour}
-                          onChange={(e) =>
-                            setStartHour(parseInt(e.target.value))
-                          }
-                          className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-sm font-mono"
-                        >
-                          {Array.from({ length: 24 }, (_, i) => (
-                            <option key={i} value={i}>
-                              {i.toString().padStart(2, "0")}:00
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {goalError && (
-                      <p className="text-[10px] text-system-red">{goalError}</p>
-                    )}
-
-                    <div className="flex gap-2">
-                      <button
-                        disabled={goalLoading}
-                        onClick={async () => {
-                          setGoalLoading(true);
-                          setGoalError(null);
-                          try {
-                            const startPayload: {
-                              startDate?: string;
-                              startHour?: number;
-                            } = {};
-                            if (startDate) startPayload.startDate = startDate;
-                            if (startHour || startHour === 0)
-                              startPayload.startHour = startHour;
-                            const res = await repo.setGoal(
-                              targetDays,
-                              activity || "Olahraga",
-                              startPayload,
-                            );
-                            // Optimistic update: apply goal to local state
-                            // immediately so the UI transitions from empty→active
-                            // before the server round-trip completes.
-                            const optimisticGoal = buildOptimisticGoal(
-                              targetDays,
-                              activity || "Olahraga",
-                              startDate || undefined,
-                              startHour,
-                            );
-                            const optimisticUser: EnrichedReport = {
-                              ...localUser,
-                              active_goal: optimisticGoal,
-                            };
-                            setLocalUser(optimisticUser);
-                            onUserRefresh?.(optimisticUser);
-                            setShowGoalForm(false);
-                            showToast(
-                              res.message || "Goal berhasil diperbarui",
-                            );
-                            // Sync with server in background — on success the
-                            // server data (with real day statuses) replaces
-                            // the optimistic goal. On failure we keep the
-                            // optimistic state since the goal was saved.
-                            try {
-                              await refreshUser();
-                            } catch {
-                              // Goal saved, UI already showing it — silent
-                              // background sync failure is acceptable.
-                            }
-                          } catch (e) {
-                            setGoalError(
-                              e instanceof Error
-                                ? e.message
-                                : "Gagal menyimpan goal (mungkin sudah ada goal aktif)",
-                            );
-                          } finally {
-                            setGoalLoading(false);
-                          }
-                        }}
-                        className="flex-1 px-4 py-2 rounded-xl bg-system-gold text-gray-950 text-sm font-bold"
-                      >
-                        {goalLoading ? "Menyimpan..." : "Simpan Goal"}
-                      </button>
-                      <button
-                        onClick={() => setShowGoalForm(false)}
-                        className="px-4 py-2 rounded-xl border border-gray-700 text-xs"
-                      >
-                        Batal
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-gray-500">
-                      Goal berlaku 7 hari dari tanggal+jam yang dipilih.
-                      Kosongkan tanggal untuk mulai hari ini.
-                    </p>
-                  </div>
-                )}
-              </div>
+            <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+              <StatCard
+                label="Season Points"
+                value={localUser.seasonal_points}
+                tone="text-system-gold"
+              />
+              <StatCard
+                label="Daily Streak"
+                value={`${localUser.current_daily_streak ?? 0} hari`}
+                tone="text-system-red"
+              />
+              <StatCard
+                label="Weekly Streak"
+                value={`${localUser.streak} minggu`}
+                tone="text-system-green"
+              />
+              <StatCard
+                label="Active Window"
+                value={`${localUser.active_days_in_window ?? 0}/${dailyActivity.length || 35}`}
+                tone="text-system-blue"
+              />
             </section>
 
-            {/* Side Quest Hari Ini (kept intact) */}
-            <section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
-              <div className="flex items-start justify-between gap-4 mb-5">
-                <div>
-                  <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
-                    <ScrollText className="text-system-green" size={18} />
-                    Side Quest Hari Ini
-                  </h3>
-                  <p className="text-xs text-gray-500 font-mono mt-1 leading-relaxed">
-                    Selesaikan via WhatsApp:{" "}
-                    <span className="text-gray-300">
-                      /lapor sidequest &lt;kegiatan&gt; &lt;jumlah&gt;
-                    </span>
-                    .
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-sm font-bold font-orbitron text-white">
-                    {completedSideQuests}/{sideQuests.length}
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="space-y-6">
+                {/* Streak Map — monthly view with day labels + weekly streak hero */}
+                <div className="glass rounded-3xl p-4 sm:p-6">
+                  <div className="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                      <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
+                        <Flame className="text-system-red" size={18} />
+                        Streak Map
+                      </h3>
+                      <p className="text-xs text-gray-500 font-mono mt-1 leading-relaxed">
+                        <span className="text-system-green font-bold">
+                          {localUser.streak} minggu
+                        </span>{" "}
+                        berturut-turut. Harimu mendukung streak mingguanmu.
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-2xl font-black font-orbitron text-system-green">
+                        {localUser.streak}w
+                      </div>
+                      <div className="text-[10px] text-gray-500 font-mono uppercase">
+                        Weekly Streak
+                      </div>
+                      <div className="mt-1 text-[10px] text-gray-600 font-mono">
+                        Best: {localUser.longest_daily_streak ?? 0}d
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-gray-500 font-mono uppercase">
-                    Selesai
-                  </div>
-                </div>
-              </div>
 
-              {sideQuests.length === 0 ? (
-                <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-4 text-center">
-                  <p className="text-sm text-gray-400 font-mono">
-                    Side quest belum terbuka.
-                  </p>
-                  <p className="text-xs text-gray-600 font-mono mt-1">
-                    Side quest tersedia untuk profil yang sudah punya job.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {sideQuests.map((quest) => {
-                    const done = quest.progress >= quest.target;
-                    return (
-                      <div
-                        key={quest.id}
-                        className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-4"
-                      >
-                        <div className="flex items-start gap-3">
-                          {done ? (
-                            <CheckCircle2
-                              className="text-system-green shrink-0 mt-0.5"
-                              size={18}
-                            />
-                          ) : (
-                            <Circle
-                              className="text-gray-600 shrink-0 mt-0.5"
-                              size={18}
-                            />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                              <p className="text-sm font-bold text-white font-mono">
-                                {quest.name}
-                              </p>
-                              <span className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">
-                                {formatQuestDifficulty(quest.difficulty)}
-                              </span>
+                  {/* Monthly calendar heatmap with day labels */}
+                  {dailyActivity.length > 0 &&
+                    (() => {
+                      const DAY_LABELS = ["M", "S", "S", "R", "K", "J", "S"];
+                      const startDate = new Date(
+                        dailyActivity[0].date + "T00:00:00",
+                      );
+                      const startDay = startDate.getDay(); // 0=Sun
+                      const rowLabels = Array.from(
+                        { length: 7 },
+                        (_, i) => DAY_LABELS[(startDay + i) % 7],
+                      );
+                      const weeks = chunkWeeks(dailyActivity);
+
+                      return (
+                        <div className="overflow-x-auto pb-2">
+                          <div
+                            className="inline-flex items-start gap-1.5 p-3 rounded-2xl bg-gray-950/70 border border-gray-800/60"
+                            aria-label="Streak map — konsistensi mingguan"
+                          >
+                            {/* Day labels column */}
+                            <div className="flex flex-col gap-[5px] pt-0 shrink-0">
+                              {rowLabels.map((label, i) => (
+                                <div
+                                  key={i}
+                                  className="h-[22px] w-[24px] flex items-center justify-center"
+                                >
+                                  <span className="text-[10px] font-bold font-mono text-gray-500 uppercase">
+                                    {label}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                            <p className="text-xs text-gray-500 font-mono mt-1">
-                              Target: {formatQuestTarget(quest)}
-                            </p>
-                            <p className="text-xs text-gray-600 font-mono mt-1">
-                              Progress: {formatQuestProgress(quest)}
-                            </p>
+
+                            {/* Week columns */}
+                            {weeks.map((week, weekIdx) => {
+                              const activeDays = week.filter(
+                                (d) => d.active,
+                              ).length;
+                              return (
+                                <div
+                                  key={`week-${weekIdx}`}
+                                  className="flex flex-col items-center gap-[3px]"
+                                >
+                                  <div className="grid grid-rows-7 gap-[5px]">
+                                    {week.map((day) => {
+                                      const intensity =
+                                        !day.active || day.count <= 0
+                                          ? "empty"
+                                          : day.count >= 3
+                                            ? "high"
+                                            : day.count === 2
+                                              ? "mid"
+                                              : "low";
+                                      const cellClass =
+                                        intensity === "high"
+                                          ? "bg-system-green border-system-green shadow-[0_0_8px_rgb(16,185,129,0.65)]"
+                                          : intensity === "mid"
+                                            ? "bg-system-green/90 border-system-green/80 shadow-[0_0_4px_rgb(16,185,129,0.5)]"
+                                            : intensity === "low"
+                                              ? "bg-system-green border-system-green/70"
+                                              : "bg-[#111418] border-gray-800/70";
+                                      return (
+                                        <span
+                                          key={day.date}
+                                          className={`h-[22px] w-[22px] rounded-[5px] border transition-all hover:scale-110 hover:brightness-110 ${cellClass}`}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                  {/* Per-week active count */}
+                                  <span
+                                    className={`text-[8px] font-mono leading-none ${activeDays > 0 ? "text-system-green/60" : "text-gray-700"}`}
+                                  >
+                                    {activeDays}/7
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
+                      );
+                    })()}
+
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-4 text-[10px] text-gray-500 font-mono uppercase tracking-wider">
+                    <div className="text-gray-400">
+                      {dailyActivity[0]
+                        ? formatDate(dailyActivity[0].date)
+                        : "—"}{" "}
+                      →{" "}
+                      {dailyActivity.at(-1)
+                        ? formatDate(dailyActivity.at(-1)!.date)
+                        : "—"}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-3.5 w-3.5 rounded-[3px] bg-[#111418] border border-gray-800/70" />
+                        <span>Rest</span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-          </div>
-
-          {/* Right aside — attributes and achievements post incoming */}
-          <aside className="space-y-6">
-            <StravaConnectPanel onMessage={showToast} />
-
-            {/* Job Profile — same layout as public leaderboard click (ProfileModal) */}
-            <section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
-              <h3 className="text-xs text-system-gold font-mono font-bold uppercase tracking-widest mb-3">
-                Job Profile
-              </h3>
-              <div className="flex flex-col sm:flex-row items-center gap-3 mb-3">
-                <span className="text-2xl">{localUser.job_icon}</span>
-                <span
-                  className={`text-xs px-2.5 py-1 rounded-full border font-mono ${getJobColor(localUser.job_class)}`}
-                >
-                  {localUser.job_name}
-                </span>
-                <button
-                  onClick={async () => {
-                    setJobError(null);
-                    setShowJobModal(true);
-                    if (jobs.length === 0) {
-                      setJobsLoading(true);
-                      try {
-                        const list = await repo.listJobs();
-                        setJobs(list);
-                      } catch (e) {
-                        setJobError(
-                          e instanceof Error ? e.message : "Gagal memuat jobs",
-                        );
-                      } finally {
-                        setJobsLoading(false);
-                      }
-                    }
-                  }}
-                  className="ml-auto text-xs px-2 py-1 rounded-lg border border-gray-700 text-gray-400 hover:text-white"
-                >
-                  Ganti
-                </button>
-              </div>
-              <p className="text-sm text-gray-300 leading-relaxed">
-                {localUser.job_description}
-              </p>
-              {localUser.job_trait && (
-                <div className="mt-3 p-2.5 rounded-lg bg-gray-950/50 border border-gray-800 text-xs text-gray-400 font-mono">
-                  <span className="text-system-gold font-bold">Trait:</span>{" "}
-                  {localUser.job_trait}
-                </div>
-              )}
-            </section>
-
-            <section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
-              <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">
-                <Activity className="text-system-blue" size={18} />
-                Attributes
-              </h3>
-              <div className="space-y-4">
-                {[
-                  {
-                    icon: Swords,
-                    label: "STR",
-                    hint: "Strength / Gym",
-                    value: clampAttribute(localUser.str),
-                    color: "text-system-red",
-                    bar: "bg-gradient-to-r from-system-red to-amber-500",
-                  },
-                  {
-                    icon: Zap,
-                    label: "STA",
-                    hint: "Stamina / Cardio",
-                    value: clampAttribute(localUser.sta),
-                    color: "text-system-blue",
-                    bar: "bg-gradient-to-r from-amber-500 to-system-gold",
-                  },
-                  {
-                    icon: Shield,
-                    label: "AGI",
-                    hint: "Agility / Sport",
-                    value: clampAttribute(localUser.agi),
-                    color: "text-system-purple",
-                    bar: "bg-gradient-to-r from-system-blue to-system-green",
-                  },
-                  {
-                    icon: Heart,
-                    label: "VIT",
-                    hint: "Vitality / Recovery",
-                    value: clampAttribute(localUser.vit),
-                    color: "text-system-green",
-                    bar: "bg-gradient-to-r from-system-green to-system-blue",
-                  },
-                  {
-                    icon: Mountain,
-                    label: "END",
-                    hint: "Endurance / Hiking",
-                    value: clampAttribute(localUser.end),
-                    color: "text-system-gold",
-                    bar: "bg-gradient-to-r from-system-gold to-amber-500",
-                  },
-                  {
-                    icon: Moon,
-                    label: "LUK",
-                    hint: "Luck / Resilience",
-                    value: clampAttribute(localUser.luk),
-                    color: "text-gray-400",
-                    bar: "bg-gradient-to-r from-gray-500 to-gray-700",
-                  },
-                ].map((stat) => {
-                  const Icon = stat.icon;
-                  const width = attributeBarWidth(stat.value);
-                  return (
-                    <div key={stat.label}>
-                      <div className="flex items-center justify-between gap-3 mb-1.5">
-                        <div
-                          className={`flex items-center gap-2 ${stat.color}`}
-                        >
-                          <Icon size={16} />
-                          <span className="text-xs font-bold font-mono">
-                            {stat.label}
-                          </span>
-                          <span className="text-[10px] text-gray-500 font-mono">
-                            {stat.hint}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold font-orbitron text-white">
-                          {stat.value}
-                        </span>
-                      </div>
-                      <div className="h-2 rounded-full bg-gray-950 border border-gray-800 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${stat.bar} transition-all duration-500`}
-                          style={{ width: `${width}%` }}
-                        />
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-3.5 w-3.5 rounded-[3px] bg-system-green border border-system-green/60" />
+                        <span>Active</span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </section>
+                  </div>
+                </div>
 
-            <section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
-              <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">
-                <TrendingUp className="text-system-gold" size={18} />
-                Rank Baseline
-              </h3>
-              <div className="rounded-2xl border border-gray-800 bg-gray-950/50 p-4 mb-4">
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <div>
-                    <p className="text-[10px] text-gray-500 font-mono uppercase">
-                      Season Rank
-                    </p>
-                    <p className="text-lg font-bold font-orbitron text-white">
-                      {localUser.rank_icon} {localUser.rank_name}
+                {/* Weekly Goal — atur, lacak, raih */}
+                <section
+                  className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}
+                >
+                  <div className="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                      <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
+                        <Target className="text-system-gold" size={18} />
+                        Weekly Goal
+                      </h3>
+                      <p className="text-xs text-gray-500 font-mono mt-1">
+                        Goal mingguan pribadi — atur target, lacak progress,
+                        raih streak.
+                      </p>
+                    </div>
+                    {activeGoal && (
+                      <div className="text-right shrink-0">
+                        <div
+                          className={`text-sm font-bold font-orbitron ${activeGoal.is_completed ? "text-system-gold" : "text-white"}`}
+                        >
+                          {activeGoal.is_completed
+                            ? "✅ Selesai"
+                            : `${activeGoal.completed_days}/${activeGoal.target_days}`}
+                        </div>
+                        <div className="text-[10px] text-gray-500 font-mono uppercase">
+                          {activeGoal.is_completed
+                            ? "Goal Tercapai"
+                            : "Progress"}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {!activeGoal ? (
+                    <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-6 text-center">
+                      <Target
+                        className="mx-auto mb-3 text-gray-600"
+                        size={28}
+                      />
+                      <p className="text-sm text-gray-400 font-mono">
+                        Belum ada goal aktif.
+                      </p>
+                      <p className="text-xs text-gray-600 font-mono mt-1 mb-4 max-w-xs mx-auto">
+                        Tentukan target mingguanmu dan lacak konsistensimu
+                        setiap hari.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowGoalForm(true);
+                          setGoalError(null);
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-system-gold text-gray-950 text-sm font-bold hover:bg-system-gold/90 transition-colors"
+                      >
+                        <Target size={14} />
+                        Atur Goal
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Completed celebration banner */}
+                      {activeGoal.is_completed && (
+                        <div className="mb-4 rounded-2xl border border-system-gold/40 bg-system-gold/10 p-4 text-center">
+                          <p className="text-lg font-bold font-orbitron text-system-gold">
+                            🎉 GOAL TERCAPAI! 🎉
+                          </p>
+                          <p className="text-sm text-gray-300 font-mono mt-1">
+                            {activeGoal.target_days}x {activeGoal.activity}{" "}
+                            berhasil kamu selesaikan!
+                          </p>
+                          <p className="text-xs text-gray-500 font-mono mt-2">
+                            Konsisten itu kunci 💪 Sekarang kamu bisa set goal
+                            baru dan lanjutkan streak mingguanmu!
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Progress bar (hidden when completed — replaced by banner) */}
+                      {!activeGoal.is_completed && (
+                        <div className="mb-4 rounded-2xl border border-gray-800 bg-gray-950/50 p-4">
+                          <div className="flex items-center justify-between gap-3 mb-2">
+                            <p className="text-sm text-white font-bold font-mono">
+                              {activeGoal.target_days}x {activeGoal.activity}
+                            </p>
+                            <p className="text-xs text-system-gold font-mono">
+                              {activeGoal.percent}%
+                            </p>
+                          </div>
+                          <div className="h-3 rounded-full bg-gray-900 border border-gray-800 overflow-hidden p-[2px]">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-system-gold to-system-green"
+                              style={{ width: `${activeGoal.percent}%` }}
+                            />
+                          </div>
+                          <p className="mt-2 text-[10px] text-gray-500 font-mono uppercase">
+                            Sisa {activeGoal.remaining_days} hari lagi untuk
+                            mencapai goal.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* 7-day grid — hari dimulai dari tanggal start user */}
+                      <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                        {activeGoal.days.map((day) => (
+                          <div
+                            key={day.date}
+                            className={`rounded-xl border p-1 sm:p-2 text-center ${
+                              day.active
+                                ? activeGoal.is_completed
+                                  ? "border-system-gold/50 bg-system-gold/10"
+                                  : "border-system-green/50 bg-system-green/10"
+                                : "border-gray-800 bg-gray-950/50"
+                            }`}
+                            title={day.activity}
+                          >
+                            <div className="text-[10px] text-gray-500 font-mono uppercase">
+                              {day.day_label}
+                            </div>
+                            <div className="mt-1 flex justify-center">
+                              {day.active ? (
+                                <CheckCircle2
+                                  size={16}
+                                  className={
+                                    activeGoal.is_completed
+                                      ? "text-system-gold"
+                                      : "text-system-green"
+                                  }
+                                />
+                              ) : (
+                                <Circle size={16} className="text-gray-700" />
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Goal setter controls */}
+                  <div className="mt-4 pt-4 border-t border-gray-800/60">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <button
+                        onClick={() => {
+                          setShowGoalForm((v) => !v);
+                          setGoalError(null);
+                          if (localUser.active_goal) {
+                            setTargetDays(
+                              localUser.active_goal.target_days || 3,
+                            );
+                            setActivity(
+                              localUser.active_goal.activity || "Olahraga",
+                            );
+                          }
+                        }}
+                        className="text-xs px-3 py-1.5 rounded-xl border border-gray-700 text-gray-300 hover:text-white"
+                      >
+                        {showGoalForm
+                          ? "Tutup"
+                          : localUser.active_goal?.is_completed
+                            ? "Set Goal Baru 🎯"
+                            : "Atur / Ubah Goal"}
+                      </button>
+                      {localUser.active_goal &&
+                        !localUser.active_goal.is_completed && (
+                          <button
+                            disabled={resetLoading}
+                            onClick={async () => {
+                              setResetLoading(true);
+                              setGoalError(null);
+                              try {
+                                const res = await repo.resetGoal!();
+                                await refreshUser();
+                                showToast(
+                                  res.message || "Goal berhasil direset",
+                                );
+                              } catch (e) {
+                                setGoalError(
+                                  e instanceof Error
+                                    ? e.message
+                                    : "Gagal reset goal",
+                                );
+                              } finally {
+                                setResetLoading(false);
+                              }
+                            }}
+                            className="text-xs px-3 py-1.5 rounded-xl border border-system-red/30 text-system-red hover:bg-system-red/10"
+                          >
+                            {resetLoading ? "Reset..." : "Reset Goal"}
+                          </button>
+                        )}
+                    </div>
+
+                    {showGoalForm && (
+                      <div className="rounded-2xl border border-gray-800 bg-gray-950/50 p-4 space-y-3">
+                        <div>
+                          <label className="block text-[10px] text-gray-500 font-mono mb-1">
+                            Target Hari (1-7)
+                          </label>
+                          <select
+                            value={targetDays}
+                            onChange={(e) =>
+                              setTargetDays(parseInt(e.target.value))
+                            }
+                            className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-sm font-mono"
+                          >
+                            {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+                              <option key={d} value={d}>
+                                {d} hari / minggu
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-500 font-mono mb-1">
+                            Aktivitas
+                          </label>
+                          <input
+                            value={activity}
+                            onChange={(e) => setActivity(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-sm font-mono"
+                            placeholder="Olahraga"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] text-gray-500 font-mono mb-1">
+                              Mulai Tanggal
+                            </label>
+                            <input
+                              type="date"
+                              value={startDate}
+                              onChange={(e) => setStartDate(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-sm font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 font-mono mb-1">
+                              Jam Mulai
+                            </label>
+                            <select
+                              value={startHour}
+                              onChange={(e) =>
+                                setStartHour(parseInt(e.target.value))
+                              }
+                              className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-sm font-mono"
+                            >
+                              {Array.from({ length: 24 }, (_, i) => (
+                                <option key={i} value={i}>
+                                  {i.toString().padStart(2, "0")}:00
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {goalError && (
+                          <p className="text-[10px] text-system-red">
+                            {goalError}
+                          </p>
+                        )}
+
+                        <div className="flex gap-2">
+                          <button
+                            disabled={goalLoading}
+                            onClick={async () => {
+                              setGoalLoading(true);
+                              setGoalError(null);
+                              try {
+                                const startPayload: {
+                                  startDate?: string;
+                                  startHour?: number;
+                                } = {};
+                                if (startDate)
+                                  startPayload.startDate = startDate;
+                                if (startHour || startHour === 0)
+                                  startPayload.startHour = startHour;
+                                const res = await repo.setGoal(
+                                  targetDays,
+                                  activity || "Olahraga",
+                                  startPayload,
+                                );
+                                // Optimistic update: apply goal to local state
+                                // immediately so the UI transitions from empty→active
+                                // before the server round-trip completes.
+                                const optimisticGoal = buildOptimisticGoal(
+                                  targetDays,
+                                  activity || "Olahraga",
+                                  startDate || undefined,
+                                  startHour,
+                                );
+                                const optimisticUser: EnrichedReport = {
+                                  ...localUser,
+                                  active_goal: optimisticGoal,
+                                };
+                                setLocalUser(optimisticUser);
+                                onUserRefresh?.(optimisticUser);
+                                setShowGoalForm(false);
+                                showToast(
+                                  res.message || "Goal berhasil diperbarui",
+                                );
+                                // Sync with server in background — on success the
+                                // server data (with real day statuses) replaces
+                                // the optimistic goal. On failure we keep the
+                                // optimistic state since the goal was saved.
+                                try {
+                                  await refreshUser();
+                                } catch {
+                                  // Goal saved, UI already showing it — silent
+                                  // background sync failure is acceptable.
+                                }
+                              } catch (e) {
+                                setGoalError(
+                                  e instanceof Error
+                                    ? e.message
+                                    : "Gagal menyimpan goal (mungkin sudah ada goal aktif)",
+                                );
+                              } finally {
+                                setGoalLoading(false);
+                              }
+                            }}
+                            className="flex-1 px-4 py-2 rounded-xl bg-system-gold text-gray-950 text-sm font-bold"
+                          >
+                            {goalLoading ? "Menyimpan..." : "Simpan Goal"}
+                          </button>
+                          <button
+                            onClick={() => setShowGoalForm(false)}
+                            className="px-4 py-2 rounded-xl border border-gray-700 text-xs"
+                          >
+                            Batal
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-gray-500">
+                          Goal berlaku 7 hari dari tanggal+jam yang dipilih.
+                          Kosongkan tanggal untuk mulai hari ini.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Side Quest Hari Ini (kept intact) */}
+                <section
+                  className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}
+                >
+                  <div className="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                      <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2">
+                        <ScrollText className="text-system-green" size={18} />
+                        Side Quest Hari Ini
+                      </h3>
+                      <p className="text-xs text-gray-500 font-mono mt-1 leading-relaxed">
+                        Selesaikan via WhatsApp:{" "}
+                        <span className="text-gray-300">
+                          /lapor sidequest &lt;kegiatan&gt; &lt;jumlah&gt;
+                        </span>
+                        .
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-bold font-orbitron text-white">
+                        {completedSideQuests}/{sideQuests.length}
+                      </div>
+                      <div className="text-[10px] text-gray-500 font-mono uppercase">
+                        Selesai
+                      </div>
+                    </div>
+                  </div>
+
+                  {sideQuests.length === 0 ? (
+                    <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-4 text-center">
+                      <p className="text-sm text-gray-400 font-mono">
+                        Side quest belum terbuka.
+                      </p>
+                      <p className="text-xs text-gray-600 font-mono mt-1">
+                        Side quest tersedia untuk profil yang sudah punya job.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {sideQuests.map((quest) => {
+                        const done = quest.progress >= quest.target;
+                        return (
+                          <div
+                            key={quest.id}
+                            className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-4"
+                          >
+                            <div className="flex items-start gap-3">
+                              {done ? (
+                                <CheckCircle2
+                                  className="text-system-green shrink-0 mt-0.5"
+                                  size={18}
+                                />
+                              ) : (
+                                <Circle
+                                  className="text-gray-600 shrink-0 mt-0.5"
+                                  size={18}
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                                  <p className="text-sm font-bold text-white font-mono">
+                                    {quest.name}
+                                  </p>
+                                  <span className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">
+                                    {formatQuestDifficulty(quest.difficulty)}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-500 font-mono mt-1">
+                                  Target: {formatQuestTarget(quest)}
+                                </p>
+                                <p className="text-xs text-gray-600 font-mono mt-1">
+                                  Progress: {formatQuestProgress(quest)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              </div>
+
+              {/* Right aside — attributes and achievements post incoming */}
+              <aside className="space-y-6">
+                <StravaConnectPanel onMessage={showToast} />
+
+                {/* Job Profile — same layout as public leaderboard click (ProfileModal) */}
+                <section
+                  className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}
+                >
+                  <h3 className="text-xs text-system-gold font-mono font-bold uppercase tracking-widest mb-3">
+                    Job Profile
+                  </h3>
+                  <div className="flex flex-col sm:flex-row items-center gap-3 mb-3">
+                    <span className="text-2xl">{localUser.job_icon}</span>
+                    <span
+                      className={`text-xs px-2.5 py-1 rounded-full border font-mono ${getJobColor(localUser.job_class)}`}
+                    >
+                      {localUser.job_name}
+                    </span>
+                    <button
+                      onClick={async () => {
+                        setJobError(null);
+                        setShowJobModal(true);
+                        if (jobs.length === 0) {
+                          setJobsLoading(true);
+                          try {
+                            const list = await repo.listJobs();
+                            setJobs(list);
+                          } catch (e) {
+                            setJobError(
+                              e instanceof Error
+                                ? e.message
+                                : "Gagal memuat jobs",
+                            );
+                          } finally {
+                            setJobsLoading(false);
+                          }
+                        }
+                      }}
+                      className="ml-auto text-xs px-2 py-1 rounded-lg border border-gray-700 text-gray-400 hover:text-white"
+                    >
+                      Ganti
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-300 leading-relaxed">
+                    {localUser.job_description}
+                  </p>
+                  {localUser.job_trait && (
+                    <div className="mt-3 p-2.5 rounded-lg bg-gray-950/50 border border-gray-800 text-xs text-gray-400 font-mono">
+                      <span className="text-system-gold font-bold">Trait:</span>{" "}
+                      {localUser.job_trait}
+                    </div>
+                  )}
+                </section>
+
+                <section
+                  className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}
+                >
+                  <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">
+                    <Activity className="text-system-blue" size={18} />
+                    Attributes
+                  </h3>
+                  <div className="space-y-4">
+                    {[
+                      {
+                        icon: Swords,
+                        label: "STR",
+                        hint: "Strength / Gym",
+                        value: clampAttribute(localUser.str),
+                        color: "text-system-red",
+                        bar: "bg-gradient-to-r from-system-red to-amber-500",
+                      },
+                      {
+                        icon: Zap,
+                        label: "STA",
+                        hint: "Stamina / Cardio",
+                        value: clampAttribute(localUser.sta),
+                        color: "text-system-blue",
+                        bar: "bg-gradient-to-r from-amber-500 to-system-gold",
+                      },
+                      {
+                        icon: Shield,
+                        label: "AGI",
+                        hint: "Agility / Sport",
+                        value: clampAttribute(localUser.agi),
+                        color: "text-system-purple",
+                        bar: "bg-gradient-to-r from-system-blue to-system-green",
+                      },
+                      {
+                        icon: Heart,
+                        label: "VIT",
+                        hint: "Vitality / Recovery",
+                        value: clampAttribute(localUser.vit),
+                        color: "text-system-green",
+                        bar: "bg-gradient-to-r from-system-green to-system-blue",
+                      },
+                      {
+                        icon: Mountain,
+                        label: "END",
+                        hint: "Endurance / Hiking",
+                        value: clampAttribute(localUser.end),
+                        color: "text-system-gold",
+                        bar: "bg-gradient-to-r from-system-gold to-amber-500",
+                      },
+                      {
+                        icon: Moon,
+                        label: "LUK",
+                        hint: "Luck / Resilience",
+                        value: clampAttribute(localUser.luk),
+                        color: "text-gray-400",
+                        bar: "bg-gradient-to-r from-gray-500 to-gray-700",
+                      },
+                    ].map((stat) => {
+                      const Icon = stat.icon;
+                      const width = attributeBarWidth(stat.value);
+                      return (
+                        <div key={stat.label}>
+                          <div className="flex items-center justify-between gap-3 mb-1.5">
+                            <div
+                              className={`flex items-center gap-2 ${stat.color}`}
+                            >
+                              <Icon size={16} />
+                              <span className="text-xs font-bold font-mono">
+                                {stat.label}
+                              </span>
+                              <span className="text-[10px] text-gray-500 font-mono">
+                                {stat.hint}
+                              </span>
+                            </div>
+                            <span className="text-sm font-bold font-orbitron text-white">
+                              {stat.value}
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full bg-gray-950 border border-gray-800 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${stat.bar} transition-all duration-500`}
+                              style={{ width: `${width}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <section
+                  className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}
+                >
+                  <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">
+                    <TrendingUp className="text-system-gold" size={18} />
+                    Rank Baseline
+                  </h3>
+                  <div className="rounded-2xl border border-gray-800 bg-gray-950/50 p-4 mb-4">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div>
+                        <p className="text-[10px] text-gray-500 font-mono uppercase">
+                          Season Rank
+                        </p>
+                        <p className="text-lg font-bold font-orbitron text-white">
+                          {localUser.rank_icon} {localUser.rank_name}
+                        </p>
+                      </div>
+                      <p className="text-sm font-bold font-orbitron text-system-gold">
+                        {localUser.seasonal_points} pts
+                      </p>
+                    </div>
+                    <div className="h-3 rounded-full bg-gray-900 border border-gray-800 overflow-hidden p-[2px]">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-system-purple to-system-gold"
+                        style={{
+                          width: `${localUser.season_rank_progress.percent}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-2 text-[10px] text-gray-500 font-mono uppercase">
+                      {localUser.season_rank_progress.is_max
+                        ? "Max rank season ini"
+                        : `Menuju ${localUser.season_rank_progress.next_icon} ${localUser.season_rank_progress.next_name}: ${localUser.season_rank_progress.remaining} pts lagi`}
                     </p>
                   </div>
-                  <p className="text-sm font-bold font-orbitron text-system-gold">
-                    {localUser.seasonal_points} pts
-                  </p>
-                </div>
-                <div className="h-3 rounded-full bg-gray-900 border border-gray-800 overflow-hidden p-[2px]">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-system-purple to-system-gold"
-                    style={{
-                      width: `${localUser.season_rank_progress.percent}%`,
-                    }}
-                  />
-                </div>
-                <p className="mt-2 text-[10px] text-gray-500 font-mono uppercase">
-                  {localUser.season_rank_progress.is_max
-                    ? "Max rank season ini"
-                    : `Menuju ${localUser.season_rank_progress.next_icon} ${localUser.season_rank_progress.next_name}: ${localUser.season_rank_progress.remaining} pts lagi`}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <StatCard
-                  label="Goals Done"
-                  value={localUser.goals_completed}
-                  tone="text-system-gold"
-                />
-                <StatCard
-                  label="Side Quests"
-                  value={localUser.total_side_quests}
-                  tone="text-system-green"
-                />
-                <StatCard
-                  label="Season Days"
-                  value={localUser.seasonal_activity_count}
-                  tone="text-system-blue"
-                />
-                <StatCard
-                  label="Lifetime Days"
-                  value={localUser.total_active_days}
-                  tone="text-white"
-                />
-              </div>
-            </section>
+                  <div className="grid grid-cols-2 gap-3">
+                    <StatCard
+                      label="Goals Done"
+                      value={localUser.goals_completed}
+                      tone="text-system-gold"
+                    />
+                    <StatCard
+                      label="Side Quests"
+                      value={localUser.total_side_quests}
+                      tone="text-system-green"
+                    />
+                    <StatCard
+                      label="Season Days"
+                      value={localUser.seasonal_activity_count}
+                      tone="text-system-blue"
+                    />
+                    <StatCard
+                      label="Lifetime Days"
+                      value={localUser.total_active_days}
+                      tone="text-white"
+                    />
+                  </div>
+                </section>
 
-            <section className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}>
-              <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">
-                <Award className="text-system-gold" size={18} />
-                Achievements
-              </h3>
-              {allBadges.length === 0 ? (
-                <p className="text-xs text-gray-600 font-mono italic">
-                  Belum ada badge. Fokus ke streak, goal, dan side quest dulu.
+                <section
+                  className={`glass rounded-3xl p-4 sm:p-6 ${glowClass}`}
+                >
+                  <h3 className="text-lg font-bold font-orbitron text-white flex items-center gap-2 mb-4">
+                    <Award className="text-system-gold" size={18} />
+                    Achievements
+                  </h3>
+                  {allBadges.length === 0 ? (
+                    <p className="text-xs text-gray-600 font-mono italic">
+                      Belum ada badge. Fokus ke streak, goal, dan side quest
+                      dulu.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {localUser.achievements.map((badge) => (
+                        <span
+                          key={`life-${badge}`}
+                          className="inline-flex items-center gap-1 rounded-lg border border-system-gold/30 bg-system-gold/10 px-2.5 py-1 text-[10px] font-bold font-mono text-system-gold"
+                        >
+                          <Award size={11} /> {badge}
+                        </span>
+                      ))}
+                      {localUser.seasonal_achievements.map((badge) => (
+                        <span
+                          key={`season-${badge}`}
+                          className="inline-flex items-center gap-1 rounded-lg border border-system-purple/30 bg-system-purple/10 px-2.5 py-1 text-[10px] font-bold font-mono text-system-purple"
+                        >
+                          <Award size={11} /> {badge}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </aside>
+            </div>
+          </>
+        )}
+
+        {pageTab === "program" && (
+          <section
+            id="page-panel-program"
+            role="tabpanel"
+            aria-labelledby="page-tab-program"
+            className="animate-fade-in"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-bold font-orbitron text-white">
+                  Program Latihan
+                </h2>
+                <p className="text-xs text-gray-500 font-mono mt-1">
+                  Susun dan lacak program latihan pribadimu.
                 </p>
+              </div>
+              <ProgramTabBar activeTab={programTab} onChange={setProgramTab} />
+            </div>
+
+            <div id="program-panel-program" role="tabpanel">
+              {programTab === "program" ? (
+                <ProgramOverviewTab program={null} />
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {localUser.achievements.map((badge) => (
-                    <span
-                      key={`life-${badge}`}
-                      className="inline-flex items-center gap-1 rounded-lg border border-system-gold/30 bg-system-gold/10 px-2.5 py-1 text-[10px] font-bold font-mono text-system-gold"
-                    >
-                      <Award size={11} /> {badge}
-                    </span>
-                  ))}
-                  {localUser.seasonal_achievements.map((badge) => (
-                    <span
-                      key={`season-${badge}`}
-                      className="inline-flex items-center gap-1 rounded-lg border border-system-purple/30 bg-system-purple/10 px-2.5 py-1 text-[10px] font-bold font-mono text-system-purple"
-                    >
-                      <Award size={11} /> {badge}
-                    </span>
-                  ))}
-                </div>
+                <ProgramHistoryTab programs={[]} />
               )}
-            </section>
-          </aside>
-        </div>
+            </div>
+          </section>
+        )}
       </div>
 
       {showJobModal && (

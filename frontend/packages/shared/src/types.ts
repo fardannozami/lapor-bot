@@ -95,6 +95,62 @@ export interface PersonalGoal {
   days: GoalDay[];
 }
 
+/**
+ * A structured training program (program latihan) assigned to a user.
+ * Backend does not exist yet - this is the forward contract for the
+ * upcoming program feature. The UI renders from this shape once wired.
+ */
+export interface TrainingProgram {
+  id: string;
+  title: string;
+  description?: string;
+  /** ISO date the program starts (YYYY-MM-DD). */
+  start_date: string;
+  /** ISO date the program ends (YYYY-MM-DD). */
+  end_date?: string;
+  /** Program-level completion 0-100. */
+  progress_percent: number;
+  /** Total sessions in the program. */
+  total_sessions: number;
+  /** Sessions the user has completed. */
+  completed_sessions: number;
+  /** Weekly cadence target (e.g. 3 = 3x per week). */
+  sessions_per_week: number;
+  /** Optional structured weeks of the program. */
+  weeks?: TrainingWeek[];
+  /** Marked active when the program is the user's current one. */
+  is_active?: boolean;
+}
+
+export interface TrainingWeek {
+  week_number: number;
+  title?: string;
+  sessions: TrainingSession[];
+}
+
+export interface TrainingSession {
+  id: string;
+  /** Session title, e.g. "Push Day" or "Lari Interval". */
+  title: string;
+  /** ISO date the session is scheduled (YYYY-MM-DD). */
+  scheduled_date: string;
+  /** Session-level completion 0-100. */
+  progress_percent: number;
+  is_completed: boolean;
+  /** Optional exercises / moves inside the session. */
+  exercises?: TrainingExercise[];
+}
+
+export interface TrainingExercise {
+  id: string;
+  name: string;
+  /** Target value, e.g. "10", "5 km", "30 menit". */
+  target: string;
+  /** Best-effort result logged by the user, when reported. */
+  result?: string;
+  is_completed: boolean;
+}
+
 export interface QuestTask {
   id: string;
   name: string;
