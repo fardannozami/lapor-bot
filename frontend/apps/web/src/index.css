@@ -22,6 +22,25 @@
   --shadow-neon-purple: 0 0 15px rgba(139, 92, 246, 0.35);
   --shadow-neon-red: 0 0 15px rgba(239, 68, 68, 0.35);
   --shadow-neon-gold: 0 0 15px rgba(245, 158, 11, 0.35);
+
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.45s ease-out both;
+  --animate-scale-in: scale-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.96) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
 }
 
 @layer base {
@@ -126,6 +145,20 @@
 .glass-glow-gold {
   border-color: color-mix(in srgb, var(--color-system-gold) 25%, transparent);
   box-shadow: 0 0 15px color-mix(in srgb, var(--color-system-gold) 10%, transparent);
+}
+
+/* Staggered entrance: pair .stagger-children on a container with
+   .animate-fade-in-up on each child. Capped so late items never lag. */
+.stagger-children > * {
+  animation-delay: calc(var(--stagger-i, 0) * 45ms);
+}
+
+/* Thin horizontal scroll strips (tab bars) stay clean cross-browser. */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
 /* Keyboard accessibility: visible focus ring for interactive elements. */

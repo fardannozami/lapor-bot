@@ -242,15 +242,22 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
   return (
     <div className="glass rounded-3xl p-5 md:p-6 mb-8">
       <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between mb-6 border-b border-gray-850 pb-5">
-        <div className="flex flex-wrap bg-gray-950/80 p-1.5 rounded-xl border border-gray-800/60 max-w-fit">
+        <div className="flex flex-nowrap overflow-x-auto scrollbar-none bg-gray-950/80 p-1.5 rounded-xl border border-gray-800/60 w-full lg:w-auto lg:max-w-fit">
           {LEADERBOARD_TABS.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
+                onClick={(e) => {
+                  handleTabChange(tab.id);
+                  e.currentTarget.scrollIntoView({
+                    behavior: "smooth",
+                    inline: "center",
+                    block: "nearest",
+                  });
+                }}
+                className={`flex shrink-0 whitespace-nowrap items-center gap-2 px-4 py-2 min-h-[40px] rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
                   active
                     ? "bg-gradient-to-r from-system-blue to-system-purple text-white shadow-neon-purple"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/60"
@@ -263,8 +270,8 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
           })}
         </div>
 
-        <div className="flex gap-2 items-center">
-          <div className="relative">
+        <div className="flex gap-2 items-center w-full lg:w-auto">
+          <div className="relative flex-1 lg:flex-none min-w-0">
             <Search
               size={14}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
@@ -273,10 +280,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari hunter…"
-              className="pl-9 pr-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-system-blue/50 transition-colors w-40"
+              className="w-full lg:w-40 pl-9 pr-3 py-2 min-h-[40px] rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-system-blue/50 transition-colors"
             />
           </div>
-          <div className="relative">
+          <div className="relative shrink-0">
             <SlidersHorizontal
               size={14}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
@@ -338,7 +345,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      <div key={activeTab} className="overflow-x-auto animate-fade-in">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-800/80">
@@ -372,7 +379,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
       )}
 
       {totalPages > 1 && (
-        <nav className="flex items-center justify-between mt-6 pt-4 border-t border-gray-800/60">
+        <nav className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6 pt-4 border-t border-gray-800/60">
           <p className="text-xs font-mono text-gray-500">
             Menampilkan {pageStartRank + 1}–
             {Math.min(pageStartRank + visibleHunters.length, totalCount)} dari{" "}

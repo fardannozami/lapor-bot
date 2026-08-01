@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import {
   LayoutGrid,
   Table2,
@@ -109,12 +109,12 @@ function App() {
       </a>
       {/* HUD System Top Bar */}
       <header className="max-w-7xl mx-auto pt-8 pb-6 border-b border-gray-850 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
+        <div className="min-w-0 w-full md:w-auto">
           <div className="flex items-center gap-2.5">
-            <div className="w-3 h-3 bg-system-green shadow-neon-purple rounded-full animate-pulse"></div>
-            <h1 className="text-xl md:text-2xl font-black font-orbitron tracking-widest text-white uppercase flex items-center gap-2">
-              <HeartPulse className="text-system-green" size={22} />
-              {seasonTitle}
+            <div className="w-3 h-3 shrink-0 bg-system-green shadow-neon-purple rounded-full animate-pulse"></div>
+            <h1 className="text-lg md:text-2xl font-black font-orbitron tracking-widest text-white uppercase flex items-center gap-2 min-w-0">
+              <HeartPulse className="text-system-green shrink-0" size={22} />
+              <span className="truncate">{seasonTitle}</span>
             </h1>
           </div>
           <p className="text-xs text-gray-500 font-mono mt-1 tracking-wider uppercase">
@@ -124,8 +124,8 @@ function App() {
         </div>
 
         {/* Global actions and toggles */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto md:justify-end">
+          <div className="flex items-center gap-2 md:gap-3">
             <div className="flex items-center bg-gray-950 p-1 rounded-xl border border-gray-800">
               <button
                 onClick={() => setViewMode("table")}
@@ -168,7 +168,7 @@ function App() {
             <button
               onClick={() => refresh()}
               disabled={loading || refreshing}
-              className="flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 min-h-[44px] px-3 md:px-4 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors disabled:opacity-50"
             >
               <RefreshCw
                 size={12}
@@ -189,7 +189,7 @@ function App() {
             <button
               type="button"
               onClick={() => setPage("personal")}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-system-green/10 hover:bg-system-green/20 border border-system-green/30 font-mono text-xs text-system-green hover:text-white transition-colors"
+              className="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-system-green/10 hover:bg-system-green/20 border border-system-green/30 font-mono text-xs text-system-green hover:text-white transition-colors"
               title="Lihat profil saya"
               aria-label={`Buka profil ${personalUser.name || "saya"}`}
             >
@@ -202,7 +202,7 @@ function App() {
             <button
               type="button"
               onClick={() => setPage("login")}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-system-blue/10 hover:bg-system-blue/20 border border-system-blue/30 font-mono text-xs text-system-blue hover:text-white transition-colors"
+              className="flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-system-blue/10 hover:bg-system-blue/20 border border-system-blue/30 font-mono text-xs text-system-blue hover:text-white transition-colors"
               title="Masuk ke akun"
             >
               <LogIn size={14} />
@@ -316,13 +316,18 @@ function App() {
               />
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                  {visibleCardHunters.map((hunter) => (
-                    <HunterCard
+                <div className="stagger-children grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                  {visibleCardHunters.map((hunter, i) => (
+                    <div
                       key={hunter.user_id}
-                      hunter={hunter}
-                      onClick={() => setSelectedHunter(hunter)}
-                    />
+                      style={{ "--stagger-i": i } as CSSProperties}
+                      className="animate-fade-in-up"
+                    >
+                      <HunterCard
+                        hunter={hunter}
+                        onClick={() => setSelectedHunter(hunter)}
+                      />
+                    </div>
                   ))}
                 </div>
                 <nav
