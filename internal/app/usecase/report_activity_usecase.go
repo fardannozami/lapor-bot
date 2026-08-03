@@ -153,8 +153,16 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		return msg, nil
 	}
 
-	isRepeatReport := !isSideQuest && dailyCount > 0
-	isFullReport := !isSideQuest && !isRepeatReport
+	// One calendar day yields at most one active day on the leaderboard. A
+	// regular report starts a new active day only when the day has no regular
+	// reports yet AND the stored last-report date is not already today.
+	// Requiring both makes the invariant fail closed: if the activity ledger
+	// and LastReportDate ever disagree, the report is treated as a repeat
+	// (halved XP, no counters/bonuses) instead of awarding a second active day
+	// for the same calendar day.
+	lastReportIsToday := report != nil && domain.GetToday(report.LastReportDate).Equal(today)
+	isFullReport := !isSideQuest && dailyCount == 0 && !lastReportIsToday
+	isRepeatReport := !isSideQuest && !isFullReport
 
 	streakFreezeUsed := false
 
@@ -166,8 +174,7 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 			report.Name = name
 		}
 
-		lastReport := report.LastReportDate
-		lastReportDate := domain.GetToday(lastReport)
+		lastReportDate := domain.GetToday(report.LastReportDate)
 
 		if isSideQuest {
 			if shouldUpdateStoredName {
@@ -176,7 +183,11 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 				}
 			}
 			name = report.Name
-		} else if lastReportDate.Equal(today) {
+		} else if isRepeatReport {
+			// Repeat report on the same active day (2nd/3rd report, or a
+			// fail-closed state where the ledger and LastReportDate disagree):
+			// never touch active-day counters or streaks; XP is halved in the
+			// scoring section below.
 			if shouldUpdateStoredName {
 				if err := uc.repo.UpsertReport(ctx, report); err != nil {
 					return "", err
@@ -191,31 +202,29 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 			lastWeekStart := domain.GetStartOfISOWeek(lastReportDate)
 			weeksSinceLastReport := int(math.Round(currentWeekStart.Sub(lastWeekStart).Hours() / (24 * 7)))
 
-			if isFullReport {
-				if currentWeekStart.Equal(lastWeekStart) {
-				} else if weeksSinceLastReport == 1 {
-					report.Streak++
-					report.ComebackStreak++
-				} else if weeksSinceLastReport == 2 && report.StreakFreezes > 0 {
-					report.StreakFreezes--
-					report.Streak++
-					report.ComebackStreak++
-					streakFreezeUsed = true
-				} else {
-					report.InactiveDays = daysSinceLastReport
-					report.ComebackStreak = 1
-					report.Streak = 1
-				}
-				report.ActivityCount++
-				report.SeasonalActivityCount++
-				if report.Streak > report.SeasonalMaxStreak {
-					report.SeasonalMaxStreak = report.Streak
-				}
+			if currentWeekStart.Equal(lastWeekStart) {
+			} else if weeksSinceLastReport == 1 {
+				report.Streak++
+				report.ComebackStreak++
+			} else if weeksSinceLastReport == 2 && report.StreakFreezes > 0 {
+				report.StreakFreezes--
+				report.Streak++
+				report.ComebackStreak++
+				streakFreezeUsed = true
+			} else {
+				report.InactiveDays = daysSinceLastReport
+				report.ComebackStreak = 1
+				report.Streak = 1
+			}
+			report.ActivityCount++
+			report.SeasonalActivityCount++
+			if report.Streak > report.SeasonalMaxStreak {
+				report.SeasonalMaxStreak = report.Streak
+			}
 
-				if report.ActivityCount > 100 {
-					report.ActivityCount = 1
-					report.CenturionCycles++
-				}
+			if report.ActivityCount > 100 {
+				report.ActivityCount = 1
+				report.CenturionCycles++
 			}
 
 			report.LastReportDate = now
@@ -223,6 +232,13 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		}
 	} else {
 		name = reportName("", name)
+		if isSideQuest {
+			// A side quest must never create a profile: that would bypass the
+			// registration/job requirement and seed an active day (Streak=1,
+			// ActivityCount=1) without any main report. Fail closed before any
+			// mutation.
+			return fmt.Sprintf("Halo %s, kamu belum terdaftar di database. Silakan lakukan laporan pertama dengan `/lapor` terlebih dahulu! 💪", name), nil
+		}
 		report = &domain.Report{
 			UserID:                userID,
 			Name:                  name,
@@ -530,6 +546,13 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	}
 	if dailyCount >= MaxDailyReports {
 		return fmt.Sprintf("%s sudah mencapai batas maksimal %dx laporan untuk hari kemarin. 🙏", report.Name, MaxDailyReports), nil
+	}
+	if dailyCount > 0 {
+		// Yesterday already has an accepted regular report, so it is already
+		// counted as one active day. Reject the catch-up instead of awarding
+		// the same calendar day twice (same one-active-day-per-day invariant
+		// as /lapor).
+		return fmt.Sprintf("%s, laporan utama untuk hari kemarin sudah tercatat (%dx). Hari kemarin sudah dihitung 1 hari aktif. 🙏", name, dailyCount), nil
 	}
 
 	if report != nil && domain.GetToday(report.LastReportDate).Equal(today) {
