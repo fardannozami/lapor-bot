@@ -92,13 +92,51 @@ func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name strin
 	return uc.execute(ctx, userID, name, workout, reportActivityOptions{})
 }
 func (uc *ReportActivityUsecase) ExecuteWithMessage(ctx context.Context, userID, name, message string, workout *domain.HevyWorkout) (string, error) {
-	walkSteps := 0
-	if steps, ok := domain.ParseWalkReport(message); ok {
-		walkSteps = steps
+	// Walk validation: if the message contains a walk trigger word (jalan kaki,
+	// jalan, walk, langkah, steps) the step count is mandatory and must be in
+	// [MinWalkSteps, MaxWalkStepsPerReport]. Without a valid count the report
+	// is rejected — it must not silently fall through as a regular /lapor.
+	// Position of /lapor/#lapor in the message is irrelevant (handled by
+	// extractCommandArgument's "lapor anywhere" rule — e.g. "jalan kaki 5000
+	// /lapor" or "/lapor jalan kaki 5000 extra text" both work); only the
+	// presence of a walk keyword plus a valid number matters.
+	if domain.HasWalkKeyword(message) {
+		if steps, ok := domain.ParseWalkReport(message); ok {
+			return uc.execute(ctx, userID, name, workout, reportActivityOptions{
+				activityText: message,
+				walkSteps:    steps,
+			})
+		}
+		candidate := domain.WalkCandidateSteps(message)
+		// Explicit duration like "jalan 30 menit" / "jalan 2 jam" is a regular
+		// activity report, not a steps report — let it fall through as normal
+		// /lapor so we don't block ordinary "jalan pagi 30 menit" reports.
+		lowerMsg := strings.ToLower(message)
+		isDuration := strings.Contains(lowerMsg, "menit") || strings.Contains(lowerMsg, "jam") || strings.Contains(lowerMsg, "detik") || strings.Contains(lowerMsg, "minute") || strings.Contains(lowerMsg, "hour")
+		if candidate > 0 && candidate < domain.MinWalkSteps {
+			if isDuration {
+				return uc.execute(ctx, userID, name, workout, reportActivityOptions{
+					activityText: message,
+					walkSteps:    0,
+				})
+			}
+			return fmt.Sprintf("🚶 *Lapor jalan kaki butuh jumlah langkah.*\n\nKamu menulis *%s langkah* tapi minimal *%s langkah* agar tercatat sebagai laporan langkah (mis. `jalan 30 menit` bukan laporan langkah). Coba lagi dengan format:\n• `/lapor jalan kaki 5000`\n• `/lapor jalan kaki 8rb` / `12.500` / `10k`\nPrefix `/`/`#` dan posisi `/lapor` bebas — yang penting ada kata kunci jalan/walk/langkah + angka langkah.", domain.FormatStepsID(candidate), domain.FormatStepsID(domain.MinWalkSteps)), nil
+		}
+		if candidate > domain.MaxWalkStepsPerReport {
+			return fmt.Sprintf("🚶 *Jumlah langkah terlalu besar.*\n\nKamu menulis *%s langkah* tapi maksimal *%s langkah* per laporan. Cek lagi angkanya ya (contoh: `/lapor jalan kaki 12.500` atau `/lapor jalan kaki 10k`).", domain.FormatStepsID(candidate), domain.FormatStepsID(domain.MaxWalkStepsPerReport)), nil
+		}
+		if candidate == 0 && isDuration {
+			return uc.execute(ctx, userID, name, workout, reportActivityOptions{
+				activityText: message,
+				walkSteps:    0,
+			})
+		}
+		// No parseable count at all (or only non-step numbers like link IDs).
+		return "🚶 *Lapor jalan kaki butuh jumlah langkah.*\n\nTulis angkanya setelah kata kunci jalan/walk/langkah, contoh:\n• `/lapor jalan kaki 5000`\n• `/lapor jalan kaki 8rb` / `12.500` / `10k`\n• `walking 6500 steps /lapor` atau `/lapor 7500 langkah jalan pagi`\nMinimal 100 langkah, maksimal 250.000. Posisi `/lapor` bebas — di depan atau belakang tetap jalan asal ada kata kunci + angka.", nil
 	}
 	return uc.execute(ctx, userID, name, workout, reportActivityOptions{
 		activityText: message,
-		walkSteps:    walkSteps,
+		walkSteps:    0,
 	})
 }
 
@@ -554,7 +592,39 @@ func (uc *ReportActivityUsecase) ExecuteYesterday(ctx context.Context, userID, n
 }
 
 func (uc *ReportActivityUsecase) ExecuteYesterdayWithMessage(ctx context.Context, userID, name, message string, workout *domain.HevyWorkout) (string, error) {
+	if domain.HasWalkKeyword(message) {
+		if steps, ok := domain.ParseWalkReport(message); ok {
+			return uc.executeYesterdayWithWalk(ctx, userID, name, message, workout, steps)
+		}
+		candidate := domain.WalkCandidateSteps(message)
+		if candidate > 0 && candidate < domain.MinWalkSteps {
+			return fmt.Sprintf("🚶 *Lapor jalan kaki butuh jumlah langkah.*\n\nKamu menulis *%s langkah* tapi minimal *%s langkah* agar tercatat sebagai laporan langkah (mis. `jalan 30 menit` bukan laporan langkah). Coba lagi dengan format:\n• `/lapor-kemarin jalan kaki 5000`\n• `/lapor-kemarin jalan kaki 8rb` / `12.500` / `10k`", domain.FormatStepsID(candidate), domain.FormatStepsID(domain.MinWalkSteps)), nil
+		}
+		if candidate > domain.MaxWalkStepsPerReport {
+			return fmt.Sprintf("🚶 *Jumlah langkah terlalu besar.*\n\nKamu menulis *%s langkah* tapi maksimal *%s langkah* per laporan. Cek lagi angkanya ya (contoh: `/lapor-kemarin jalan kaki 12.500` atau `/lapor-kemarin jalan kaki 10k`).", domain.FormatStepsID(candidate), domain.FormatStepsID(domain.MaxWalkStepsPerReport)), nil
+		}
+		return "🚶 *Lapor jalan kaki butuh jumlah langkah.*\n\nTulis angkanya setelah kata kunci jalan/walk/langkah, contoh:\n• `/lapor-kemarin jalan kaki 5000`\n• `/lapor-kemarin jalan kaki 8rb` / `12.500` / `10k`\nMinimal 100 langkah, maksimal 250.000.", nil
+	}
 	return uc.executeYesterday(ctx, userID, name, message, workout)
+}
+
+func (uc *ReportActivityUsecase) executeYesterdayWithWalk(ctx context.Context, userID, name, activityText string, workout *domain.HevyWorkout, walkSteps int) (string, error) {
+	msg, err := uc.executeYesterday(ctx, userID, name, activityText, workout)
+	if err != nil || walkSteps <= 0 {
+		return msg, err
+	}
+	// Credit walk steps to yesterday's ledger, mirroring the main /lapor flow.
+	yesterday := domain.GetToday(time.Now()).AddDate(0, 0, -1)
+	if wa, ok := uc.repo.(walkActivityRepository); ok {
+		_ = wa.AddWalkSteps(ctx, userID, yesterday, walkSteps)
+	}
+	// Update totals on the persisted report (best-effort).
+	if rep, _ := uc.repo.GetReport(ctx, userID); rep != nil {
+		rep.WalkStepsTotal += walkSteps
+		rep.SeasonalWalkSteps += walkSteps
+		_ = uc.repo.UpsertReport(ctx, rep)
+	}
+	return msg, nil
 }
 
 func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, name, activityText string, workout *domain.HevyWorkout) (string, error) {

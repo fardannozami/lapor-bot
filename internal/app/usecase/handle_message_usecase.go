@@ -125,8 +125,16 @@ func (uc *HandleMessageUsecase) Execute(ctx context.Context, userID, name, messa
 	// }
 
 	if hasCommand(msg, "/lapor-kemarin") {
-		workout := domain.ParseHevy(trimmedMessage)
-		text, err := uc.reportUC.ExecuteYesterdayWithMessage(ctx, userID, name, trimmedMessage, workout)
+		// Support position-flexible trigger like regular /lapor: extract the
+		// command token wherever it appears ("/lapor-kemarin ...", "... /lapor-kemarin",
+		// "#lapor-kemarin"). Fall back to hasCommand prefix for backward compat.
+		var activityText string
+		var ok bool
+		if activityText, ok = extractCommandArgument(trimmedMessage, "/lapor-kemarin"); !ok {
+			activityText = trimmedMessage
+		}
+		workout := domain.ParseHevy(activityText)
+		text, err := uc.reportUC.ExecuteYesterdayWithMessage(ctx, userID, name, activityText, workout)
 		return MessageResponse{Text: text}, err
 	}
 

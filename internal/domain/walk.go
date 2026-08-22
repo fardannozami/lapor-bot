@@ -31,6 +31,23 @@ var walkNumberSuffixes = []struct {
 	{"k", 1000},
 }
 
+// HasWalkKeyword reports whether text contains any walk trigger keyword
+// (jalan kaki, jalan, walk, walking, langkah, steps) using the same
+// boundary-aware matcher as activity attributes. Exported so callers can
+// distinguish "not a walk report" from "walk intent but missing/invalid steps".
+func HasWalkKeyword(text string) bool {
+	normalized := normalizeActivityText(text)
+	return containsAnyActivityKeyword(normalized, walkKeywords)
+}
+
+// WalkCandidateSteps returns the largest numeric step candidate found in the
+// raw text (thousand separators and rb/ribu/k suffixes expanded), regardless
+// of keyword presence or range. 0 means no number found. Used to tailor the
+// validation message when HasWalkKeyword is true but ParseWalkReport fails.
+func WalkCandidateSteps(text string) int {
+	return largestStepCandidate(splitDigitLetterBoundaries(strings.ToLower(text)))
+}
+
 // ParseWalkReport extracts a step count from a walk activity text such as
 // "/lapor jalan kaki 12.500 https://strava.com/activities/123".
 //
@@ -46,8 +63,7 @@ var walkNumberSuffixes = []struct {
 // Returns steps=0, ok=false when the text is not a steps report; callers
 // then fall through to the regular /lapor flow unchanged.
 func ParseWalkReport(text string) (int, bool) {
-	normalized := normalizeActivityText(text)
-	if !containsAnyActivityKeyword(normalized, walkKeywords) {
+	if !HasWalkKeyword(text) {
 		return 0, false
 	}
 	// Number scanning runs on the raw (lowercased) text: normalize collapses
