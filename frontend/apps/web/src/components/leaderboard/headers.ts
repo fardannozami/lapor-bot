@@ -44,6 +44,15 @@ export const WEEK_HEADERS = [
   "Skor Aktif (est pts)",
 ] as const;
 
+export const WALK_HEADERS = [
+  "Rank",
+  "Hunter",
+  "Job",
+  "Langkah Minggu Ini",
+  "Langkah Season",
+  "Lifetime Langkah",
+] as const;
+
 export const ATTRIBUTE_HEADERS = [
   "Rank",
   "Hunter",

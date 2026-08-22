@@ -8,6 +8,7 @@ export { AttributeBar } from "./AttributeBar";
 export { ActiveTodayBadge } from "./ActiveTodayBadge";
 export { QuestBadge } from "./QuestBadge";
 
+export { WalkRow } from "./rows/WalkRow";
 export { SeasonalRow } from "./rows/SeasonalRow";
 export { LifetimeRow } from "./rows/LifetimeRow";
 export { StreakRow } from "./rows/StreakRow";
@@ -18,6 +19,7 @@ export {
   SEASONAL_HEADERS,
   LIFETIME_HEADERS,
   STREAK_HEADERS,
+  WALK_HEADERS,
   WEEK_HEADERS,
   ATTRIBUTE_HEADERS,
 } from "./headers";

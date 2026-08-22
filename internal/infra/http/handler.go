@@ -174,6 +174,10 @@ func (s *Server) HandleStravaWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 // EnrichedReport holds parsed and visual RPG stats for rendering in the FE.
+type walkStepsRepository interface {
+	GetWalkStepsTotals(ctx context.Context, since time.Time) ([]domain.WalkStepsEntry, error)
+}
+
 type EnrichedReport struct {
 	UserID                string                      `json:"user_id"`
 	Name                  string                      `json:"name"`
@@ -212,6 +216,10 @@ type EnrichedReport struct {
 	Vit                   int                         `json:"vit"`
 	End                   int                         `json:"end"`
 	Luk                   int                         `json:"luk"`
+	WalkStepsTotal        int                         `json:"walk_steps_total,omitempty"`
+	SeasonalWalkSteps     int                         `json:"seasonal_walk_steps,omitempty"`
+	WeekWalkSteps         int                         `json:"week_walk_steps,omitempty"`
+	DayWalkSteps          int                         `json:"day_walk_steps,omitempty"`
 	RankName              string                      `json:"rank_name"`
 	RankIcon              string                      `json:"rank_icon"`
 	SeasonRankProgress    TierProgress                `json:"season_rank_progress"`
@@ -626,6 +634,17 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, v any) {
 // Clean Go: this assembler isolates data transformation and N queries from the HTTP handler.
 // Note (ponytail): the per-user GetUserActivityDates loop is N+1. Acceptable ceiling for current scale (<100 users);
 // upgrade path: pre-load activity by week range or pre-join + group.
+func (s *Server) fetchWalkStepsMap(ctx context.Context, since time.Time) map[string]int {
+	m := make(map[string]int)
+	if wa, ok := s.repo.(walkStepsRepository); ok {
+		entries, _ := wa.GetWalkStepsTotals(ctx, since)
+		for _, e := range entries {
+			m[e.UserID] = e.Steps
+		}
+	}
+	return m
+}
+
 func (s *Server) AssemblePublicLeaderboard(ctx context.Context) ([]EnrichedReport, error) {
 	reports, err := s.repo.GetAllReports(ctx)
 	if err != nil {
@@ -643,6 +662,10 @@ func (s *Server) AssemblePublicLeaderboard(ctx context.Context) ([]EnrichedRepor
 	// dots consistent with what is actually logged (no cutoff <-> strict drift).
 	// Manual user counts and the week tab will now align.
 	weekStart := domain.GetStartOfISOWeek(now)
+	_, seasonStart := usecase.GetCurrentSessionInfo(now)
+	walkTotalsAll := s.fetchWalkStepsMap(ctx, time.Time{})
+	walkTotalsSeason := s.fetchWalkStepsMap(ctx, seasonStart)
+	walkTotalsWeek := s.fetchWalkStepsMap(ctx, weekStart)
 
 	enriched := make([]EnrichedReport, 0, len(reports))
 	for _, rep := range reports {
@@ -652,6 +675,9 @@ func (s *Server) AssemblePublicLeaderboard(ctx context.Context) ([]EnrichedRepor
 		}
 		weekAct, weekDays := buildWeekActivity(dates, weekStart)
 		row := enrichReport(rep, today, weekAct, weekDays)
+		row.WalkStepsTotal = walkTotalsAll[rep.UserID]
+		row.SeasonalWalkSteps = walkTotalsSeason[rep.UserID]
+		row.WeekWalkSteps = walkTotalsWeek[rep.UserID]
 		row.CurrentDailyStreak, row.LongestDailyStreak = buildDailyStreaks(dates, today)
 		enriched = append(enriched, row)
 	}
@@ -801,6 +827,28 @@ func (s *Server) HandleGetUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		enriched.TodaySideQuests = tasks
+	}
+	walkMap := s.fetchWalkStepsMap(r.Context(), time.Time{})
+	_, seasonStart2 := usecase.GetCurrentSessionInfo(now)
+	weekStart2 := domain.GetStartOfISOWeek(now)
+	enriched.WalkStepsTotal = walkMap[report.UserID]
+	if ws, ok := s.repo.(walkStepsRepository); ok {
+		if ent, _ := ws.GetWalkStepsTotals(r.Context(), seasonStart2); ent != nil {
+			for _, e := range ent {
+				if e.UserID == report.UserID {
+					enriched.SeasonalWalkSteps = e.Steps
+					break
+				}
+			}
+		}
+		if ent, _ := ws.GetWalkStepsTotals(r.Context(), weekStart2); ent != nil {
+			for _, e := range ent {
+				if e.UserID == report.UserID {
+					enriched.WeekWalkSteps = e.Steps
+					break
+				}
+			}
+		}
 	}
 	s.writeJSON(w, http.StatusOK, enriched)
 }

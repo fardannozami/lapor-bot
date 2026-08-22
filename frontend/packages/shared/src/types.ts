@@ -54,6 +54,9 @@ export interface EnrichedReport {
   vit: number;
   end: number;
   luk: number;
+  walk_steps_total?: number;
+  seasonal_walk_steps?: number;
+  week_walk_steps?: number;
   rank_name: string;
   rank_icon: string;
   season_rank_progress: TierProgress;
@@ -192,6 +195,7 @@ export type LeaderboardTab =
   | "lifetime"
   | "streak"
   | "week"
+  | "walk"
   | "attributes";
 
 export type AttributeTab =
@@ -211,6 +215,9 @@ export type LeaderboardSortKey =
   | "weekly_streak"
   | "daily_streak"
   | "weekly_activity"
+  | "walk_steps"
+  | "walk_steps_week"
+  | "walk_steps_season"
   | "attribute_overall"
   | "attribute_str"
   | "attribute_sta"

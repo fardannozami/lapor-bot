@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -50,6 +51,10 @@ type eventActivityRepository interface {
 	UpsertReportWithActivityEvent(ctx context.Context, report *domain.Report, event domain.ReportActivityEvent) error
 }
 
+type walkActivityRepository interface {
+	AddWalkSteps(ctx context.Context, userID string, date time.Time, delta int) error
+}
+
 // GoalCompletionNotifier is called when a user's weekly goal is completed.
 // userID and name identify the user; activity and targetDays describe the completed goal;
 // totalCompleted is the cumulative goals_completed count.
@@ -66,6 +71,7 @@ type reportActivityOptions struct {
 	activityText    string
 	now             time.Time
 	sideQuestPoints int // total points from side quest difficulty multipliers (computed in DailyQuestUsecase)
+	walkSteps       int // parsed from "jalan kaki N" messages; 0 means "not a walk-steps report"
 }
 
 func NewReportActivityUsecase(repo domain.ReportRepository) *ReportActivityUsecase {
@@ -85,14 +91,21 @@ func (uc *ReportActivityUsecase) userLock(userID string) *sync.Mutex {
 func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name string, workout *domain.HevyWorkout) (string, error) {
 	return uc.execute(ctx, userID, name, workout, reportActivityOptions{})
 }
-
 func (uc *ReportActivityUsecase) ExecuteWithMessage(ctx context.Context, userID, name, message string, workout *domain.HevyWorkout) (string, error) {
+	walkSteps := 0
+	if steps, ok := domain.ParseWalkReport(message); ok {
+		walkSteps = steps
+	}
 	return uc.execute(ctx, userID, name, workout, reportActivityOptions{
 		activityText: message,
+		walkSteps:    walkSteps,
 	})
 }
 
-func (uc *ReportActivityUsecase) ExecuteSideQuest(ctx context.Context, userID, name, activityText string, completedCount, sideQuestPoints int, now time.Time) (string, error) {
+// ExecuteSideQuest records a completed side quest batch. walkSteps carries the
+// steps earned through the easy walk quest so they join the same walk-step
+// ledger used by the main /lapor (leaderboard + profile totals).
+func (uc *ReportActivityUsecase) ExecuteSideQuest(ctx context.Context, userID, name, activityText string, completedCount, sideQuestPoints, walkSteps int, now time.Time) (string, error) {
 	if completedCount < 1 {
 		completedCount = 1
 	}
@@ -101,6 +114,7 @@ func (uc *ReportActivityUsecase) ExecuteSideQuest(ctx context.Context, userID, n
 		activityText:    activityText,
 		now:             now,
 		sideQuestPoints: sideQuestPoints,
+		walkSteps:       walkSteps,
 	})
 }
 
@@ -380,8 +394,22 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		regularCountDelta:   boolToInt(!isSideQuest),
 		sideQuestCountDelta: opts.sideQuestCount,
 		activityText:        goalActivityTextWithFallback(workout, opts.activityText),
+		walkSteps:           opts.walkSteps,
 	}); err != nil {
 		return "", err
+	}
+	// Walk steps: the step count is accumulated onto activity_logs
+	// (walk_steps) for the walk leaderboard and the user's profile totals.
+	// Regular /lapor jalan kaki and the easy walk side quest both credit the
+	// ledger; cancel reverses the latest entry. Best-effort so the report
+	// never fails for a steps error.
+	if opts.walkSteps > 0 {
+		if wa, ok := uc.repo.(walkActivityRepository); ok {
+			_ = wa.AddWalkSteps(ctx, userID, today, opts.walkSteps)
+		}
+		report.WalkStepsTotal += opts.walkSteps
+		report.SeasonalWalkSteps += opts.walkSteps
+		_ = uc.repo.UpsertReport(ctx, report)
 	}
 	goalCompleted := false
 	if !isSideQuest {
@@ -436,6 +464,9 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		}
 		if report.JobClass != "" {
 			response += fmt.Sprintf("\n🧭 Job: %s", domain.FormatJobClass(report.JobClass))
+		}
+		if opts.walkSteps > 0 {
+			response += fmt.Sprintf("\n🚶 Langkah hari ini: %s (akumulasi total %s)", domain.FormatStepsID(opts.walkSteps), domain.FormatStepsID(report.WalkStepsTotal))
 		}
 	}
 	if !attributesActive {
@@ -860,11 +891,18 @@ type reportActivityEventInput struct {
 	regularCountDelta   int
 	sideQuestCountDelta int
 	activityText        string
+	walkSteps           int
 }
 
 func (uc *ReportActivityUsecase) upsertReportWithActivity(ctx context.Context, report *domain.Report, input reportActivityEventInput) error {
 	if repo, ok := uc.repo.(eventActivityRepository); ok && ReportEventLedgerEnabled(input.occurredAt) {
 		seasonNumber, _ := GetCurrentSessionInfo(input.occurredAt)
+		metadata := "{}"
+		if input.walkSteps > 0 {
+			if b, err := json.Marshal(map[string]int{"walk_steps": input.walkSteps}); err == nil {
+				metadata = string(b)
+			}
+		}
 		event := domain.ReportActivityEvent{
 			EventID:             reportActivityEventID(report.UserID, input.kind, input.activityDate, input.occurredAt, input.pointsDelta, input.regularCountDelta, input.sideQuestCountDelta),
 			UserID:              report.UserID,
@@ -878,7 +916,7 @@ func (uc *ReportActivityUsecase) upsertReportWithActivity(ctx context.Context, r
 			RuleVersion:         1,
 			Source:              "whatsapp",
 			ActivityText:        input.activityText,
-			MetadataJSON:        "{}",
+			MetadataJSON:        metadata,
 		}
 		return repo.UpsertReportWithActivityEvent(ctx, report, event)
 	}

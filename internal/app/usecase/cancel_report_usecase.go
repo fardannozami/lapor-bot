@@ -15,6 +15,10 @@ type CancelReportUsecase struct {
 	repo domain.ReportRepository
 }
 
+type walkCancelRepository interface {
+	DeleteLatestWalkSteps(ctx context.Context, userID string, date time.Time) error
+}
+
 func NewCancelReportUsecase(repo domain.ReportRepository) *CancelReportUsecase {
 	return &CancelReportUsecase{repo: repo}
 }
@@ -82,6 +86,9 @@ func (uc *CancelReportUsecase) cancelToday(ctx context.Context, userID, name str
 		}
 
 		removeRepeatReportPoints(report)
+		if wa, ok := uc.repo.(walkCancelRepository); ok {
+			_ = wa.DeleteLatestWalkSteps(ctx, userID, today)
+		}
 		if err := uc.repo.UpsertReport(ctx, report); err != nil {
 			return "", err
 		}
@@ -151,6 +158,7 @@ func (uc *CancelReportUsecase) cancelSideQuestToday(ctx context.Context, report 
 			return "", err
 		}
 		deletedCount = 1
+		uc.reverseSideQuestWalkSteps(ctx, report.UserID, today)
 		decrementSideQuestCount(report, deletedCount)
 		if err := uc.repo.UpsertReport(ctx, report); err != nil {
 			return "", err
@@ -166,6 +174,7 @@ func (uc *CancelReportUsecase) cancelSideQuestToday(ctx context.Context, report 
 	if err := uc.repo.DeleteActivityLogByKind(ctx, report.UserID, today, domain.ActivityKindSideQuest); err != nil {
 		return "", err
 	}
+	uc.reverseSideQuestWalkSteps(ctx, report.UserID, today)
 	decrementSideQuestCount(report, deletedCount)
 	if err := uc.repo.UpsertReport(ctx, report); err != nil {
 		return "", err
@@ -188,6 +197,35 @@ func decrementSideQuestCount(report *domain.Report, count int) {
 	report.SeasonalSideQuests -= count
 	if report.SeasonalSideQuests < 0 {
 		report.SeasonalSideQuests = 0
+	}
+}
+
+// reverseSideQuestWalkSteps reverses the walk-step ledger entry when the most
+// recent activity is a walking side quest. Easy-cardio walk completions are
+// stored as "Side quest: ... (N langkah)" in activity_text; only that newest
+// entry is reversed (best-effort, mirroring the regular /cancel behavior).
+func (uc *CancelReportUsecase) reverseSideQuestWalkSteps(ctx context.Context, userID string, today time.Time) {
+	type activityTextRepository interface {
+		GetLatestActivityText(ctx context.Context, userID string, activityDate time.Time, kind string) (string, error)
+	}
+	atr, ok := uc.repo.(activityTextRepository)
+	if !ok {
+		return
+	}
+	text, err := atr.GetLatestActivityText(ctx, userID, today, domain.ActivityKindSideQuest)
+	if err != nil {
+		return
+	}
+	text = strings.TrimSpace(text)
+	if !strings.HasPrefix(text, "Side quest") {
+		return
+	}
+	steps, ok := domain.ParseWalkReport(text)
+	if !ok || steps <= 0 {
+		return
+	}
+	if wa, ok := uc.repo.(walkCancelRepository); ok {
+		_ = wa.DeleteLatestWalkSteps(ctx, userID, today)
 	}
 }
 

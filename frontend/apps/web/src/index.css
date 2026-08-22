@@ -12,6 +12,8 @@
   --color-system-red: #ef4444;
   --color-system-gold: #f59e0b;
   --color-system-green: #22c55e;
+  /* Electric lime — sports energy accent (think pitch lines / kit volt). */
+  --color-system-volt: #a3e635;
 
   --color-gray-850: #1a1f2e;
 
@@ -22,10 +24,14 @@
   --shadow-neon-purple: 0 0 15px rgba(139, 92, 246, 0.35);
   --shadow-neon-red: 0 0 15px rgba(239, 68, 68, 0.35);
   --shadow-neon-gold: 0 0 15px rgba(245, 158, 11, 0.35);
+  --shadow-neon-green: 0 0 15px rgba(34, 197, 94, 0.35);
+  --shadow-neon-volt: 0 0 15px rgba(163, 230, 53, 0.35);
 
   --animate-fade-in: fade-in 0.25s ease-out both;
   --animate-fade-in-up: fade-in-up 0.45s ease-out both;
   --animate-scale-in: scale-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pop: pop 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pulse-glow: pulse-glow 2.2s ease-in-out infinite;
 
   @keyframes fade-in {
     from { opacity: 0; }
@@ -41,6 +47,18 @@
     from { opacity: 0; transform: scale(0.96) translateY(8px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
   }
+
+  /* Badge entrance — medals and live indicators spring in. */
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.6); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  /* Expanding ring — "live" / match-day energy on the #1 spot. */
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(163, 230, 53, 0.45); }
+    50% { box-shadow: 0 0 0 6px rgba(163, 230, 53, 0); }
+  }
 }
 
 @layer base {
@@ -51,13 +69,22 @@
     --app-bg-soft: #f1f5f9;
     --app-card: rgba(255, 255, 255, 0.82);
     --app-card-strong: rgba(248, 250, 252, 0.95);
+    --app-header-bg: rgba(248, 250, 252, 0.85);
     --app-border: rgba(59, 130, 246, 0.18);
     --app-text: #0f172a;
     --app-text-soft: #475569;
     --app-text-muted: #64748b;
     --app-grid: rgba(59, 130, 246, 0.06);
+    --app-spot: rgba(34, 197, 94, 0.10);
     --app-track: #e2e8f0;
     --app-thumb: #94a3b8;
+  }
+
+  /* Volt roles per theme: raw #a3e635 fails contrast on light surfaces, so
+     light mode shifts to lime-700 (passes AA for small text). Declared
+     per-theme — never in the shared :root block — so dark keeps #a3e635. */
+  [data-theme='light'] {
+    --color-system-volt: #4d7c0f;
   }
 
   [data-theme='dark'] {
@@ -66,24 +93,29 @@
     --app-bg-soft: #101829;
     --app-card: rgba(17, 25, 40, 0.78);
     --app-card-strong: rgba(10, 15, 26, 0.92);
+    --app-header-bg: rgba(10, 15, 26, 0.82);
     --app-border: rgba(59, 130, 246, 0.15);
     --app-text: #f1f5f9;
     --app-text-soft: #cbd5e1;
     --app-text-muted: #64748b;
     --app-grid: rgba(59, 130, 246, 0.06);
+    --app-spot: rgba(163, 230, 53, 0.08);
     --app-track: #0a0f1a;
     --app-thumb: #1e293b;
+    --color-system-volt: #a3e635;
   }
 
   body {
     @apply font-inter antialiased;
     color: var(--app-text);
     background-color: var(--app-bg);
-    background-image: 
+    background-image:
+      /* Stadium floodlight cone from the top of the page */
+      radial-gradient(65% 40% at 50% -8%, var(--app-spot) 0, transparent 62%),
       linear-gradient(135deg, transparent 0 48%, var(--app-grid) 48% 52%, transparent 52% 100%),
-      radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.16) 0, transparent 45%), 
+      radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.16) 0, transparent 45%),
       radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.10) 0, transparent 45%);
-    background-size: 42px 42px, auto, auto;
+    background-size: auto, 42px 42px, auto, auto;
     background-attachment: fixed;
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -145,6 +177,99 @@
 .glass-glow-gold {
   border-color: color-mix(in srgb, var(--color-system-gold) 25%, transparent);
   box-shadow: 0 0 15px color-mix(in srgb, var(--color-system-gold) 10%, transparent);
+}
+
+.glass-glow-green {
+  border-color: color-mix(in srgb, var(--color-system-green) 25%, transparent);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--color-system-green) 10%, transparent);
+}
+
+.glass-glow-volt {
+  border-color: color-mix(in srgb, var(--color-system-volt) 30%, transparent);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--color-system-volt) 12%, transparent);
+}
+
+/* Sticky HUD header — frosted bar that keeps global actions on screen. */
+.header-glass {
+  background: var(--app-header-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Scoreboard numbers: equal-width digits so stats and ranks align like a
+   broadcast overlay instead of jittering between proportional glyphs. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Physical press feedback: instant scale snap on tap/click.
+   Implemented without a transition shorthand so it never overrides
+   Tailwind's transition-colors/transition-all at call sites. */
+.btn-press:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+/* Light sweep across cards on hover — broadcast highlight reel feel.
+   overflow:hidden clips the translated pseudo-element to the card. */
+.card-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.card-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.07) 48%,
+    transparent 62%
+  );
+  transform: translateX(-130%);
+  transition: transform 0.7s ease;
+  pointer-events: none;
+}
+.card-sheen:hover::after {
+  transform: translateX(130%);
+}
+
+/* Colored edge strip on top of stat cards, like jersey trim. Set --edge
+   inline per tone. */
+.stat-edge {
+  position: relative;
+}
+.stat-edge::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--edge, var(--color-system-blue));
+  opacity: 0.85;
+}
+
+/* Podium rows: medal-colored rail on the rank cell + faint tint so the
+   top 3 read as a podium, not just rows. */
+.tr-podium-1 {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.12), transparent 55%);
+}
+.tr-podium-1 td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-system-gold);
+}
+.tr-podium-2 {
+  background: linear-gradient(90deg, rgba(203, 213, 225, 0.08), transparent 55%);
+}
+.tr-podium-2 td:first-child {
+  box-shadow: inset 3px 0 0 #cbd5e1;
+}
+.tr-podium-3 {
+  background: linear-gradient(90deg, rgba(180, 83, 9, 0.10), transparent 55%);
+}
+.tr-podium-3 td:first-child {
+  box-shadow: inset 3px 0 0 #b45309;
 }
 
 /* Staggered entrance: pair .stagger-children on a container with

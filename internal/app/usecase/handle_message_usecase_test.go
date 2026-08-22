@@ -165,6 +165,18 @@ func (m *mockReportRepo) GetDailyActivityCountByKind(ctx context.Context, userID
 	return m.dailyCountByKind[kind], nil
 }
 
+func (m *mockReportRepo) GetLatestActivityText(ctx context.Context, userID string, activityDate time.Time, kind string) (string, error) {
+	return "", nil
+}
+
+func (m *mockReportRepo) AddWalkSteps(ctx context.Context, userID string, date time.Time, delta int) error {
+	return nil
+}
+
+func (m *mockReportRepo) DeleteLatestWalkSteps(ctx context.Context, userID string, date time.Time) error {
+	return nil
+}
+
 func (m *mockReportRepo) SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error {
 	return nil
 }

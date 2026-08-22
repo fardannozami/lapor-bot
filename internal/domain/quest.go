@@ -78,6 +78,13 @@ func questTasksConflict(a, b QuestTask) bool {
 	return a.ID == b.ID || MatchTask(a.Name, b.ID) || MatchTask(b.Name, a.ID)
 }
 
+// questOptionsForJob builds the daily medium/hard pools for a job's primary
+// attribute. The pool is curated for office workers: medium tasks fit in a
+// workday break or lunch (roughly 15-25 minutes when done routinely, in line
+// with WHO's 150-300 min/week moderate activity guidance), hard tasks are one
+// real 30-45 minute session before or after work. Every attribute keeps at
+// least 4 options per tier so the per-user, per-day hash selection below stays
+// varied.
 func questOptionsForJob(jobClass string, mediumBonus, hardBonus int) ([]QuestTask, []QuestTask) {
 	mediumByAttr := map[AttributeType][]QuestTask{
 		AttrStr: {
@@ -88,17 +95,16 @@ func questOptionsForJob(jobClass string, mediumBonus, hardBonus int) ([]QuestTas
 			{ID: "wallsit", Name: "Wall Sit", Difficulty: "medium", Target: 30 + mediumBonus*5, Unit: "detik", RewardPoints: 5},
 		},
 		AttrSta: {
+			{ID: "briskwalk", Name: "Jalan Cepat / Brisk Walk", Difficulty: "medium", Target: 15 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
 			{ID: "stairs", Name: "Naik-Turun Tangga", Difficulty: "medium", Target: 5 + mediumBonus, Unit: "menit", RewardPoints: 5},
 			{ID: "stepups", Name: "Step-up", Difficulty: "medium", Target: 16 + mediumBonus*2, Unit: "x", RewardPoints: 5},
 			{ID: "jumpingjacks", Name: "Jumping Jacks", Difficulty: "medium", Target: 25 + mediumBonus*3, Unit: "x", RewardPoints: 5},
-			{ID: "skipping", Name: "Skipping / Rope Jump", Difficulty: "medium", Target: 2 + mediumBonus, Unit: "menit", RewardPoints: 5},
-			{ID: "briskwalk", Name: "Jalan Cepat / Brisk Walk", Difficulty: "medium", Target: 15 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
 		},
 		AttrAgi: {
 			{ID: "highknees", Name: "High Knees (Marching)", Difficulty: "medium", Target: 1 + mediumBonus, Unit: "menit", RewardPoints: 5},
 			{ID: "shadowboxing", Name: "Shadow Boxing", Difficulty: "medium", Target: 2 + mediumBonus, Unit: "menit", RewardPoints: 5},
 			{ID: "lateralshuffle", Name: "Lateral Shuffle", Difficulty: "medium", Target: 30 + mediumBonus*5, Unit: "detik", RewardPoints: 5},
-			{ID: "ladderdrill", Name: "Ladder Drill", Difficulty: "medium", Target: 2 + mediumBonus, Unit: "menit", RewardPoints: 5},
+			{ID: "singlelegbalance", Name: "Single-Leg Balance", Difficulty: "medium", Target: 2 + mediumBonus, Unit: "menit", RewardPoints: 3},
 		},
 		AttrVit: {
 			{ID: "stretching", Name: "Office Stretching / Mobility", Difficulty: "medium", Target: 8 + mediumBonus, Unit: "menit", RewardPoints: 5},
@@ -108,16 +114,16 @@ func questOptionsForJob(jobClass string, mediumBonus, hardBonus int) ([]QuestTas
 			{ID: "recoveryflow", Name: "Gentle Recovery Flow", Difficulty: "medium", Target: 6 + mediumBonus, Unit: "menit", RewardPoints: 5},
 		},
 		AttrEnd: {
-			{ID: "hiking", Name: "Hiking / Jalan Alam", Difficulty: "medium", Target: 20 + mediumBonus*5, Unit: "menit", RewardPoints: 5},
 			{ID: "longwalk", Name: "Jalan Jauh / Long Walk", Difficulty: "medium", Target: 20 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
-			{ID: "trail", Name: "Trail Walk / Trekking Ringan", Difficulty: "medium", Target: 15 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
 			{ID: "powerwalk", Name: "Power Walk", Difficulty: "medium", Target: 15 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
+			{ID: "uphill", Name: "Jalan Menanjak / Uphill Walk", Difficulty: "medium", Target: 10 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
+			{ID: "stairwalk", Name: "Jalan di Tangga / Stair Walk", Difficulty: "medium", Target: 10 + mediumBonus*2, Unit: "menit", RewardPoints: 3},
 		},
 		AttrLuk: {
 			{ID: "newmovement", Name: "New Movement Practice", Difficulty: "medium", Target: 8 + mediumBonus, Unit: "menit", RewardPoints: 5},
 			{ID: "explorationwalk", Name: "Exploration Walk", Difficulty: "medium", Target: 15 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
 			{ID: "comebackwalk", Name: "Comeback Walk", Difficulty: "medium", Target: 15 + mediumBonus*3, Unit: "menit", RewardPoints: 5},
-			{ID: "adaptability", Name: "Adaptability Drill", Difficulty: "medium", Target: 8 + mediumBonus, Unit: "menit", RewardPoints: 5},
+			{ID: "newroutewalk", Name: "New Route Walk", Difficulty: "medium", Target: 15 + mediumBonus*3, Unit: "menit", RewardPoints: 3},
 		},
 	}
 
@@ -133,7 +139,7 @@ func questOptionsForJob(jobClass string, mediumBonus, hardBonus int) ([]QuestTas
 			{ID: "mountainclimber", Name: "Mountain Climber", Difficulty: "hard", Target: 30 + hardBonus*5, Unit: "detik", RewardPoints: 5},
 			{ID: "jumpingjacks", Name: "Jumping Jacks", Difficulty: "hard", Target: 35 + hardBonus*3, Unit: "x", RewardPoints: 5},
 			{ID: "stairs", Name: "Naik-Turun Tangga", Difficulty: "hard", Target: 8 + hardBonus, Unit: "menit", RewardPoints: 5},
-			{ID: "shuttlerun", Name: "Shuttle Run", Difficulty: "hard", Target: 4 + hardBonus, Unit: "menit", RewardPoints: 5},
+			{ID: "intervalwalk", Name: "Interval Walk (Cepat-Lambat)", Difficulty: "hard", Target: 20 + hardBonus*3, Unit: "menit", RewardPoints: 5},
 		},
 		AttrAgi: {
 			{ID: "squatjump", Name: "Squat Jump Ringan", Difficulty: "hard", Target: 8 + hardBonus, Unit: "x", RewardPoints: 5},
@@ -148,16 +154,16 @@ func questOptionsForJob(jobClass string, mediumBonus, hardBonus int) ([]QuestTas
 			{ID: "pilates", Name: "Pilates Mobility Flow", Difficulty: "hard", Target: 10 + hardBonus, Unit: "menit", RewardPoints: 5},
 		},
 		AttrEnd: {
-			{ID: "hiking", Name: "Hiking Trekking", Difficulty: "hard", Target: 45 + hardBonus*5, Unit: "menit", RewardPoints: 5},
-			{ID: "longwalk", Name: "Jalan Jauh / Long Walk", Difficulty: "hard", Target: 45 + hardBonus*5, Unit: "menit", RewardPoints: 5},
 			{ID: "uphill", Name: "Naik Bukit / Uphill Walk", Difficulty: "hard", Target: 20 + hardBonus*3, Unit: "menit", RewardPoints: 5},
+			{ID: "longwalk", Name: "Jalan Jauh / Long Walk", Difficulty: "hard", Target: 45 + hardBonus*5, Unit: "menit", RewardPoints: 5},
 			{ID: "endurancewalk", Name: "Endurance Walk (daya tahan)", Difficulty: "hard", Target: 40 + hardBonus*5, Unit: "menit", RewardPoints: 5},
+			{ID: "hiking", Name: "Hiking Trekking", Difficulty: "hard", Target: 45 + hardBonus*5, Unit: "menit", RewardPoints: 5},
 		},
 		AttrLuk: {
-			{ID: "orienteering", Name: "Orienteering Walk", Difficulty: "hard", Target: 25 + hardBonus*5, Unit: "menit", RewardPoints: 5},
-			{ID: "obstaclecourse", Name: "Obstacle Course", Difficulty: "hard", Target: 10 + hardBonus*2, Unit: "menit", RewardPoints: 5},
 			{ID: "adventurewalk", Name: "Adventure Walk", Difficulty: "hard", Target: 30 + hardBonus*5, Unit: "menit", RewardPoints: 5},
+			{ID: "orienteering", Name: "Orienteering Walk", Difficulty: "hard", Target: 25 + hardBonus*5, Unit: "menit", RewardPoints: 5},
 			{ID: "resiliencecircuit", Name: "Resilience Circuit", Difficulty: "hard", Target: 3 + hardBonus, Unit: "ronde", RewardPoints: 5},
+			{ID: "timedwalk", Name: "Timed Walk Challenge", Difficulty: "hard", Target: 30 + hardBonus*5, Unit: "menit", RewardPoints: 5},
 		},
 	}
 
@@ -203,6 +209,7 @@ var questTaskKeywords = map[string][]string{
 	"calfraises":        {"calf raises", "calf raise", "calfraises", "jinjit"},
 	"shouldershrugs":    {"shoulder shrug", "shoulder shrugs", "shrug bahu"},
 	"stairs":            {"stairs", "tangga", "naik turun tangga"},
+	"stairwalk":         {"stair walk", "stairwalk", "jalan di tangga", "tangga jalan"},
 	"mountainclimber":   {"mountain climber", "mountainclimber", "gerakan panjat", "panjat"},
 	"lunges":            {"lunges", "lunge", "lunjak"},
 	"glutebridge":       {"glute bridge", "glutebridge", "jembatan pinggul"},
@@ -216,23 +223,23 @@ var questTaskKeywords = map[string][]string{
 	"shuttlerun":        {"shuttle run", "shuttlerun"},
 	"deadbug":           {"dead bug", "deadbug"},
 	"birddog":           {"bird dog", "birddog"},
-	"balance":           {"balance", "balance drill", "keseimbangan"},
+	"singlelegbalance":  {"single leg balance", "single leg", "balance satu kaki", "seimbang satu kaki"},
 	"recoveryflow":      {"gentle recovery flow", "recovery flow", "pemulihan ringan"},
 	"pilates":           {"pilates", "pilates mobility flow"},
-	"briskwalk":         {"brisk walk", "jalan cepat", "power walk", "powerwalk"},
-	"hiking":            {"hiking", "trekking", "jalan alam", "trail", "naik bukit", "uphill"},
+	"briskwalk":         {"brisk walk", "jalan cepat"},
+	"hiking":            {"hiking", "trekking", "jalan alam"},
 	"longwalk":          {"jalan jauh", "long walk", "long distance", "jarak jauh", "endurance walk", "endurancewalk"},
-	"trail":             {"trail", "trail walk", "trekking ringan"},
 	"powerwalk":         {"power walk", "powerwalk", "jalan santai pagi"},
+	"intervalwalk":      {"interval walk", "jalan interval", "interval"},
 	"newmovement":       {"new movement", "movement practice", "gerakan baru"},
 	"explorationwalk":   {"exploration walk", "jalan eksplorasi"},
 	"comebackwalk":      {"comeback walk", "jalan comeback"},
-	"adaptability":      {"adaptability drill", "latihan adaptasi"},
+	"newroutewalk":      {"new route walk", "rute baru", "new route"},
 	"orienteering":      {"orienteering", "orienteering walk"},
-	"obstaclecourse":    {"obstacle course", "lintasan rintangan"},
 	"adventurewalk":     {"adventure walk", "jalan petualangan"},
 	"resiliencecircuit": {"resilience circuit", "sirkuit resiliensi"},
-	"uphill":            {"uphill", "naik bukit", "uphill walk"},
+	"timedwalk":         {"timed walk challenge", "timed walk", "walk challenge", "time challenge"},
+	"uphill":            {"uphill walk", "uphill", "naik bukit", "jalan menanjak", "menanjak"},
 	"endurancewalk":     {"endurance walk", "endurancewalk", "daya tahan", "endurance"},
 }
 

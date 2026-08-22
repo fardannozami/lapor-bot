@@ -6,6 +6,9 @@ export const LEADERBOARD_SORT_KEYS: LeaderboardSortKey[] = [
   "weekly_streak",
   "daily_streak",
   "weekly_activity",
+  "walk_steps",
+  "walk_steps_week",
+  "walk_steps_season",
   "attribute_overall",
   "attribute_str",
   "attribute_sta",
@@ -131,6 +134,18 @@ export function hasAttributeActivity(r: EnrichedReport): boolean {
   );
 }
 
+export function walkStepsTotal(r: EnrichedReport): number {
+  return r.walk_steps_total ?? 0;
+}
+
+export function hasWalkActivity(r: EnrichedReport): boolean {
+  return (r.walk_steps_total ?? 0) > 0 || (r.seasonal_walk_steps ?? 0) > 0 || (r.week_walk_steps ?? 0) > 0;
+}
+
+export function formatStepsID(steps: number): string {
+  return new Intl.NumberFormat("id-ID").format(steps);
+}
+
 export function compareReports(
   a: EnrichedReport,
   b: EnrichedReport,
@@ -147,6 +162,12 @@ export function compareReports(
       return compareDailyStreak(a, b);
     case "weekly_activity":
       return compareWeeklyActivity(a, b);
+    case "walk_steps":
+      return compareWalkSteps(a, b);
+    case "walk_steps_week":
+      return compareWalkStepsWeek(a, b);
+    case "walk_steps_season":
+      return compareWalkStepsSeason(a, b);
     case "attribute_overall":
       return compareAttributeOverall(a, b);
     case "attribute_str":
@@ -210,6 +231,35 @@ function compareWeeklyActivity(a: EnrichedReport, b: EnrichedReport): boolean {
   if (a.streak !== b.streak) return a.streak > b.streak;
   if (a.seasonal_points !== b.seasonal_points)
     return a.seasonal_points > b.seasonal_points;
+  return compareNameThenUserID(a, b);
+}
+
+function compareWalkSteps(a: EnrichedReport, b: EnrichedReport): boolean {
+  const av = walkStepsTotal(a);
+  const bv = walkStepsTotal(b);
+  if (av !== bv) return av > bv;
+  const as = a.seasonal_walk_steps ?? 0;
+  const bs = b.seasonal_walk_steps ?? 0;
+  if (as !== bs) return as > bs;
+  const aw = a.week_walk_steps ?? 0;
+  const bw = b.week_walk_steps ?? 0;
+  if (aw !== bw) return aw > bw;
+  return compareNameThenUserID(a, b);
+}
+
+function compareWalkStepsWeek(a: EnrichedReport, b: EnrichedReport): boolean {
+  const av = a.week_walk_steps ?? 0;
+  const bv = b.week_walk_steps ?? 0;
+  if (av !== bv) return av > bv;
+  if (walkStepsTotal(a) !== walkStepsTotal(b)) return walkStepsTotal(a) > walkStepsTotal(b);
+  return compareNameThenUserID(a, b);
+}
+
+function compareWalkStepsSeason(a: EnrichedReport, b: EnrichedReport): boolean {
+  const av = a.seasonal_walk_steps ?? 0;
+  const bv = b.seasonal_walk_steps ?? 0;
+  if (av !== bv) return av > bv;
+  if (walkStepsTotal(a) !== walkStepsTotal(b)) return walkStepsTotal(a) > walkStepsTotal(b);
   return compareNameThenUserID(a, b);
 }
 
