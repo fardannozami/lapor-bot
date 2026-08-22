@@ -630,7 +630,7 @@ func TestReportActivity_SideQuestUsesSameAttributeClassifier(t *testing.T) {
 		Str:            1,
 	}
 
-	msg, err := uc.ExecuteSideQuest(ctx, "fighter", "Fighter", "Side quest: Wall Push-up / Desk Push-up", 1, 3, now)
+	msg, err := uc.ExecuteSideQuest(ctx, "fighter", "Fighter", "Side quest: Wall Push-up / Desk Push-up", 1, 3, 0, now)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1063,7 +1063,7 @@ func TestStreakBonus_SideQuestHasNoStreakBonus(t *testing.T) {
 	}
 	before := repo.reports["u"].TotalPoints
 
-	msg, err := uc.ExecuteSideQuest(ctx, "u", "Questor", "Side quest: jalan kaki", 1, 5, time.Now())
+	msg, err := uc.ExecuteSideQuest(ctx, "u", "Questor", "Side quest: jalan kaki", 1, 5, 0, time.Now())
 	if err != nil {
 		t.Fatalf("ExecuteSideQuest: %v", err)
 	}
@@ -1274,7 +1274,7 @@ func TestReportActivity_SideQuestRejectedForUnregisteredUser(t *testing.T) {
 	uc := usecase.NewReportActivityUsecase(repo)
 	ctx := context.Background()
 
-	msg, err := uc.ExecuteSideQuest(ctx, "new", "Baru", "Side quest: Jalan Kaki", 1, 2, time.Now())
+	msg, err := uc.ExecuteSideQuest(ctx, "new", "Baru", "Side quest: Jalan Kaki", 1, 2, 0, time.Now())
 	if err != nil {
 		t.Fatalf("side quest: %v", err)
 	}
@@ -1311,7 +1311,7 @@ func TestReportActivity_SideQuestDoesNotTouchActiveDays(t *testing.T) {
 
 	now := time.Now()
 	// Two completions in one side-quest report (easy 2 + medium 3 = 5 points).
-	if _, err := uc.ExecuteSideQuest(ctx, "u", "Quest", "Side quest: Jalan Kaki, Chair Squat", 2, 5, now); err != nil {
+	if _, err := uc.ExecuteSideQuest(ctx, "u", "Quest", "Side quest: Jalan Kaki, Chair Squat", 2, 5, 0, now); err != nil {
 		t.Fatalf("side quest: %v", err)
 	}
 

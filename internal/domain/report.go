@@ -33,12 +33,22 @@ type Report struct {
 	GoalsCompleted        int       `json:"goals_completed" db:"goals_completed"`
 	TotalSideQuests       int       `json:"total_side_quests" db:"total_side_quests"`
 	SeasonalSideQuests    int       `json:"seasonal_side_quests" db:"seasonal_side_quests"`
+	WalkStepsTotal        int       `json:"walk_steps_total" db:"walk_steps_total"`
+	SeasonalWalkSteps     int       `json:"seasonal_walk_steps" db:"seasonal_walk_steps"`
 	Str                   int       `json:"str" db:"str"`
 	Sta                   int       `json:"sta" db:"sta"`
 	Agi                   int       `json:"agi" db:"agi"`
 	Vit                   int       `json:"vit" db:"vit"`
 	End                   int       `json:"end" db:"end"`
 	Luk                   int       `json:"luk" db:"luk"`
+}
+
+// WalkStepsEntry is one user's aggregated step count over a time window,
+// used by the public walk leaderboard.
+type WalkStepsEntry struct {
+	UserID string
+	Name   string
+	Steps  int
 }
 
 type ActivityLeaderboardEntry struct {
@@ -144,6 +154,7 @@ var attributeKeywordSets = []struct {
 		"swim", "swimming", "elliptical", "rowing machine", "walk", "walking", "jalan kaki",
 		"jalan cepat", "brisk walk", "jalan pagi", "stairs", "tangga", "naik turun tangga",
 		"jumping jacks", "jumpingjacks", "step up", "stepup", "skipping", "rope jump",
+		"interval walk", "jalan interval",
 	}},
 	{AttrAgi, []string{
 		// Sports and neuromotor drills emphasize speed, balance, coordination, and direction changes.
@@ -154,7 +165,7 @@ var attributeKeywordSets = []struct {
 		"dance", "dancing", "menari", "zumba", "balance", "keseimbangan", "coordination",
 		"koordinasi", "high knees", "highknees", "mountain climber", "mountainclimber",
 		"lateral shuffle", "lateralshuffle", "squat jump", "jump squat", "ladder drill",
-		"shuttle run",
+		"shuttle run", "single leg",
 	}},
 	{AttrVit, []string{
 		// Flexibility, mobility, and active recovery support vitality.
@@ -169,6 +180,7 @@ var attributeKeywordSets = []struct {
 		"century ride", "hiking", "trekking", "rucking", "jalan jauh", "jalan santai",
 		"long walk", "long distance", "jarak jauh", "endurance", "daya tahan", "trail",
 		"trail run", "uphill", "naik bukit", "jalan santai pagi", "power walk",
+		"stair walk", "timed walk",
 	}},
 	{AttrLuk, []string{
 		// LUK is a game-specific adaptability/resilience stat, not a clinical fitness component.
@@ -176,7 +188,7 @@ var attributeKeywordSets = []struct {
 		// fall back to the Necromancer specialty through JobClassPrimaryAttribute.
 		"orienteering", "obstacle course", "adventure walk", "exploration walk", "comeback walk",
 		"comeback workout", "return to training", "new movement", "movement challenge",
-		"adaptability drill", "resilience circuit",
+		"adaptability drill", "resilience circuit", "new route walk",
 	}},
 }
 
@@ -406,7 +418,21 @@ type ReportRepository interface {
 	DeleteLatestActivityLogByKind(ctx context.Context, userID string, activityDate time.Time, kind string) (int, error)
 	GetUserActivityDates(ctx context.Context, userID string) ([]time.Time, error)
 	GetUserActivityDatesByKind(ctx context.Context, userID string, kind string) ([]time.Time, error)
+	// GetLatestActivityText returns the newest stored activity text for a user,
+	// date and kind (empty string when nothing is stored).
+	GetLatestActivityText(ctx context.Context, userID string, activityDate time.Time, kind string) (string, error)
 	DeleteReport(ctx context.Context, userID string) error
+
+	// Walk Steps Tracking
+	// AddWalkSteps accumulates steps onto the user's activity log for the
+	// given date (walk_steps += delta; walk_steps_last = delta).
+	AddWalkSteps(ctx context.Context, userID string, date time.Time, delta int) error
+	// DeleteLatestWalkSteps reverses the most recent walk addition for the
+	// date (cancel support): walk_steps -= walk_steps_last.
+	DeleteLatestWalkSteps(ctx context.Context, userID string, date time.Time) error
+	// GetWalkStepsTotals aggregates steps per user since the given date
+	// (zero time = lifetime). Rows are ordered by steps DESC.
+	GetWalkStepsTotals(ctx context.Context, since time.Time) ([]WalkStepsEntry, error)
 
 	GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error)
 	GetDailyActivityCountByKind(ctx context.Context, userID string, date time.Time, kind string) (int, error)

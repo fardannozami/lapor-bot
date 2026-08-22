@@ -19,11 +19,34 @@ interface StatItem {
   pulse?: boolean;
 }
 
-const TONE_STYLES: Record<StatTone, { text: string; glow: string }> = {
-  blue: { text: "text-system-blue", glow: "glass-glow-blue" },
-  red: { text: "text-system-red", glow: "glass-glow-red" },
-  green: { text: "text-system-green", glow: "glass-glow-blue" },
-  gold: { text: "text-system-gold", glow: "glass-glow-gold" },
+const TONE_STYLES: Record<
+  StatTone,
+  { text: string; glow: string; edge: string; chip: string }
+> = {
+  blue: {
+    text: "text-system-blue",
+    glow: "glass-glow-blue",
+    edge: "var(--color-system-blue)",
+    chip: "shadow-neon-blue",
+  },
+  red: {
+    text: "text-system-red",
+    glow: "glass-glow-red",
+    edge: "var(--color-system-red)",
+    chip: "shadow-neon-red",
+  },
+  green: {
+    text: "text-system-green",
+    glow: "glass-glow-green",
+    edge: "var(--color-system-green)",
+    chip: "shadow-neon-green",
+  },
+  gold: {
+    text: "text-system-gold",
+    glow: "glass-glow-gold",
+    edge: "var(--color-system-gold)",
+    chip: "shadow-neon-gold",
+  },
 };
 
 export const StatsOverview: React.FC<StatsOverviewProps> = ({
@@ -76,20 +99,25 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
         return (
           <div
             key={stat.key}
-            style={{ "--stagger-i": i } as React.CSSProperties}
-            className={`glass animate-fade-in-up p-4 md:p-6 rounded-2xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 ${tone.glow}`}
+            style={
+              {
+                "--stagger-i": i,
+                "--edge": tone.edge,
+              } as React.CSSProperties
+            }
+            className={`glass stat-edge card-sheen animate-fade-in-up p-4 md:p-6 rounded-2xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 ${tone.glow}`}
           >
             <div className="flex items-center justify-between gap-2">
               <p className="text-gray-400 text-xs md:text-sm font-medium leading-tight">
                 {stat.label}
               </p>
               <div
-                className={`shrink-0 p-2 md:p-3 rounded-xl bg-gray-900/60 ${tone.text} ${stat.pulse ? "animate-pulse" : ""}`}
+                className={`shrink-0 p-2 md:p-3 rounded-xl bg-gray-900/60 ${tone.text} ${tone.chip} ${stat.pulse ? "animate-pulse" : ""}`}
               >
                 <Icon size={24} className="w-5 h-5 md:w-6 md:h-6" />
               </div>
             </div>
-            <h3 className="text-xl md:text-3xl font-bold font-orbitron tracking-wide mt-1.5 md:mt-2 text-white break-words">
+            <h3 className="text-2xl md:text-4xl font-bold font-orbitron tracking-wide mt-1.5 md:mt-2 text-white break-words tnum">
               {stat.value}
             </h3>
             <p className="text-[10px] md:text-xs text-gray-500 mt-3 md:mt-4 font-mono">

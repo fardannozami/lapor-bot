@@ -151,6 +151,10 @@ func (r *cancelReportRepoStub) GetDailyActivityCountByKind(ctx context.Context, 
 	return r.dailyCount, nil
 }
 
+func (r *cancelReportRepoStub) GetLatestActivityText(ctx context.Context, userID string, activityDate time.Time, kind string) (string, error) {
+	return "", nil
+}
+
 func (r *cancelReportRepoStub) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
 	return nil
 }

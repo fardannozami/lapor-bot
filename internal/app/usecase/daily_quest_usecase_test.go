@@ -55,6 +55,14 @@ func (m *mockQuestRepo) GetDailyActivityCount(ctx context.Context, userID string
 	return m.dailyCount, nil
 }
 
+func (m *mockQuestRepo) AddWalkSteps(ctx context.Context, userID string, date time.Time, delta int) error {
+	return nil
+}
+
+func (m *mockQuestRepo) DeleteLatestWalkSteps(ctx context.Context, userID string, date time.Time) error {
+	return nil
+}
+
 func (m *mockQuestRepo) ResolveLIDToPhone(ctx context.Context, lid string) string {
 	return lid
 }

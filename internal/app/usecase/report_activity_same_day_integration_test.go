@@ -99,10 +99,10 @@ func TestIntegration_SameDayReportAndSideQuests_FairPoints(t *testing.T) {
 	}
 
 	now := time.Now()
-	if _, err := uc.ExecuteSideQuest(ctx, "u2", "Bob", "Side quest: Jalan Kaki", 1, 2, now); err != nil {
+	if _, err := uc.ExecuteSideQuest(ctx, "u2", "Bob", "Side quest: Jalan Kaki", 1, 2, 0, now); err != nil {
 		t.Fatalf("side quest 1: %v", err)
 	}
-	if _, err := uc.ExecuteSideQuest(ctx, "u2", "Bob", "Side quest: Chair Squat", 1, 3, now); err != nil {
+	if _, err := uc.ExecuteSideQuest(ctx, "u2", "Bob", "Side quest: Chair Squat", 1, 3, 0, now); err != nil {
 		t.Fatalf("side quest 2: %v", err)
 	}
 

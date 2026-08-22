@@ -33,6 +33,7 @@ const QUICK_CHIPS = [
   { label: "Gym", icon: Dumbbell, message: "Gym hari ini" },
   { label: "Lari", icon: Footprints, message: "Lari" },
   { label: "Sepeda", icon: Bike, message: "Sepeda" },
+  { label: "Jalan", icon: Footprints, message: "jalan kaki" },
   { label: "Olahraga", icon: Activity, message: "Olahraga" },
 ];
 

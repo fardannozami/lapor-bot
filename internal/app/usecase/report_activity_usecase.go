@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -50,6 +51,10 @@ type eventActivityRepository interface {
 	UpsertReportWithActivityEvent(ctx context.Context, report *domain.Report, event domain.ReportActivityEvent) error
 }
 
+type walkActivityRepository interface {
+	AddWalkSteps(ctx context.Context, userID string, date time.Time, delta int) error
+}
+
 // GoalCompletionNotifier is called when a user's weekly goal is completed.
 // userID and name identify the user; activity and targetDays describe the completed goal;
 // totalCompleted is the cumulative goals_completed count.
@@ -66,6 +71,7 @@ type reportActivityOptions struct {
 	activityText    string
 	now             time.Time
 	sideQuestPoints int // total points from side quest difficulty multipliers (computed in DailyQuestUsecase)
+	walkSteps       int // parsed from "jalan kaki N" messages; 0 means "not a walk-steps report"
 }
 
 func NewReportActivityUsecase(repo domain.ReportRepository) *ReportActivityUsecase {
@@ -85,14 +91,59 @@ func (uc *ReportActivityUsecase) userLock(userID string) *sync.Mutex {
 func (uc *ReportActivityUsecase) Execute(ctx context.Context, userID, name string, workout *domain.HevyWorkout) (string, error) {
 	return uc.execute(ctx, userID, name, workout, reportActivityOptions{})
 }
-
 func (uc *ReportActivityUsecase) ExecuteWithMessage(ctx context.Context, userID, name, message string, workout *domain.HevyWorkout) (string, error) {
+	// Walk validation: if the message contains a walk trigger word (jalan kaki,
+	// jalan, walk, langkah, steps) the step count is mandatory and must be in
+	// [MinWalkSteps, MaxWalkStepsPerReport]. Without a valid count the report
+	// is rejected — it must not silently fall through as a regular /lapor.
+	// Position of /lapor/#lapor in the message is irrelevant (handled by
+	// extractCommandArgument's "lapor anywhere" rule — e.g. "jalan kaki 5000
+	// /lapor" or "/lapor jalan kaki 5000 extra text" both work); only the
+	// presence of a walk keyword plus a valid number matters.
+	if domain.HasWalkKeyword(message) {
+		if steps, ok := domain.ParseWalkReport(message); ok {
+			return uc.execute(ctx, userID, name, workout, reportActivityOptions{
+				activityText: message,
+				walkSteps:    steps,
+			})
+		}
+		candidate := domain.WalkCandidateSteps(message)
+		// Explicit duration like "jalan 30 menit" / "jalan 2 jam" is a regular
+		// activity report, not a steps report — let it fall through as normal
+		// /lapor so we don't block ordinary "jalan pagi 30 menit" reports.
+		lowerMsg := strings.ToLower(message)
+		isDuration := strings.Contains(lowerMsg, "menit") || strings.Contains(lowerMsg, "jam") || strings.Contains(lowerMsg, "detik") || strings.Contains(lowerMsg, "minute") || strings.Contains(lowerMsg, "hour")
+		if candidate > 0 && candidate < domain.MinWalkSteps {
+			if isDuration {
+				return uc.execute(ctx, userID, name, workout, reportActivityOptions{
+					activityText: message,
+					walkSteps:    0,
+				})
+			}
+			return fmt.Sprintf("🚶 *Lapor jalan kaki butuh jumlah langkah.*\n\nKamu menulis *%s langkah* tapi minimal *%s langkah* agar tercatat sebagai laporan langkah (mis. `jalan 30 menit` bukan laporan langkah). Coba lagi dengan format:\n• `/lapor jalan kaki 5000`\n• `/lapor jalan kaki 8rb` / `12.500` / `10k`\nPrefix `/`/`#` dan posisi `/lapor` bebas — yang penting ada kata kunci jalan/walk/langkah + angka langkah.", domain.FormatStepsID(candidate), domain.FormatStepsID(domain.MinWalkSteps)), nil
+		}
+		if candidate > domain.MaxWalkStepsPerReport {
+			return fmt.Sprintf("🚶 *Jumlah langkah terlalu besar.*\n\nKamu menulis *%s langkah* tapi maksimal *%s langkah* per laporan. Cek lagi angkanya ya (contoh: `/lapor jalan kaki 12.500` atau `/lapor jalan kaki 10k`).", domain.FormatStepsID(candidate), domain.FormatStepsID(domain.MaxWalkStepsPerReport)), nil
+		}
+		if candidate == 0 && isDuration {
+			return uc.execute(ctx, userID, name, workout, reportActivityOptions{
+				activityText: message,
+				walkSteps:    0,
+			})
+		}
+		// No parseable count at all (or only non-step numbers like link IDs).
+		return "🚶 *Lapor jalan kaki butuh jumlah langkah.*\n\nTulis angkanya setelah kata kunci jalan/walk/langkah, contoh:\n• `/lapor jalan kaki 5000`\n• `/lapor jalan kaki 8rb` / `12.500` / `10k`\n• `walking 6500 steps /lapor` atau `/lapor 7500 langkah jalan pagi`\nMinimal 100 langkah, maksimal 250.000. Posisi `/lapor` bebas — di depan atau belakang tetap jalan asal ada kata kunci + angka.", nil
+	}
 	return uc.execute(ctx, userID, name, workout, reportActivityOptions{
 		activityText: message,
+		walkSteps:    0,
 	})
 }
 
-func (uc *ReportActivityUsecase) ExecuteSideQuest(ctx context.Context, userID, name, activityText string, completedCount, sideQuestPoints int, now time.Time) (string, error) {
+// ExecuteSideQuest records a completed side quest batch. walkSteps carries the
+// steps earned through the easy walk quest so they join the same walk-step
+// ledger used by the main /lapor (leaderboard + profile totals).
+func (uc *ReportActivityUsecase) ExecuteSideQuest(ctx context.Context, userID, name, activityText string, completedCount, sideQuestPoints, walkSteps int, now time.Time) (string, error) {
 	if completedCount < 1 {
 		completedCount = 1
 	}
@@ -101,6 +152,7 @@ func (uc *ReportActivityUsecase) ExecuteSideQuest(ctx context.Context, userID, n
 		activityText:    activityText,
 		now:             now,
 		sideQuestPoints: sideQuestPoints,
+		walkSteps:       walkSteps,
 	})
 }
 
@@ -380,8 +432,22 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		regularCountDelta:   boolToInt(!isSideQuest),
 		sideQuestCountDelta: opts.sideQuestCount,
 		activityText:        goalActivityTextWithFallback(workout, opts.activityText),
+		walkSteps:           opts.walkSteps,
 	}); err != nil {
 		return "", err
+	}
+	// Walk steps: the step count is accumulated onto activity_logs
+	// (walk_steps) for the walk leaderboard and the user's profile totals.
+	// Regular /lapor jalan kaki and the easy walk side quest both credit the
+	// ledger; cancel reverses the latest entry. Best-effort so the report
+	// never fails for a steps error.
+	if opts.walkSteps > 0 {
+		if wa, ok := uc.repo.(walkActivityRepository); ok {
+			_ = wa.AddWalkSteps(ctx, userID, today, opts.walkSteps)
+		}
+		report.WalkStepsTotal += opts.walkSteps
+		report.SeasonalWalkSteps += opts.walkSteps
+		_ = uc.repo.UpsertReport(ctx, report)
 	}
 	goalCompleted := false
 	if !isSideQuest {
@@ -436,6 +502,9 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		}
 		if report.JobClass != "" {
 			response += fmt.Sprintf("\n🧭 Job: %s", domain.FormatJobClass(report.JobClass))
+		}
+		if opts.walkSteps > 0 {
+			response += fmt.Sprintf("\n🚶 Langkah hari ini: %s (akumulasi total %s)", domain.FormatStepsID(opts.walkSteps), domain.FormatStepsID(report.WalkStepsTotal))
 		}
 	}
 	if !attributesActive {
@@ -523,7 +592,39 @@ func (uc *ReportActivityUsecase) ExecuteYesterday(ctx context.Context, userID, n
 }
 
 func (uc *ReportActivityUsecase) ExecuteYesterdayWithMessage(ctx context.Context, userID, name, message string, workout *domain.HevyWorkout) (string, error) {
+	if domain.HasWalkKeyword(message) {
+		if steps, ok := domain.ParseWalkReport(message); ok {
+			return uc.executeYesterdayWithWalk(ctx, userID, name, message, workout, steps)
+		}
+		candidate := domain.WalkCandidateSteps(message)
+		if candidate > 0 && candidate < domain.MinWalkSteps {
+			return fmt.Sprintf("🚶 *Lapor jalan kaki butuh jumlah langkah.*\n\nKamu menulis *%s langkah* tapi minimal *%s langkah* agar tercatat sebagai laporan langkah (mis. `jalan 30 menit` bukan laporan langkah). Coba lagi dengan format:\n• `/lapor-kemarin jalan kaki 5000`\n• `/lapor-kemarin jalan kaki 8rb` / `12.500` / `10k`", domain.FormatStepsID(candidate), domain.FormatStepsID(domain.MinWalkSteps)), nil
+		}
+		if candidate > domain.MaxWalkStepsPerReport {
+			return fmt.Sprintf("🚶 *Jumlah langkah terlalu besar.*\n\nKamu menulis *%s langkah* tapi maksimal *%s langkah* per laporan. Cek lagi angkanya ya (contoh: `/lapor-kemarin jalan kaki 12.500` atau `/lapor-kemarin jalan kaki 10k`).", domain.FormatStepsID(candidate), domain.FormatStepsID(domain.MaxWalkStepsPerReport)), nil
+		}
+		return "🚶 *Lapor jalan kaki butuh jumlah langkah.*\n\nTulis angkanya setelah kata kunci jalan/walk/langkah, contoh:\n• `/lapor-kemarin jalan kaki 5000`\n• `/lapor-kemarin jalan kaki 8rb` / `12.500` / `10k`\nMinimal 100 langkah, maksimal 250.000.", nil
+	}
 	return uc.executeYesterday(ctx, userID, name, message, workout)
+}
+
+func (uc *ReportActivityUsecase) executeYesterdayWithWalk(ctx context.Context, userID, name, activityText string, workout *domain.HevyWorkout, walkSteps int) (string, error) {
+	msg, err := uc.executeYesterday(ctx, userID, name, activityText, workout)
+	if err != nil || walkSteps <= 0 {
+		return msg, err
+	}
+	// Credit walk steps to yesterday's ledger, mirroring the main /lapor flow.
+	yesterday := domain.GetToday(time.Now()).AddDate(0, 0, -1)
+	if wa, ok := uc.repo.(walkActivityRepository); ok {
+		_ = wa.AddWalkSteps(ctx, userID, yesterday, walkSteps)
+	}
+	// Update totals on the persisted report (best-effort).
+	if rep, _ := uc.repo.GetReport(ctx, userID); rep != nil {
+		rep.WalkStepsTotal += walkSteps
+		rep.SeasonalWalkSteps += walkSteps
+		_ = uc.repo.UpsertReport(ctx, rep)
+	}
+	return msg, nil
 }
 
 func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, name, activityText string, workout *domain.HevyWorkout) (string, error) {
@@ -860,11 +961,18 @@ type reportActivityEventInput struct {
 	regularCountDelta   int
 	sideQuestCountDelta int
 	activityText        string
+	walkSteps           int
 }
 
 func (uc *ReportActivityUsecase) upsertReportWithActivity(ctx context.Context, report *domain.Report, input reportActivityEventInput) error {
 	if repo, ok := uc.repo.(eventActivityRepository); ok && ReportEventLedgerEnabled(input.occurredAt) {
 		seasonNumber, _ := GetCurrentSessionInfo(input.occurredAt)
+		metadata := "{}"
+		if input.walkSteps > 0 {
+			if b, err := json.Marshal(map[string]int{"walk_steps": input.walkSteps}); err == nil {
+				metadata = string(b)
+			}
+		}
 		event := domain.ReportActivityEvent{
 			EventID:             reportActivityEventID(report.UserID, input.kind, input.activityDate, input.occurredAt, input.pointsDelta, input.regularCountDelta, input.sideQuestCountDelta),
 			UserID:              report.UserID,
@@ -878,7 +986,7 @@ func (uc *ReportActivityUsecase) upsertReportWithActivity(ctx context.Context, r
 			RuleVersion:         1,
 			Source:              "whatsapp",
 			ActivityText:        input.activityText,
-			MetadataJSON:        "{}",
+			MetadataJSON:        metadata,
 		}
 		return repo.UpsertReportWithActivityEvent(ctx, report, event)
 	}
