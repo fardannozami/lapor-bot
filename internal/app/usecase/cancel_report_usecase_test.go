@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +23,9 @@ type cancelReportRepoStub struct {
 	remainingCount   int
 	deletedReport    bool
 	upsertedReport   *domain.Report
+	questText        string
+	questJSON        string
+	savedQuestJSON   string
 }
 
 func (r *cancelReportRepoStub) GetReport(ctx context.Context, userID string) (*domain.Report, error) {
@@ -152,7 +156,16 @@ func (r *cancelReportRepoStub) GetDailyActivityCountByKind(ctx context.Context, 
 }
 
 func (r *cancelReportRepoStub) GetLatestActivityText(ctx context.Context, userID string, activityDate time.Time, kind string) (string, error) {
-	return "", nil
+	return r.questText, nil
+}
+
+func (r *cancelReportRepoStub) GetDailyQuest(ctx context.Context, userID, questDate string) (string, error) {
+	return r.questJSON, nil
+}
+
+func (r *cancelReportRepoStub) SaveDailyQuest(ctx context.Context, userID, questDate, tasksJSON string) error {
+	r.savedQuestJSON = tasksJSON
+	return nil
 }
 
 func (r *cancelReportRepoStub) SetGoal(ctx context.Context, goal *domain.WeeklyGoal) error {
@@ -462,6 +475,240 @@ func TestCancelSideQuest_DeletesOnlyLatestSideQuestKind(t *testing.T) {
 	}
 	if msg == "" {
 		t.Fatal("message should not be empty")
+	}
+}
+
+// cancelLedgerRepoStub adds the ledger capabilities (event query + atomic
+// cancel persistence + quest storage + exact walk subtraction) on top of the
+// base stub, so tests can exercise the exact-reversal paths.
+type cancelLedgerRepoStub struct {
+	*cancelReportRepoStub
+	events          []domain.ReportActivityEvent
+	cancelEvent     *domain.ReportActivityEvent
+	cancelDeleteAll bool
+	cancelReport    *domain.Report
+	cancelCalled    bool
+}
+
+func (s *cancelLedgerRepoStub) GetReportEvents(ctx context.Context, userID string, activityDate time.Time, kind string) ([]domain.ReportActivityEvent, error) {
+	return s.events, nil
+}
+
+func (s *cancelLedgerRepoStub) CancelActivityEvents(ctx context.Context, report *domain.Report, cancelEvent domain.ReportActivityEvent, kind string, deleteAll bool) (int, error) {
+	s.cancelCalled = true
+	s.cancelDeleteAll = deleteAll
+	s.cancelReport = report
+	ev := cancelEvent
+	s.cancelEvent = &ev
+	// Mirror the repo contract: decrement or clear the kind counter.
+	if s.dailyCountByKind == nil {
+		if deleteAll {
+			s.dailyCount = 0
+			return 0, nil
+		}
+		if s.dailyCount > 0 {
+			s.dailyCount--
+		}
+		return s.dailyCount, nil
+	}
+	if deleteAll {
+		s.dailyCountByKind[kind] = 0
+		return 0, nil
+	}
+	if s.dailyCountByKind[kind] > 0 {
+		s.dailyCountByKind[kind]--
+	}
+	return s.dailyCountByKind[kind], nil
+}
+
+// TestCancelReport_MultiDay_PreservesSeasonProgress is the F1 regression test:
+// cancelling today's report must remove ONLY today's value. Points and
+// seasonal progress from earlier days survive; today's exact grant (from the
+// ledger, including badge points bundled into the event) is reversed.
+func TestCancelReport_MultiDay_PreservesSeasonProgress(t *testing.T) {
+	today := domain.GetToday(time.Now())
+	lastWeek := today.AddDate(0, 0, -7)
+	base := &cancelReportRepoStub{
+		report: &domain.Report{
+			UserID: "user1", Name: "Budi",
+			LastReportDate:        time.Now(),
+			ActivityCount:         2,
+			Streak:                2,
+			MaxStreak:             2,
+			SeasonalMaxStreak:     2,
+			TotalPoints:           100,
+			SeasonalPoints:        80,
+			SeasonalActivityCount: 5,
+			Achievements:          "first_report,streak_1",
+			SeasonalAchievements:  "first_report,streak_1,streak_2",
+			WalkStepsTotal:        9000,
+			SeasonalWalkSteps:     9000,
+		},
+		dates:      []time.Time{lastWeek, today},
+		dailyCount: 1,
+	}
+	repo := &cancelLedgerRepoStub{
+		cancelReportRepoStub: base,
+		events: []domain.ReportActivityEvent{{
+			EventID: "ev-today", UserID: "user1", SeasonNumber: 1,
+			Kind: domain.ActivityKindRegularReport, ActivityDate: today,
+			OccurredAt: time.Now(), PointsDelta: 17, RegularCountDelta: 1,
+			Source: "whatsapp", ActivityText: "gym",
+			MetadataJSON: `{"walk_steps": 4000}`,
+		}},
+	}
+	uc := NewCancelReportUsecase(repo)
+
+	msg, err := uc.Execute(context.Background(), "user1", "Budi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !repo.cancelCalled {
+		t.Fatal("expected atomic CancelActivityEvents persistence")
+	}
+	if !repo.cancelDeleteAll {
+		t.Fatal("single-report day must cancel with deleteAll=true")
+	}
+	ce := repo.cancelEvent
+	if ce == nil || ce.Source != "cancel" || ce.PointsDelta != -17 || ce.RegularCountDelta != -1 {
+		t.Fatalf("compensating event wrong: %+v", ce)
+	}
+	if !strings.Contains(ce.MetadataJSON, `"walk_steps":-4000`) {
+		t.Fatalf("compensating event must carry negative walk metadata, got %s", ce.MetadataJSON)
+	}
+
+	r := repo.cancelReport
+	if r == nil {
+		t.Fatal("cancel must persist the recalculated report")
+	}
+	if r.ActivityCount != 1 || r.Streak != 1 {
+		t.Fatalf("counters should be recalculated to last week only, got count=%d streak=%d", r.ActivityCount, r.Streak)
+	}
+	if r.TotalPoints != 83 || r.SeasonalPoints != 63 {
+		t.Fatalf("points must be preserved minus today's 17, got total=%d season=%d", r.TotalPoints, r.SeasonalPoints)
+	}
+	if r.SeasonalActivityCount != 4 {
+		t.Fatalf("one season active day removed: got %d, want 4", r.SeasonalActivityCount)
+	}
+	if r.SeasonalAchievements != "first_report,streak_1,streak_2" || r.Achievements != "first_report,streak_1" {
+		t.Fatalf("earned badges must be preserved, got season=%q all=%q", r.SeasonalAchievements, r.Achievements)
+	}
+	if r.WalkStepsTotal != 5000 || r.SeasonalWalkSteps != 5000 {
+		t.Fatalf("walk totals must keep earlier days' steps: got %d/%d, want 5000/5000", r.WalkStepsTotal, r.SeasonalWalkSteps)
+	}
+	if !strings.Contains(msg, "-17") {
+		t.Fatalf("response should announce the deducted points, got: %s", msg)
+	}
+}
+
+// TestCancelSideQuest_ReversesPointsAndQuestState is the F2 regression test:
+// cancelling a side quest must reverse its difficulty points, decrement the
+// counters, and reopen the task in today's quest list.
+func TestCancelSideQuest_ReversesPointsAndQuestState(t *testing.T) {
+	today := domain.GetToday(time.Now())
+	questJSON := `[{"id":"q1","name":"Chair Squat","target":18,"progress":18,"unit":"x","difficulty":"medium"}]`
+	base := &cancelReportRepoStub{
+		report: &domain.Report{
+			UserID: "user1", Name: "Budi",
+			LastReportDate:     time.Now(),
+			ActivityCount:      3,
+			TotalPoints:        50,
+			SeasonalPoints:     40,
+			TotalSideQuests:    2,
+			SeasonalSideQuests: 2,
+		},
+		dailyCountByKind: map[string]int{
+			domain.ActivityKindRegularReport: 1,
+			domain.ActivityKindSideQuest:     1,
+		},
+		questJSON: questJSON,
+	}
+	repo := &cancelLedgerRepoStub{
+		cancelReportRepoStub: base,
+		events: []domain.ReportActivityEvent{{
+			EventID: "ev-sq", UserID: "user1", SeasonNumber: 1,
+			Kind: domain.ActivityKindSideQuest, ActivityDate: today,
+			OccurredAt: time.Now(), PointsDelta: 3, SideQuestCountDelta: 1,
+			Source: "whatsapp", ActivityText: "Side quest: Chair Squat",
+			MetadataJSON: "{}",
+		}},
+	}
+	uc := NewCancelReportUsecase(repo)
+
+	msg, err := uc.ExecuteSideQuest(context.Background(), "user1", "Budi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !repo.cancelCalled || repo.cancelDeleteAll != true {
+		t.Fatalf("expected atomic full sidequest cancel, got called=%v deleteAll=%v", repo.cancelCalled, repo.cancelDeleteAll)
+	}
+	if ce := repo.cancelEvent; ce == nil || ce.PointsDelta != -3 || ce.SideQuestCountDelta != -1 {
+		t.Fatalf("compensating event wrong: %+v", ce)
+	}
+	r := repo.cancelReport
+	if r.TotalPoints != 47 || r.SeasonalPoints != 37 {
+		t.Fatalf("sidequest points must be reversed: got total=%d season=%d", r.TotalPoints, r.SeasonalPoints)
+	}
+	if r.TotalSideQuests != 1 || r.SeasonalSideQuests != 1 {
+		t.Fatalf("sidequest counters must decrement: got %d/%d", r.TotalSideQuests, r.SeasonalSideQuests)
+	}
+	if r.ActivityCount != 3 {
+		t.Fatalf("regular ActivityCount must not change, got %d", r.ActivityCount)
+	}
+	// Quest state reverted: task progress back to 0 so it can be redone.
+	if !strings.Contains(repo.savedQuestJSON, `"progress":0`) {
+		t.Fatalf("quest completion should be reverted, saved: %s", repo.savedQuestJSON)
+	}
+	if !strings.Contains(msg, "Chair Squat") {
+		t.Fatalf("response should name the reopened quest, got: %s", msg)
+	}
+}
+
+// TestCancelSideQuest_PreLedger_UsesQuestDifficultyFallback covers the
+// no-ledger path: points are recovered from the reverted quest's difficulty
+// instead of the ledger.
+func TestCancelSideQuest_PreLedger_UsesQuestDifficultyFallback(t *testing.T) {
+	questJSON := `[{"id":"q1","name":"Push-up","target":20,"progress":20,"unit":"x","difficulty":"hard"}]`
+	repo := &cancelReportRepoStub{
+		report: &domain.Report{
+			UserID: "user1", Name: "Budi",
+			LastReportDate:     time.Now(),
+			ActivityCount:      3,
+			TotalPoints:        50,
+			SeasonalPoints:     40,
+			TotalSideQuests:    1,
+			SeasonalSideQuests: 1,
+		},
+		dailyCountByKind: map[string]int{
+			domain.ActivityKindRegularReport: 1,
+			domain.ActivityKindSideQuest:     1,
+		},
+		questText: "Side quest: Push-up",
+		questJSON: questJSON,
+	}
+	uc := NewCancelReportUsecase(repo)
+
+	msg, err := uc.ExecuteSideQuest(context.Background(), "user1", "Budi")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r := repo.upsertedReport
+	if r == nil {
+		t.Fatal("legacy path must upsert the report")
+	}
+	if r.TotalPoints != 45 || r.SeasonalPoints != 35 {
+		t.Fatalf("hard quest = 5 pts fallback reversal, got total=%d season=%d", r.TotalPoints, r.SeasonalPoints)
+	}
+	if r.TotalSideQuests != 0 {
+		t.Fatalf("expected TotalSideQuests=0, got %d", r.TotalSideQuests)
+	}
+	if !strings.Contains(repo.savedQuestJSON, `"progress":0`) {
+		t.Fatalf("quest completion should be reverted, saved: %s", repo.savedQuestJSON)
+	}
+	if !strings.Contains(msg, "-5") {
+		t.Fatalf("response should announce the deducted points, got: %s", msg)
 	}
 }
 

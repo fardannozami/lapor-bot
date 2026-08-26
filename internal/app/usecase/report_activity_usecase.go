@@ -370,6 +370,7 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	}
 	attributesActive := hasSelectedJob(report)
 	var statGains []string
+	chosenAttribute := ""
 	if attributesActive {
 		// A report grants a single, fair attribute point. The activity directs
 		// which attribute is rewarded; the job breaks ties among multiple
@@ -379,6 +380,7 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		attrs, _ := domain.ResolveReportAttributes(activityForParse, report.JobClass)
 		chosen := domain.SelectReportAttribute(attrs, report.JobClass,
 			attributeSelectionSeed(userID, activityKind, today.Format(time.DateOnly), dailyCount+1, activityForParse))
+		chosenAttribute = string(chosen)
 		statGains = applyAttributeGains(report, []domain.AttributeType{chosen}, AttributeGainPerReport)
 	}
 
@@ -433,6 +435,7 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		sideQuestCountDelta: opts.sideQuestCount,
 		activityText:        goalActivityTextWithFallback(workout, opts.activityText),
 		walkSteps:           opts.walkSteps,
+		attribute:           chosenAttribute,
 	}); err != nil {
 		return "", err
 	}
@@ -588,13 +591,13 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 }
 
 func (uc *ReportActivityUsecase) ExecuteYesterday(ctx context.Context, userID, name string, workout *domain.HevyWorkout) (string, error) {
-	return uc.executeYesterday(ctx, userID, name, "", workout)
+	return uc.executeYesterday(ctx, userID, name, "", workout, 0)
 }
 
 func (uc *ReportActivityUsecase) ExecuteYesterdayWithMessage(ctx context.Context, userID, name, message string, workout *domain.HevyWorkout) (string, error) {
 	if domain.HasWalkKeyword(message) {
 		if steps, ok := domain.ParseWalkReport(message); ok {
-			return uc.executeYesterdayWithWalk(ctx, userID, name, message, workout, steps)
+			return uc.executeYesterday(ctx, userID, name, message, workout, steps)
 		}
 		candidate := domain.WalkCandidateSteps(message)
 		if candidate > 0 && candidate < domain.MinWalkSteps {
@@ -605,29 +608,10 @@ func (uc *ReportActivityUsecase) ExecuteYesterdayWithMessage(ctx context.Context
 		}
 		return "🚶 *Lapor jalan kaki butuh jumlah langkah.*\n\nTulis angkanya setelah kata kunci jalan/walk/langkah, contoh:\n• `/lapor-kemarin jalan kaki 5000`\n• `/lapor-kemarin jalan kaki 8rb` / `12.500` / `10k`\nMinimal 100 langkah, maksimal 250.000.", nil
 	}
-	return uc.executeYesterday(ctx, userID, name, message, workout)
+	return uc.executeYesterday(ctx, userID, name, message, workout, 0)
 }
 
-func (uc *ReportActivityUsecase) executeYesterdayWithWalk(ctx context.Context, userID, name, activityText string, workout *domain.HevyWorkout, walkSteps int) (string, error) {
-	msg, err := uc.executeYesterday(ctx, userID, name, activityText, workout)
-	if err != nil || walkSteps <= 0 {
-		return msg, err
-	}
-	// Credit walk steps to yesterday's ledger, mirroring the main /lapor flow.
-	yesterday := domain.GetToday(time.Now()).AddDate(0, 0, -1)
-	if wa, ok := uc.repo.(walkActivityRepository); ok {
-		_ = wa.AddWalkSteps(ctx, userID, yesterday, walkSteps)
-	}
-	// Update totals on the persisted report (best-effort).
-	if rep, _ := uc.repo.GetReport(ctx, userID); rep != nil {
-		rep.WalkStepsTotal += walkSteps
-		rep.SeasonalWalkSteps += walkSteps
-		_ = uc.repo.UpsertReport(ctx, rep)
-	}
-	return msg, nil
-}
-
-func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, name, activityText string, workout *domain.HevyWorkout) (string, error) {
+func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, name, activityText string, workout *domain.HevyWorkout, walkSteps int) (string, error) {
 	lock := uc.userLock(userID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -772,6 +756,7 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	}
 	attributesActive := hasSelectedJob(report)
 	var statGains []string
+	chosenAttribute := ""
 	if attributesActive {
 		// A report grants a single, fair attribute point. The activity directs
 		// which attribute is rewarded; the job breaks ties among multiple
@@ -781,6 +766,7 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 		attrs, _ := domain.ResolveReportAttributes(activityForParse, report.JobClass)
 		chosen := domain.SelectReportAttribute(attrs, report.JobClass,
 			attributeSelectionSeed(userID, domain.ActivityKindRegularReport, yesterday.Format(time.DateOnly), dailyCount+1, activityForParse))
+		chosenAttribute = string(chosen)
 		statGains = applyAttributeGains(report, []domain.AttributeType{chosen}, AttributeGainPerReport)
 	}
 
@@ -824,8 +810,23 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 		regularCountDelta:   1,
 		sideQuestCountDelta: 0,
 		activityText:        goalActivityTextWithFallback(workout, activityText),
+		walkSteps:           walkSteps,
+		attribute:           chosenAttribute,
 	}); err != nil {
 		return "", err
+	}
+	// Walk steps are credited ONLY here, on the accepted path, after the
+	// report is persisted. Rejections above (duplicate report, already
+	// reported today, <2 days since last report) return before this point,
+	// so a rejected /lapor-kemarin can never credit steps. Mirrors the main
+	// /lapor flow: best-effort so the report never fails for a steps error.
+	if walkSteps > 0 {
+		if wa, ok := uc.repo.(walkActivityRepository); ok {
+			_ = wa.AddWalkSteps(ctx, userID, yesterday, walkSteps)
+		}
+		report.WalkStepsTotal += walkSteps
+		report.SeasonalWalkSteps += walkSteps
+		_ = uc.repo.UpsertReport(ctx, report)
 	}
 	goalCompleted, err := NewGoalUsecase(uc.repo).RecordActivity(ctx, userID, yesterday, goalActivityText(workout))
 	if err != nil {
@@ -870,6 +871,9 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 			cyclePrefix, name, report.ActivityCount, report.Streak, expBreakdown)
 		if report.JobClass != "" {
 			response += fmt.Sprintf("\n🧭 Job: %s", domain.FormatJobClass(report.JobClass))
+		}
+		if walkSteps > 0 {
+			response += fmt.Sprintf("\n🚶 Langkah kemarin: %s (akumulasi total %s)", domain.FormatStepsID(walkSteps), domain.FormatStepsID(report.WalkStepsTotal))
 		}
 	}
 	if !attributesActive {
@@ -962,14 +966,25 @@ type reportActivityEventInput struct {
 	sideQuestCountDelta int
 	activityText        string
 	walkSteps           int
+	// attribute is the chosen attribute granted by this report ("" when the
+	// user has no job). Recorded in event metadata so a future cancellation
+	// can reverse the exact attribute gain instead of guessing.
+	attribute string
 }
 
 func (uc *ReportActivityUsecase) upsertReportWithActivity(ctx context.Context, report *domain.Report, input reportActivityEventInput) error {
 	if repo, ok := uc.repo.(eventActivityRepository); ok && ReportEventLedgerEnabled(input.occurredAt) {
 		seasonNumber, _ := GetCurrentSessionInfo(input.occurredAt)
 		metadata := "{}"
+		meta := make(map[string]any, 2)
 		if input.walkSteps > 0 {
-			if b, err := json.Marshal(map[string]int{"walk_steps": input.walkSteps}); err == nil {
+			meta["walk_steps"] = input.walkSteps
+		}
+		if input.attribute != "" {
+			meta["attr"] = input.attribute
+		}
+		if len(meta) > 0 {
+			if b, err := json.Marshal(meta); err == nil {
 				metadata = string(b)
 			}
 		}

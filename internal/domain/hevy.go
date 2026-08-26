@@ -21,7 +21,7 @@ func ParseHevy(message string) *HevyWorkout {
 
 	// Regex to match "Today at 9:46 AM · Hevy" or similar
 	hevyHeader := regexp.MustCompile(`.*(· Hevy|Logged with Hevy|Hevy)`)
-	
+
 	for i, line := range lines {
 		if hevyHeader.MatchString(line) {
 			// Usually the title is the very next non-empty line
