@@ -260,6 +260,258 @@ func TestReportRepository_UpsertReportWithActivityEvent_WritesLedgerAndProjectio
 	}
 }
 
+// TestReportRepository_CancelActivityEvents_ReversesLedgerAndProjections covers
+// the atomic cancel path end to end: the activity counter drops, the
+// compensating event is appended to the ledger (net zero), the projections are
+// reversed (active_days included), the walk metadata reverses the day's
+// steps, and the caller-adjusted report is persisted.
+func TestReportRepository_CancelActivityEvents_ReversesLedgerAndProjections(t *testing.T) {
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.September, 2, 10, 0, 0, 0, time.UTC)
+	activityDate := domain.GetToday(now)
+
+	// Forward grant: one regular report worth 17 points carrying 4000 steps.
+	report := &domain.Report{
+		UserID: "user123", Name: "Alice",
+		Streak: 1, ActivityCount: 1, SeasonalActivityCount: 1,
+		LastReportDate: now, TotalPoints: 17, SeasonalPoints: 17,
+		WalkStepsTotal: 4000, SeasonalWalkSteps: 4000,
+	}
+	forward := domain.ReportActivityEvent{
+		EventID: "ev-forward", UserID: "user123", SeasonNumber: 2,
+		Kind: domain.ActivityKindRegularReport, ActivityDate: activityDate,
+		OccurredAt: now, PointsDelta: 17, RegularCountDelta: 1,
+		RuleVersion: 1, Source: "whatsapp", ActivityText: "gym",
+		MetadataJSON: `{"walk_steps": 4000}`,
+	}
+	if err := repo.UpsertReportWithActivityEvent(ctx, report, forward); err != nil {
+		t.Fatalf("forward UpsertReportWithActivityEvent() error = %v", err)
+	}
+	if err := repo.AddWalkSteps(ctx, "user123", activityDate, 4000); err != nil {
+		t.Fatalf("AddWalkSteps() error = %v", err)
+	}
+
+	// Cancel: caller-adjusted report (points/steps already reversed) + the
+	// compensating event with negated deltas.
+	cancelled := &domain.Report{
+		UserID: "user123", Name: "Alice",
+		Streak: 0, ActivityCount: 0, SeasonalActivityCount: 0,
+		TotalPoints: 0, SeasonalPoints: 0,
+	}
+	cancelEvent := domain.ReportActivityEvent{
+		EventID: "ev-cancel", UserID: "user123", SeasonNumber: 2,
+		Kind: domain.ActivityKindRegularReport, ActivityDate: activityDate,
+		OccurredAt: now.Add(time.Minute), PointsDelta: -17, RegularCountDelta: -1,
+		RuleVersion: 1, Source: "cancel", ActivityText: "gym",
+		MetadataJSON: `{"walk_steps": -4000}`,
+	}
+	remaining, err := repo.CancelActivityEvents(ctx, cancelled, cancelEvent, domain.ActivityKindRegularReport, true)
+	if err != nil {
+		t.Fatalf("CancelActivityEvents() error = %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("remaining = %d, want 0", remaining)
+	}
+
+	// activity_logs row is gone (all counters hit zero).
+	var logCount int
+	if err := db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM activity_logs WHERE user_id = ? AND activity_date = ?
+	`, "user123", activityDate.Format(time.DateOnly)).Scan(&logCount); err != nil {
+		t.Fatalf("query activity_logs: %v", err)
+	}
+	if logCount != 0 {
+		t.Fatalf("expected activity_logs row deleted, got %d rows", logCount)
+	}
+
+	// Ledger nets to zero across forward + compensation.
+	var ledgerCount, pointsSum, regularSum int
+	if err := db.QueryRowContext(ctx, `
+		SELECT COUNT(*), COALESCE(SUM(points_delta), 0), COALESCE(SUM(regular_count_delta), 0)
+		FROM report_events WHERE user_id = ? AND season_number = ?
+	`, "user123", 2).Scan(&ledgerCount, &pointsSum, &regularSum); err != nil {
+		t.Fatalf("query report_events: %v", err)
+	}
+	if ledgerCount != 2 || pointsSum != 0 || regularSum != 0 {
+		t.Fatalf("ledger should net to zero, got count=%d points=%d regular=%d", ledgerCount, pointsSum, regularSum)
+	}
+
+	// GetReportEvents returns both entries oldest-first.
+	events, err := repo.GetReportEvents(ctx, "user123", activityDate, domain.ActivityKindRegularReport)
+	if err != nil {
+		t.Fatalf("GetReportEvents() error = %v", err)
+	}
+	if len(events) != 2 || events[0].EventID != "ev-forward" || events[1].EventID != "ev-cancel" {
+		t.Fatalf("GetReportEvents order/content wrong: %+v", events)
+	}
+
+	// Daily projection reversed to zero (row stays, counters floored).
+	var dailyPoints, dailyRegular int
+	if err := db.QueryRowContext(ctx, `
+		SELECT total_points, regular_count FROM user_daily_activity
+		WHERE user_id = ? AND season_number = ? AND activity_date = ?
+	`, "user123", 2, activityDate.Format(time.DateOnly)).Scan(&dailyPoints, &dailyRegular); err != nil {
+		t.Fatalf("query user_daily_activity: %v", err)
+	}
+	if dailyPoints != 0 || dailyRegular != 0 {
+		t.Fatalf("daily projection should be zeroed, got points=%d regular=%d", dailyPoints, dailyRegular)
+	}
+
+	// Season projection reversed; the cancelled day is no longer active.
+	var seasonPoints, seasonRegular, activeDays int
+	if err := db.QueryRowContext(ctx, `
+		SELECT total_points, regular_reports, active_days FROM user_season_stats
+		WHERE user_id = ? AND season_number = ?
+	`, "user123", 2).Scan(&seasonPoints, &seasonRegular, &activeDays); err != nil {
+		t.Fatalf("query user_season_stats: %v", err)
+	}
+	if seasonPoints != 0 || seasonRegular != 0 || activeDays != 0 {
+		t.Fatalf("season projection should be zeroed, got points=%d regular=%d activeDays=%d", seasonPoints, seasonRegular, activeDays)
+	}
+
+	// Caller-adjusted report persisted.
+	got, err := repo.GetReport(ctx, "user123")
+	if err != nil || got == nil {
+		t.Fatalf("GetReport() error = %v", err)
+	}
+	if got.TotalPoints != 0 || got.ActivityCount != 0 {
+		t.Fatalf("cancelled report wrong: points=%d count=%d", got.TotalPoints, got.ActivityCount)
+	}
+}
+
+// TestReportRepository_CancelActivityEvents_PreLedgerDayWritesNoProjections
+// verifies the UPDATE-only reversal contract: cancelling a day that predates
+// the ledger (no projection rows) must not create projection rows.
+func TestReportRepository_CancelActivityEvents_PreLedgerDayWritesNoProjections(t *testing.T) {
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.June, 1, 10, 0, 0, 0, time.UTC) // before the ledger start
+	activityDate := domain.GetToday(now)
+
+	// Pre-ledger day: activity log written the old way (no event, no projections).
+	report := &domain.Report{
+		UserID: "user123", Name: "Alice",
+		Streak: 1, ActivityCount: 1, LastReportDate: now, TotalPoints: 10,
+	}
+	if err := repo.UpsertReportWithActivity(ctx, report, activityDate); err != nil {
+		t.Fatalf("UpsertReportWithActivity() error = %v", err)
+	}
+
+	cancelled := &domain.Report{UserID: "user123", Name: "Alice"}
+	cancelEvent := domain.ReportActivityEvent{
+		EventID: "ev-cancel-pre", UserID: "user123", SeasonNumber: 1,
+		Kind: domain.ActivityKindRegularReport, ActivityDate: activityDate,
+		OccurredAt: now.Add(time.Minute), PointsDelta: -10, RegularCountDelta: -1,
+		RuleVersion: 1, Source: "cancel",
+	}
+	if _, err := repo.CancelActivityEvents(ctx, cancelled, cancelEvent, domain.ActivityKindRegularReport, true); err != nil {
+		t.Fatalf("CancelActivityEvents() error = %v", err)
+	}
+
+	var dailyRows, seasonRows int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM user_daily_activity WHERE user_id = ?`, "user123").Scan(&dailyRows); err != nil {
+		t.Fatalf("query user_daily_activity: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM user_season_stats WHERE user_id = ?`, "user123").Scan(&seasonRows); err != nil {
+		t.Fatalf("query user_season_stats: %v", err)
+	}
+	if dailyRows != 0 || seasonRows != 0 {
+		t.Fatalf("pre-ledger cancel must not create projection rows, got daily=%d season=%d", dailyRows, seasonRows)
+	}
+
+	// The log is gone and the compensating event still lands in the ledger.
+	var logCount, ledgerCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM activity_logs WHERE user_id = ?`, "user123").Scan(&logCount); err != nil {
+		t.Fatalf("query activity_logs: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM report_events WHERE user_id = ?`, "user123").Scan(&ledgerCount); err != nil {
+		t.Fatalf("query report_events: %v", err)
+	}
+	if logCount != 0 || ledgerCount != 1 {
+		t.Fatalf("expected log deleted + 1 compensating event, got logs=%d events=%d", logCount, ledgerCount)
+	}
+}
+
+// TestReportRepository_CancelActivityEvents_RepeatCancelKeepsActiveDay covers
+// the decrement path: cancelling one of two same-day reports keeps the day
+// active (active_days untouched) and reverses only that report's delta.
+func TestReportRepository_CancelActivityEvents_RepeatCancelKeepsActiveDay(t *testing.T) {
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Date(2026, time.September, 2, 10, 0, 0, 0, time.UTC)
+	activityDate := domain.GetToday(now)
+
+	report := &domain.Report{
+		UserID: "user123", Name: "Alice",
+		Streak: 1, ActivityCount: 1, SeasonalActivityCount: 1,
+		LastReportDate: now, TotalPoints: 15, SeasonalPoints: 15,
+	}
+	first := domain.ReportActivityEvent{
+		EventID: "ev-1", UserID: "user123", SeasonNumber: 2,
+		Kind: domain.ActivityKindRegularReport, ActivityDate: activityDate,
+		OccurredAt: now, PointsDelta: 10, RegularCountDelta: 1,
+		RuleVersion: 1, Source: "whatsapp",
+	}
+	if err := repo.UpsertReportWithActivityEvent(ctx, report, first); err != nil {
+		t.Fatalf("first report: %v", err)
+	}
+	report.TotalPoints, report.SeasonalPoints = 15, 15
+	second := domain.ReportActivityEvent{
+		EventID: "ev-2", UserID: "user123", SeasonNumber: 2,
+		Kind: domain.ActivityKindRegularReport, ActivityDate: activityDate,
+		OccurredAt: now.Add(time.Minute), PointsDelta: 5, RegularCountDelta: 1,
+		RuleVersion: 1, Source: "whatsapp",
+	}
+	if err := repo.UpsertReportWithActivityEvent(ctx, report, second); err != nil {
+		t.Fatalf("second report: %v", err)
+	}
+
+	// Cancel the repeat: report adjusted to 10 points, event carries -5/-1.
+	report.TotalPoints, report.SeasonalPoints = 10, 10
+	cancelEvent := domain.ReportActivityEvent{
+		EventID: "ev-cancel", UserID: "user123", SeasonNumber: 2,
+		Kind: domain.ActivityKindRegularReport, ActivityDate: activityDate,
+		OccurredAt: now.Add(2 * time.Minute), PointsDelta: -5, RegularCountDelta: -1,
+		RuleVersion: 1, Source: "cancel",
+	}
+	remaining, err := repo.CancelActivityEvents(ctx, report, cancelEvent, domain.ActivityKindRegularReport, false)
+	if err != nil {
+		t.Fatalf("CancelActivityEvents() error = %v", err)
+	}
+	if remaining != 1 {
+		t.Fatalf("remaining = %d, want 1", remaining)
+	}
+
+	var dailyPoints, dailyRegular int
+	if err := db.QueryRowContext(ctx, `
+		SELECT total_points, regular_count FROM user_daily_activity
+		WHERE user_id = ? AND season_number = ? AND activity_date = ?
+	`, "user123", 2, activityDate.Format(time.DateOnly)).Scan(&dailyPoints, &dailyRegular); err != nil {
+		t.Fatalf("query user_daily_activity: %v", err)
+	}
+	if dailyPoints != 10 || dailyRegular != 1 {
+		t.Fatalf("daily projection should keep the first report, got points=%d regular=%d", dailyPoints, dailyRegular)
+	}
+
+	var seasonPoints, activeDays int
+	if err := db.QueryRowContext(ctx, `
+		SELECT total_points, active_days FROM user_season_stats
+		WHERE user_id = ? AND season_number = ?
+	`, "user123", 2).Scan(&seasonPoints, &activeDays); err != nil {
+		t.Fatalf("query user_season_stats: %v", err)
+	}
+	if seasonPoints != 10 || activeDays != 1 {
+		t.Fatalf("season projection should keep 10 points and 1 active day, got points=%d activeDays=%d", seasonPoints, activeDays)
+	}
+}
+
 func TestReportRepository_UpsertReport_Update(t *testing.T) {
 	_, repo, cleanup := setupTestDB(t)
 	defer cleanup()

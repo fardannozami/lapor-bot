@@ -12,8 +12,10 @@ import {
   Trophy,
   ChevronLeft,
   ChevronRight,
+  BookOpen,
 } from "lucide-react";
 import { useReports, useAuth } from "@lapor-bot/shared";
+import { CommandsPage } from "@lapor-bot/ui";
 import type { EnrichedReport } from "@lapor-bot/shared";
 import { StatsOverview } from "./components/StatsOverview";
 import { LeaderboardTable } from "./components/LeaderboardTable";
@@ -26,7 +28,7 @@ import { ProfileSetup } from "./components/ProfileSetup";
 
 const PAGE_SIZE = 15;
 type Theme = "light" | "dark";
-type Page = "dashboard" | "login" | "personal" | "profile-setup";
+type Page = "dashboard" | "login" | "personal" | "profile-setup" | "commands";
 
 function getInitialTheme(): Theme {
   if (typeof document === "undefined") return "dark";
@@ -129,6 +131,21 @@ function App() {
         {/* Global actions and toggles */}
         <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto md:justify-end">
           <div className="flex items-center gap-2 md:gap-3">
+            <button
+              type="button"
+              onClick={() => setPage("commands")}
+              aria-pressed={page === "commands"}
+              className={`btn-press flex items-center gap-2 min-h-[44px] px-3 md:px-4 rounded-xl border font-mono text-xs transition-colors ${
+                page === "commands"
+                  ? "bg-system-green/15 border-system-green/40 text-system-green"
+                  : "bg-gray-950 hover:bg-gray-900 border-gray-800 text-gray-300 hover:text-white"
+              }`}
+              title="Panduan & daftar command bot"
+            >
+              <BookOpen size={14} />
+              Panduan
+            </button>
+
             <div className="flex items-center bg-gray-950 p-1 rounded-xl border border-gray-800">
               <button
                 onClick={() => setViewMode("table")}
@@ -220,6 +237,10 @@ function App() {
 
       {/* Main Content Dashboard Frame */}
       <main id="main-content" className="max-w-7xl mx-auto">
+        {page === "commands" && (
+          <CommandsPage onBack={() => setPage("dashboard")} />
+        )}
+
         {page === "login" && (
           <LoginPage
             onLoginSuccess={(user) => {

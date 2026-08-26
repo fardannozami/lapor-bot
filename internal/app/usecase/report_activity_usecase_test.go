@@ -1020,7 +1020,7 @@ func TestStreakBonus_WeeklyCappedForLongStreak(t *testing.T) {
 				Streak: streak, MaxStreak: streak, SeasonalMaxStreak: streak,
 				ActivityCount: 30, SeasonalActivityCount: 30,
 				SeasonalAchievements: allSeasonBadgeIDs(),
-				LastReportDate:        lastWeek,
+				LastReportDate:       lastWeek,
 			}
 			// No daily history → daily bonus 0, isolating the weekly cap.
 			before := repo.reports["u"].SeasonalPoints
@@ -1059,7 +1059,7 @@ func TestStreakBonus_SideQuestHasNoStreakBonus(t *testing.T) {
 		Streak: 30, MaxStreak: 30, SeasonalMaxStreak: 30,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        today.AddDate(0, 0, -7),
+		LastReportDate:       today.AddDate(0, 0, -7),
 	}
 	before := repo.reports["u"].TotalPoints
 
@@ -1097,7 +1097,7 @@ func TestReportPoints_RepeatReportHalved(t *testing.T) {
 		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        time.Now().AddDate(0, 0, -7),
+		LastReportDate:       time.Now().AddDate(0, 0, -7),
 	}
 
 	// First report of the day (isFullReport): base 10 + weekly (3→4, +6) = 16.
@@ -1155,7 +1155,7 @@ func TestReportActivity_SameDayRepeats_CountOneActiveDay(t *testing.T) {
 		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        time.Now().AddDate(0, 0, -7),
+		LastReportDate:       time.Now().AddDate(0, 0, -7),
 	}
 
 	var deltas []int
@@ -1204,7 +1204,7 @@ func TestReportActivity_FailClosed_LastReportTodayWithoutLog(t *testing.T) {
 		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        time.Now(),
+		LastReportDate:       time.Now(),
 	}
 
 	before := repo.reports["u"].SeasonalPoints
@@ -1242,7 +1242,7 @@ func TestReportActivity_FailClosed_LogExistsWithStaleLastReportDate(t *testing.T
 		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        now.AddDate(0, 0, -7),
+		LastReportDate:       now.AddDate(0, 0, -7),
 	}
 	repo.dailyCounts["u|"+domain.GetToday(now).Format(time.DateOnly)] = 1
 
@@ -1306,7 +1306,7 @@ func TestReportActivity_SideQuestDoesNotTouchActiveDays(t *testing.T) {
 		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        lastReport,
+		LastReportDate:       lastReport,
 	}
 
 	now := time.Now()
@@ -1351,7 +1351,7 @@ func TestReportActivity_YesterdayRejectedWhenAlreadyLogged(t *testing.T) {
 		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        now.AddDate(0, 0, -3),
+		LastReportDate:       now.AddDate(0, 0, -3),
 	}
 	repo.dailyCounts["u|"+yesterday.Format(time.DateOnly)] = 1
 
@@ -1386,7 +1386,7 @@ func TestReportActivity_MultiAttributeGrantsSinglePoint(t *testing.T) {
 		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        time.Now().AddDate(0, 0, -7),
+		LastReportDate:       time.Now().AddDate(0, 0, -7),
 		// Start above the attribute clamp floor so a single fair grant shows
 		// as a clean +1 delta on the chosen attribute and +0 on the rest.
 		Str: 5, Sta: 5, Agi: 5, Vit: 5,
@@ -1408,6 +1408,108 @@ func TestReportActivity_MultiAttributeGrantsSinglePoint(t *testing.T) {
 	if r.Sta-staBefore != 0 || r.Agi-agiBefore != 0 || r.Vit-vitBefore != 0 {
 		t.Fatalf("other attributes must not gain: STA Δ%d AGI Δ%d VIT Δ%d, want all 0",
 			r.Sta-staBefore, r.Agi-agiBefore, r.Vit-vitBefore)
+	}
+}
+
+// walkTrackingRepo records AddWalkSteps calls so tests can assert when (and
+// for which date) walk steps are credited to the activity ledger.
+type walkTrackingRepo struct {
+	*mockRepo
+	walkAdds []walkAdd
+}
+
+type walkAdd struct {
+	date  time.Time
+	steps int
+}
+
+func (m *walkTrackingRepo) AddWalkSteps(ctx context.Context, userID string, date time.Time, delta int) error {
+	m.walkAdds = append(m.walkAdds, walkAdd{date: date, steps: delta})
+	return nil
+}
+
+// TestReportActivity_YesterdayWalkRejectedDoesNotCreditSteps is the regression
+// test for the /lapor-kemarin walk bug: the old executeYesterdayWithWalk
+// wrapper credited steps whenever err == nil, but rejections also return
+// (message, nil) — so a rejected catch-up still banked the steps. Steps must
+// only be credited on the accepted path.
+func TestReportActivity_YesterdayWalkRejectedDoesNotCreditSteps(t *testing.T) {
+	repo := &walkTrackingRepo{mockRepo: &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	now := time.Now()
+	yesterday := domain.GetToday(now).AddDate(0, 0, -1)
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Walker", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       now.AddDate(0, 0, -3),
+		WalkStepsTotal:       1000, SeasonalWalkSteps: 1000,
+	}
+	// Yesterday already has a regular report -> the catch-up is rejected.
+	repo.dailyCounts["u|"+yesterday.Format(time.DateOnly)] = 1
+
+	msg, err := uc.ExecuteYesterdayWithMessage(ctx, "u", "Walker", "/lapor-kemarin jalan kaki 5000", nil)
+	if err != nil {
+		t.Fatalf("yesterday walk report: %v", err)
+	}
+	if !containsSubstring(msg, "sudah tercatat") {
+		t.Fatalf("expected already-logged rejection, got: %s", msg)
+	}
+	if len(repo.walkAdds) != 0 {
+		t.Fatalf("rejected report must not credit walk steps, got %d additions: %+v", len(repo.walkAdds), repo.walkAdds)
+	}
+	if r := repo.reports["u"]; r.WalkStepsTotal != 1000 || r.SeasonalWalkSteps != 1000 {
+		t.Fatalf("rejected report must not change walk totals, got %d/%d", r.WalkStepsTotal, r.SeasonalWalkSteps)
+	}
+}
+
+// TestReportActivity_YesterdayWalkAcceptedCreditsSteps is the positive control:
+// an accepted /lapor-kemarin jalan kaki credits yesterday's ledger exactly
+// once and bumps the profile walk totals.
+func TestReportActivity_YesterdayWalkAcceptedCreditsSteps(t *testing.T) {
+	repo := &walkTrackingRepo{mockRepo: &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	now := time.Now()
+	yesterday := domain.GetToday(now).AddDate(0, 0, -1)
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Walker", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       now.AddDate(0, 0, -3),
+		WalkStepsTotal:       1000, SeasonalWalkSteps: 1000,
+	}
+
+	msg, err := uc.ExecuteYesterdayWithMessage(ctx, "u", "Walker", "/lapor-kemarin jalan kaki 5000", nil)
+	if err != nil {
+		t.Fatalf("yesterday walk report: %v", err)
+	}
+	if !containsSubstring(msg, "Laporan kemarin diterima") {
+		t.Fatalf("expected acceptance, got: %s", msg)
+	}
+	if len(repo.walkAdds) != 1 {
+		t.Fatalf("accepted report must credit walk steps exactly once, got %d: %+v", len(repo.walkAdds), repo.walkAdds)
+	}
+	add := repo.walkAdds[0]
+	if add.steps != 5000 || !add.date.Equal(yesterday) {
+		t.Fatalf("walk credit = %+v, want 5000 steps on %s", add, yesterday.Format(time.DateOnly))
+	}
+	if r := repo.reports["u"]; r.WalkStepsTotal != 6000 || r.SeasonalWalkSteps != 6000 {
+		t.Fatalf("walk totals = %d/%d, want 6000/6000", r.WalkStepsTotal, r.SeasonalWalkSteps)
+	}
+	if !containsSubstring(msg, "Langkah kemarin") {
+		t.Fatalf("response should announce the credited steps, got: %s", msg)
 	}
 }
 
