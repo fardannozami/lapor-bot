@@ -464,3 +464,50 @@ func CheckNewSeasonAchievements(report *Report) []Achievement {
 	}
 	return newlyUnlocked
 }
+
+// PartialAchievement represents a milestone award for reaching 75% progress
+// toward a full achievement. Users get 25% of the achievement's points.
+type PartialAchievement struct {
+	ID      string
+	Name    string
+	Points  int // 25% of the full achievement points
+	GetProgress func(report *Report) int // current progress value
+	Target  int                          // full achievement target
+}
+
+// allPartialAchievements defines partial milestones. Each triggers when the
+// user reaches 75% of the full achievement's target and awards 25% of points.
+var allPartialAchievements = []PartialAchievement{
+	// Streak partials (target = MaxStreak weeks)
+	{ID: "streak_3_partial", Name: "Gigih (Mendekati)", Points: 18, GetProgress: func(r *Report) int { return r.MaxStreak }, Target: 3},
+	{ID: "streak_4_partial", Name: "Spartan (Mendekati)", Points: 25, GetProgress: func(r *Report) int { return r.MaxStreak }, Target: 4},
+	{ID: "streak_5_partial", Name: "Iron Will (Mendekati)", Points: 31, GetProgress: func(r *Report) int { return r.MaxStreak }, Target: 5},
+	{ID: "streak_8_partial", Name: "Titan (Mendekati)", Points: 37, GetProgress: func(r *Report) int { return r.MaxStreak }, Target: 8},
+	{ID: "streak_10_partial", Name: "Unstoppable (Mendekati)", Points: 50, GetProgress: func(r *Report) int { return r.MaxStreak }, Target: 10},
+	{ID: "streak_12_partial", Name: "Centurion (Mendekati)", Points: 75, GetProgress: func(r *Report) int { return r.MaxStreak }, Target: 12},
+	{ID: "streak_16_partial", Name: "Season Conqueror (Mendekati)", Points: 100, GetProgress: func(r *Report) int { return r.MaxStreak }, Target: 16},
+	// Activity partials (target = ActivityCount days)
+	{ID: "activity_10_partial", Name: "10 Hari (Mendekati)", Points: 5, GetProgress: func(r *Report) int { return r.ActivityCount }, Target: 10},
+	{ID: "activity_25_partial", Name: "25 Hari (Mendekati)", Points: 12, GetProgress: func(r *Report) int { return r.ActivityCount }, Target: 25},
+	{ID: "activity_50_partial", Name: "Half Century (Mendekati)", Points: 25, GetProgress: func(r *Report) int { return r.ActivityCount }, Target: 50},
+	{ID: "activity_100_partial", Name: "Century (Mendekati)", Points: 50, GetProgress: func(r *Report) int { return r.ActivityCount }, Target: 100},
+}
+
+// CheckPartialAchievements returns partial achievement awards for reaching 75%
+// progress toward a full achievement. These award 25% of the full achievement's
+// points and are separate from the full achievement unlock.
+func CheckPartialAchievements(report *Report) []PartialAchievement {
+	var newlyUnlocked []PartialAchievement
+	for _, a := range allPartialAchievements {
+		if HasAchievement(report.Achievements, a.ID) {
+			continue
+		}
+		progress := a.GetProgress(report)
+		// Use 4x multiplication to avoid integer truncation: progress*4 >= target*3
+		// means progress >= 75% of target without losing precision.
+		if progress*4 >= a.Target*3 && progress < a.Target {
+			newlyUnlocked = append(newlyUnlocked, a)
+		}
+	}
+	return newlyUnlocked
+}

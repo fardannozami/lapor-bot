@@ -13,11 +13,11 @@ func TestCappedStreakBonus(t *testing.T) {
 		perStep int64
 		want    int
 	}{
-		{"first period (no bonus)", 0, 10, 2, 0},
-		{"negative clamped to zero", -3, 10, 2, 0},
-		{"within cap scales linearly", 4, 10, 2, 8},
-		{"at cap boundary", 10, 10, 2, 20},
-		{"above cap is clamped", 50, 10, 2, 20},
+		{"first period (no bonus)", 0, 5, 2, 0},
+		{"negative clamped to zero", -3, 5, 2, 0},
+		{"within cap scales linearly", 4, 5, 2, 8},
+		{"at cap boundary", 5, 5, 2, 10},
+		{"above cap is clamped", 50, 5, 2, 10},
 		{"daily per-step is 1", 3, 5, 1, 3},
 		{"daily capped at 5", 99, 5, 1, 5},
 	}

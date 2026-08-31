@@ -24,6 +24,17 @@ func allSeasonBadgeIDs() string {
 	return strings.Join(ids, ",")
 }
 
+// allPartialBadgeIDs returns all partial achievement IDs to pre-seed reports
+// and suppress partial achievement fires in tests that focus on other scoring.
+func allPartialBadgeIDs() string {
+	ids := []string{
+		"streak_3_partial", "streak_4_partial", "streak_5_partial",
+		"streak_8_partial", "streak_10_partial", "streak_12_partial", "streak_16_partial",
+		"activity_10_partial", "activity_25_partial", "activity_50_partial", "activity_100_partial",
+	}
+	return strings.Join(ids, ",")
+}
+
 type mockRepo struct {
 	domain.ReportRepository
 	reports            map[string]*domain.Report
@@ -216,12 +227,12 @@ func TestStreak_FirstReport(t *testing.T) {
 	if !containsSubstring(msg, "Awakened Hunter") {
 		t.Errorf("Expected message to contain season badge 'Awakened Hunter', got '%s'", msg)
 	}
-	// Points: 10 base + 5 first season + 10 Awakened Hunter + 25 E-Rank Consistency = 50
-	if r.TotalPoints != 50 {
-		t.Errorf("First report: expected TotalPoints=50, got %d", r.TotalPoints)
+	// Points: 10 base + 5 seasonal first + 5 newcomer boost + 5 season catch-up + 10 Awakened Hunter + 25 E-Rank Consistency = 60
+	if r.TotalPoints != 60 {
+		t.Errorf("First report: expected TotalPoints=60, got %d", r.TotalPoints)
 	}
-	if r.SeasonalPoints != 50 {
-		t.Errorf("First report: expected SeasonalPoints=50, got %d", r.SeasonalPoints)
+	if r.SeasonalPoints != 60 {
+		t.Errorf("First report: expected SeasonalPoints=60, got %d", r.SeasonalPoints)
 	}
 }
 
@@ -1001,12 +1012,12 @@ func TestStreakBonus_DailyAndWeeklyAwardedTogether(t *testing.T) {
 }
 
 // TestStreakBonus_WeeklyCappedForLongStreak ensures a very long weekly streak
-// no longer produces runaway XP. With cap=10, a streak of 11 (→12) and 50 (→51)
-// must both yield the same capped weekly bonus (max +20), not +22 / +100.
+// no longer produces runaway XP. With cap=5, a streak of 6 and 50
+// must both yield the same capped weekly bonus (max +10), not +12 / +100.
 func TestStreakBonus_WeeklyCappedForLongStreak(t *testing.T) {
 	lastWeek := time.Now().AddDate(0, 0, -7)
 
-	for _, streak := range []int{11, 50} {
+	for _, streak := range []int{6, 50} {
 		t.Run(fmt.Sprintf("streak_%d", streak), func(t *testing.T) {
 			repo := &mockRepo{
 				reports:       make(map[string]*domain.Report),
@@ -1019,6 +1030,7 @@ func TestStreakBonus_WeeklyCappedForLongStreak(t *testing.T) {
 				UserID: "u", Name: "Vet", JobClass: "fighter",
 				Streak: streak, MaxStreak: streak, SeasonalMaxStreak: streak,
 				ActivityCount: 30, SeasonalActivityCount: 30,
+				Achievements:         allPartialBadgeIDs(),
 				SeasonalAchievements: allSeasonBadgeIDs(),
 				LastReportDate:        lastWeek,
 			}
@@ -1028,10 +1040,18 @@ func TestStreakBonus_WeeklyCappedForLongStreak(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			// Both long streaks: base 10 + capped weekly 20 = +30.
+			// Streak increments by 1. 6→7: capped weekly bonus 10 (no DR since ≤8).
+			// 50→51: capped weekly bonus 10, then DR floor 50% → 5.
+			// base 10 + weekly.
+			var wantWkly int
+			if streak <= 8 {
+				wantWkly = 10
+			} else {
+				wantWkly = 5 // floor at 50% of 10
+			}
 			gained := repo.reports["u"].SeasonalPoints - before
-			if gained != 30 {
-				t.Fatalf("streak %d: expected capped +30 (base 10 + weekly 20), got %d", streak, gained)
+			if gained != 10+wantWkly {
+				t.Fatalf("streak %d: expected capped +%d (base 10 + weekly %d), got %d", streak, 10+wantWkly, wantWkly, gained)
 			}
 			if containsSubstring(msg, "(weekly streak") {
 				t.Fatalf("streak %d: breakdown should be hidden, got: %s", streak, msg)
@@ -1186,4 +1206,228 @@ func indexOf(s, substr string) int {
 
 func containsSubstring(s, substr string) bool {
 	return indexOf(s, substr) >= 0
+}
+
+// =============================================================================
+// FAIRNESS FEATURE TESTS
+// =============================================================================
+
+// TestNewcomerBoost_AwardsBonusForFirstTwoWeeks verifies the newcomer boost
+// awards +5 pts for users with ActivityCount <= 14.
+func TestNewcomerBoost_AwardsBonusForFirstTwoWeeks(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	lastWeek := time.Now().AddDate(0, 0, -7)
+
+	// User with ActivityCount=1 (within 2-week window)
+	repo.reports["newcomer"] = &domain.Report{
+		UserID: "newcomer", Name: "New", JobClass: "fighter",
+		Streak: 1, ActivityCount: 1, SeasonalActivityCount: 1,
+		Achievements:         allPartialBadgeIDs(),
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       lastWeek,
+	}
+	before := repo.reports["newcomer"].SeasonalPoints
+
+	_, err := uc.Execute(ctx, "newcomer", "New", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	gained := repo.reports["newcomer"].SeasonalPoints - before
+	// Streak increments from 1→2, ActivityCount 1→2, SeasonalActivityCount 1→2.
+	// base 10 + weekly streak (2→2, 1 step×2=2) + newcomer 5 + catch-up 5 = 22
+	// Seasonal first bonus does NOT fire because SeasonalActivityCount is already 2 when scored.
+	if gained != 22 {
+		t.Fatalf("newcomer: expected +22, got %d", gained)
+	}
+}
+
+// TestNewcomerBoost_NoBonusAfterTwoWeeks verifies the newcomer boost does NOT
+// fire when ActivityCount > 14.
+func TestNewcomerBoost_NoBonusAfterTwoWeeks(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	lastWeek := time.Now().AddDate(0, 0, -7)
+
+	repo.reports["veteran"] = &domain.Report{
+		UserID: "veteran", Name: "Vet", JobClass: "fighter",
+		Streak: 5, ActivityCount: 20, SeasonalActivityCount: 20,
+		Achievements:         allPartialBadgeIDs(),
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       lastWeek,
+	}
+	before := repo.reports["veteran"].SeasonalPoints
+
+	_, err := uc.Execute(ctx, "veteran", "Vet", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	gained := repo.reports["veteran"].SeasonalPoints - before
+	// Streak increments 5→6: weekly bonus = cappedStreakBonus(5, 5, 2) = 10
+	// base 10 + weekly 10 = 20 (no newcomer, no catch-up)
+	if gained != 20 {
+		t.Fatalf("veteran: expected +20 (base 10 + weekly 10), got %d", gained)
+	}
+}
+
+// TestSeasonCatchUpBonus_AwardsBonusForFirstWeekOfSeason verifies the catch-up
+// bonus awards +5 pts for users within their first 7 seasonal days.
+func TestSeasonCatchUpBonus_AwardsBonusForFirstWeekOfSeason(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	lastWeek := time.Now().AddDate(0, 0, -7)
+
+	// User with SeasonalActivityCount=3 (within first 7 days)
+	repo.reports["new"] = &domain.Report{
+		UserID: "new", Name: "New", JobClass: "fighter",
+		Streak: 1, ActivityCount: 20, SeasonalActivityCount: 3,
+		Achievements:         allPartialBadgeIDs(),
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       lastWeek,
+	}
+	before := repo.reports["new"].SeasonalPoints
+
+	_, err := uc.Execute(ctx, "new", "New", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	gained := repo.reports["new"].SeasonalPoints - before
+	// Streak increments 1→2, ActivityCount 20→21, SeasonalActivityCount 3→4
+	// base 10 + weekly (1 step×2=2) + catch-up 5 = 17
+	if gained != 17 {
+		t.Fatalf("catch-up: expected +17 (base 10 + weekly 2 + catch-up 5), got %d", gained)
+	}
+}
+
+// TestDiminishingReturns_ReducesBonusAfter8Weeks verifies the diminishing returns
+// reduce the weekly streak bonus after 8 weeks.
+func TestDiminishingReturns_ReducesBonusAfter8Weeks(t *testing.T) {
+	lastWeek := time.Now().AddDate(0, 0, -7)
+
+	cases := []struct {
+		name     string
+		streak   int // stored streak (before +1 increment in Execute)
+		wantWkly int // expected weekly bonus after increment + diminishing returns
+	}{
+		// After Execute: stored streak +1 becomes effective streak.
+		// cappedStreakBonus = min(effectiveStreak-1, 5)*2, max 10. DR applies when effective > 8.
+		{"streak 7→8 (no reduction)", 7, 10},    // eff 8: bonus 10, no DR → 10
+		{"streak 8→9 (slight reduction)", 8, 9}, // eff 9: weeks=1 pct=94 → 9
+		{"streak 9→10 (reduction)", 9, 8},       // eff 10: weeks=2 pct=88 → 8
+		{"streak 12→13 (reduction)", 12, 6},     // eff 13: weeks=5 pct=69 → 6
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			repo := &mockRepo{
+				reports:       make(map[string]*domain.Report),
+				dailyCounts:   make(map[string]int),
+				activityDates: make(map[string][]time.Time),
+			}
+			uc := usecase.NewReportActivityUsecase(repo)
+			ctx := context.Background()
+			repo.reports["u"] = &domain.Report{
+				UserID: "u", Name: "Test", JobClass: "fighter",
+				Streak: c.streak, MaxStreak: c.streak, SeasonalMaxStreak: c.streak,
+				ActivityCount: 30, SeasonalActivityCount: 30,
+				Achievements:         allPartialBadgeIDs(),
+				SeasonalAchievements: allSeasonBadgeIDs(),
+				LastReportDate:        lastWeek,
+			}
+			before := repo.reports["u"].SeasonalPoints
+			_, err := uc.Execute(ctx, "u", "Test", nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			gained := repo.reports["u"].SeasonalPoints - before
+			// base 10 + weekly bonus (after DR)
+			expected := 10 + c.wantWkly
+			if gained != expected {
+				t.Fatalf("streak %d: expected +%d (base 10 + weekly %d), got %d", c.streak, expected, c.wantWkly, gained)
+			}
+		})
+	}
+}
+
+// TestPartialAchievement_FiresAt75PercentProgress verifies partial achievements
+// award 25% of points at 75% progress toward the full achievement.
+func TestPartialAchievement_FiresAt75PercentProgress(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	lastWeek := time.Now().AddDate(0, 0, -7)
+
+	// User at MaxStreak 2 (75% of streak_3 target=3 → 3*75/100 rounded ≥ 2) and
+	// ActivityCount 7 (75% of activity_10 target=10 → 10*75/100 = 7.5 → 7)
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Test", JobClass: "fighter",
+		Streak: 2, MaxStreak: 2, SeasonalMaxStreak: 2,
+		ActivityCount: 7, SeasonalActivityCount: 7,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       lastWeek,
+	}
+	before := repo.reports["u"].TotalPoints
+
+	_, err := uc.Execute(ctx, "u", "Test", nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	gained := repo.reports["u"].TotalPoints - before
+	// After increment: Streak 2→3, ActivityCount 7→8, SeasonalActivityCount 7→8.
+	// Report points: base 10 + weekly (2 steps×2=4) + newcomer 5 = 19
+	//   (catch-up does NOT fire because SeasonalActivityCount 8 > 7)
+	// Partial achievements firing:
+	//   streak_4_partial (MaxStreak 3 ≥ 4*3/4=3) = 25
+	//   activity_10_partial (ActivityCount 8 ≥ 10*3/4=7) = 5
+	// Total = 19 + 25 + 5 = 49
+	expected := 19 + 25 + 5
+	if gained != expected {
+		t.Fatalf("partial achievement: expected +%d, got %d", expected, gained)
+	}
+}
+
+// TestMageAttribute_GrantsMultipleAttributes verifies Mage gets 1-2 attributes
+// per report (instead of just 1), while non-Mage jobs still get exactly 1.
+func TestMageAttribute_GrantsMultipleAttributes(t *testing.T) {
+	repo := &mockRepo{reports: make(map[string]*domain.Report), dailyCounts: make(map[string]int)}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	lastWeek := time.Now().AddDate(0, 0, -7)
+
+	// Mage with mixed activity
+	repo.reports["mage"] = &domain.Report{
+		UserID: "mage", Name: "Mage", JobClass: "mage",
+		Streak: 1, ActivityCount: 10, SeasonalActivityCount: 10,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       lastWeek,
+		Str: 5, Sta: 5, Agi: 5, Vit: 5, End: 5, Luk: 5,
+	}
+
+	// Run 10 times to check that multiple attributes get incremented
+	totalGains := map[string]int{}
+	for i := 0; i < 10; i++ {
+		repo.reports["mage"].LastReportDate = lastWeek
+		repo.dailyCounts = make(map[string]int)
+		msg, err := uc.ExecuteWithMessage(ctx, "mage", "Mage", "gym lari stretching", nil)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		// Parse attribute gains from the response
+		if containsSubstring(msg, "Attributes:") {
+			// Count which attributes were gained
+			for _, attr := range []string{"STR", "STA", "AGI", "VIT", "END", "LUK"} {
+				if containsSubstring(msg, attr+" +1") {
+					totalGains[attr]++
+				}
+			}
+		}
+	}
+
+	// Mage should have gained multiple different attributes (not just one)
+	if len(totalGains) < 2 {
+		t.Fatalf("Mage should gain multiple attributes over time, got: %v", totalGains)
+	}
 }

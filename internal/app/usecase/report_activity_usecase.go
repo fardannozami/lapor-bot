@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -36,9 +37,26 @@ const (
 	// an active daily AND weekly streak always earns more than with either
 	// alone, while the weekly component stays the larger of the two.
 	weeklyStreakBonusPerStep = 2
-	weeklyStreakBonusCap     = 10 // max +20 pts per report from weekly streak
+	weeklyStreakBonusCap     = 5 // max +10 pts per report from weekly streak
 	dailyStreakBonusPerStep  = 1
 	dailyStreakBonusCap      = 5 // max +5 pts per report from daily streak
+
+	// Newcomer boost: +5 pts per report for the first 2 weeks (14 days) to
+	// help new users close the gap with long-streak veterans.
+	newcomerBoostPoints     = 5
+	newcomerDaysThreshold   = 14
+
+	// Season catch-up bonus: +5 pts per report for users who join mid-season
+	// (first week of season activity). Helps late joiners stay competitive.
+	seasonCatchUpBonus      = 5
+	seasonCatchUpDaysWindow = 7
+
+	// Diminishing returns on weekly streak bonus after 8 weeks.
+	// The bonus multiplier decreases linearly from 100% to 50% between
+	// week 8 and week 16, preventing runaway XP for very long streaks.
+	diminishingReturnsStartWeek = 8
+	diminishingReturnsFloorWeek = 16
+	diminishingReturnsFloorPct  = 50
 )
 
 type typedActivityRepository interface {
@@ -261,13 +279,18 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	weeklyStreakBonus := 0
 	dailyStreakBonus := 0
 	seasonalFirstBonus := 0
+	newcomerBonus := 0
+	catchUpBonus := 0
 	if isFullReport {
 		weeklyStreakBonus = cappedStreakBonus(int64(report.Streak)-1, weeklyStreakBonusCap, weeklyStreakBonusPerStep)
+		weeklyStreakBonus = applyDiminishingReturns(weeklyStreakBonus, report.Streak)
 		dailyStreak := uc.computeDailyStreak(ctx, userID, today)
 		dailyStreakBonus = cappedStreakBonus(int64(dailyStreak)-1, dailyStreakBonusCap, dailyStreakBonusPerStep)
 		if report.SeasonalActivityCount == 1 {
 			seasonalFirstBonus = seasonalFirstReportBonus
 		}
+		newcomerBonus = computeNewcomerBonus(report.ActivityCount)
+		catchUpBonus = computeSeasonCatchUpBonus(report.SeasonalActivityCount)
 	}
 	if isSideQuest {
 		if opts.sideQuestPoints > 0 {
@@ -278,6 +301,8 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		weeklyStreakBonus = 0
 		dailyStreakBonus = 0
 		seasonalFirstBonus = 0
+		newcomerBonus = 0
+		catchUpBonus = 0
 		report.TotalSideQuests += opts.sideQuestCount
 		report.SeasonalSideQuests += opts.sideQuestCount
 	}
@@ -286,7 +311,7 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	// bonus is always the larger contributor and the two stack when both
 	// streaks are active.
 	streakBonus := weeklyStreakBonus + dailyStreakBonus
-	reportPoints := basePoints + streakBonus + seasonalFirstBonus
+	reportPoints := basePoints + streakBonus + seasonalFirstBonus + newcomerBonus + catchUpBonus
 	if isRepeatReport && !isSideQuest {
 		reportPoints = reportPoints / 2
 	}
@@ -303,19 +328,19 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 	attributesActive := hasSelectedJob(report)
 	var statGains []string
 	if attributesActive {
-		// A report grants a single, fair attribute point. The activity directs
-		// which attribute is rewarded; the job breaks ties among multiple
-		// matches and is the fallback when nothing matches. Granting +1 to
-		// every matched attribute would make mixed sessions worth several
-		// times the attribute points of focused ones.
+		// A report grants attribute points fairly. Non-Mage jobs get exactly
+		// one attribute per report (the job specialty or the keyword match).
+		// Mage gets 1-2 attributes randomly from the matched set, giving
+		// them diversity while preventing them from outpacing specialists.
 		attrs, _ := domain.ResolveReportAttributes(activityForParse, report.JobClass)
-		chosen := domain.SelectReportAttribute(attrs, report.JobClass,
+		chosenAttrs := selectMageAttributes(attrs, report.JobClass,
 			attributeSelectionSeed(userID, activityKind, today.Format(time.DateOnly), dailyCount+1, activityForParse))
-		statGains = applyAttributeGains(report, []domain.AttributeType{chosen}, AttributeGainPerReport)
+		statGains = applyAttributeGains(report, chosenAttrs, AttributeGainPerReport)
 	}
 
 	var newAchievements []domain.Achievement
 	var comebackAchievements []domain.ComebackAchievement
+	var partialAchievements []domain.PartialAchievement
 	pointsGained := 0
 
 	if isFullReport && !isSideQuest {
@@ -334,6 +359,15 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		for _, ach := range comebackAchievements {
 			report.Achievements = domain.AddAchievement(report.Achievements, ach.ID)
 			report.TotalPoints += ach.Points
+			pointsGained += ach.Points
+		}
+
+		// Partial achievements: 25% points at 75% progress
+		partialAchievements = domain.CheckPartialAchievements(report)
+		for _, ach := range partialAchievements {
+			report.Achievements = domain.AddAchievement(report.Achievements, ach.ID)
+			report.TotalPoints += ach.Points
+			report.SeasonalPoints += ach.Points
 			pointsGained += ach.Points
 		}
 	}
@@ -471,13 +505,16 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		response += fmt.Sprintf("\n🏹 *RANK SEASON UP!* %s %s → %s %s", oldSeasonRank.Name, oldSeasonRank.Icon, newSeasonRank.Name, newSeasonRank.Icon)
 	}
 
-	if len(newAchievements)+len(comebackAchievements) > 0 {
+	if len(newAchievements)+len(comebackAchievements)+len(partialAchievements) > 0 {
 		response += "\n\n🏅 *Badge baru:*"
 		for _, ach := range newAchievements {
 			response += fmt.Sprintf("\n%s %s (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
 		}
 		for _, ach := range comebackAchievements {
 			response += fmt.Sprintf("\n%s %s (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
+		}
+		for _, ach := range partialAchievements {
+			response += fmt.Sprintf("\n🎯 %s (+%d pts)", ach.Name, ach.Points)
 		}
 
 		if freezeAwarded {
@@ -649,15 +686,14 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	attributesActive := hasSelectedJob(report)
 	var statGains []string
 	if attributesActive {
-		// A report grants a single, fair attribute point. The activity directs
-		// which attribute is rewarded; the job breaks ties among multiple
-		// matches and is the fallback when nothing matches. Granting +1 to
-		// every matched attribute would make mixed sessions worth several
-		// times the attribute points of focused ones.
+		// A report grants attribute points fairly. Non-Mage jobs get exactly
+		// one attribute per report (the job specialty or the keyword match).
+		// Mage gets 1-2 attributes randomly from the matched set, giving
+		// them diversity while preventing them from outpacing specialists.
 		attrs, _ := domain.ResolveReportAttributes(activityForParse, report.JobClass)
-		chosen := domain.SelectReportAttribute(attrs, report.JobClass,
+		chosenAttrs := selectMageAttributes(attrs, report.JobClass,
 			attributeSelectionSeed(userID, domain.ActivityKindRegularReport, yesterday.Format(time.DateOnly), dailyCount+1, activityForParse))
-		statGains = applyAttributeGains(report, []domain.AttributeType{chosen}, AttributeGainPerReport)
+		statGains = applyAttributeGains(report, chosenAttrs, AttributeGainPerReport)
 	}
 
 	newAchievements := domain.CheckNewSeasonAchievements(report)
@@ -677,6 +713,15 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 	for _, ach := range comebackAchievements {
 		report.Achievements = domain.AddAchievement(report.Achievements, ach.ID)
 		report.TotalPoints += ach.Points
+		pointsGained += ach.Points
+	}
+
+	// Partial achievements: 25% points at 75% progress
+	partialAchievements := domain.CheckPartialAchievements(report)
+	for _, ach := range partialAchievements {
+		report.Achievements = domain.AddAchievement(report.Achievements, ach.ID)
+		report.TotalPoints += ach.Points
+		report.SeasonalPoints += ach.Points
 		pointsGained += ach.Points
 	}
 
@@ -791,13 +836,16 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 		response += fmt.Sprintf("\n\n⚔️ *LEVEL UP!* Lv.%d → Lv.%d", oldNumericLevel, report.Level)
 	}
 
-	if len(newAchievements)+len(comebackAchievements) > 0 {
+	if len(newAchievements)+len(comebackAchievements)+len(partialAchievements) > 0 {
 		response += "\n\n🏅 *Badge baru:*"
 		for _, ach := range newAchievements {
 			response += fmt.Sprintf("\n%s %s (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
 		}
 		for _, ach := range comebackAchievements {
 			response += fmt.Sprintf("\n%s %s (+%d pts)", ach.DisplayEmoji, ach.Name, ach.Points)
+		}
+		for _, ach := range partialAchievements {
+			response += fmt.Sprintf("\n🎯 %s (+%d pts)", ach.Name, ach.Points)
 		}
 
 		if freezeAwarded {
@@ -1048,4 +1096,76 @@ func formatCurrentAttributes(report *domain.Report) string {
 		domain.ClampedAttribute(report.End),
 		domain.ClampedAttribute(report.Luk),
 	)
+}
+
+// computeNewcomerBonus returns newcomerBoostPoints if the user is within their
+// first 2 weeks of activity, helping new users close the gap with veterans.
+func computeNewcomerBonus(activityCount int) int {
+	if activityCount <= newcomerDaysThreshold {
+		return newcomerBoostPoints
+	}
+	return 0
+}
+
+// computeSeasonCatchUpBonus returns seasonCatchUpBonus if the user joined
+// mid-season (within the first 7 days of season activity count). This helps
+// late joiners stay competitive on the seasonal leaderboard.
+func computeSeasonCatchUpBonus(seasonalActivityCount int) int {
+	if seasonalActivityCount > 0 && seasonalActivityCount <= seasonCatchUpDaysWindow {
+		return seasonCatchUpBonus
+	}
+	return 0
+}
+
+// applyDiminishingReturns reduces the weekly streak bonus after 8 weeks to
+// prevent runaway XP. The multiplier decreases linearly from 100% at week 8
+// to 50% at week 16, then stays at 50%.
+func applyDiminishingReturns(bonus, streak int) int {
+	if streak <= diminishingReturnsStartWeek {
+		return bonus
+	}
+	weeks := streak - diminishingReturnsStartWeek
+	span := diminishingReturnsFloorWeek - diminishingReturnsStartWeek
+	if weeks >= span {
+		// At or beyond the floor: bonus is reduced to 50%
+		return bonus * diminishingReturnsFloorPct / 100
+	}
+	// Linear interpolation from 100% to 50%
+	pct := 100 - (weeks * (100 - diminishingReturnsFloorPct) / span)
+	return bonus * pct / 100
+}
+
+// selectMageAttributes handles attribute selection for Mage (who has no single
+// primary attribute). Mage gets 1-2 random attributes from the matched set,
+// giving them diversity while preventing them from outpacing specialists.
+// Non-Mage jobs always get exactly 1 attribute via domain.SelectReportAttribute.
+func selectMageAttributes(attrs []domain.AttributeType, jobClass, seed string) []domain.AttributeType {
+	if len(attrs) == 0 {
+		return nil
+	}
+	primary := domain.JobClassPrimaryAttribute(jobClass)
+	if primary != "" {
+		// Non-Mage: always exactly 1 attribute (job specialty or first match)
+		chosen := domain.SelectReportAttribute(attrs, jobClass, seed)
+		return []domain.AttributeType{chosen}
+	}
+	// Mage: pick 1-2 random attributes from the matched set
+	n := len(attrs)
+	maxAttrs := 2
+	if n < maxAttrs {
+		maxAttrs = n
+	}
+	// Use the seed to create a deterministic random source for reproducibility
+	h := uint32(2166136261)
+	for i := 0; i < len(seed); i++ {
+		h ^= uint32(seed[i])
+		h *= 16777619
+	}
+	rng := rand.New(rand.NewSource(int64(h)))
+	shuffled := make([]domain.AttributeType, len(attrs))
+	copy(shuffled, attrs)
+	rng.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	})
+	return shuffled[:maxAttrs]
 }
