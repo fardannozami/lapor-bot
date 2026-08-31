@@ -380,6 +380,41 @@ func main() {
 		return waService.IsLoggedIn() && waService.GetClient().IsConnected()
 	}, cfg.GroupID)
 
+	// One-time season-start announcement: resets seasonal data, tags @all and
+	// sends the "season started" message. Idempotent per season via the marker,
+	// so docker restarts won't re-send it.
+	go func() {
+		// Wait for WA client connection
+		for {
+			if waService.GetClient() != nil && waService.GetClient().IsConnected() {
+				break
+			}
+			select {
+			case <-appCtx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
+		}
+
+		bctx := context.Background()
+		curSession, _ := usecase.GetCurrentSessionInfo(time.Now().In(jakartaLoc))
+		marker := fmt.Sprintf("session_reset_v1_%d", curSession)
+		done, err := repo.HasMigration(bctx, marker)
+		if err != nil {
+			log.Printf("[SEASON] Failed to check season marker: %v", err)
+			return
+		}
+		if done {
+			log.Printf("[SEASON] Season %d announcement already sent; skipping.", curSession)
+			return
+		}
+
+		log.Printf("[SEASON] Sending one-time Season %d start announcement...", curSession)
+		if err := resetSessionUC.Execute(bctx, waService.GetClient(), cfg.GroupID, curSession); err != nil {
+			log.Printf("[SEASON] Season %d announcement failed: %v", curSession, err)
+		}
+	}()
+
 	// 11. Daily scheduled jobs via the scheduler module
 
 	morningSchedule, err := scheduler.ParseDaily(cfg.NotifyMorningTime, jakartaLoc)

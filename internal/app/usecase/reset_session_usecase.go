@@ -109,7 +109,8 @@ func seasonResetMarker(sessionNumber int) string {
 // Execute resets seasonal report data and sends an announcement to the group.
 // It is idempotent per season: the reset and announcement only run once, so
 // duplicate triggers (e.g. startup missed-reset check racing the scheduled
-// timer, or multiple bot instances) won't send the announcement twice.
+// timer, or multiple bot instances / docker restarts) won't send the
+// announcement twice. The announcement tags @all group members.
 func (uc *ResetSessionUsecase) Execute(ctx context.Context, client *whatsmeow.Client, groupID string, sessionNumber int) error {
 	marker := seasonResetMarker(sessionNumber)
 	done, err := uc.repo.HasMigration(ctx, marker)
@@ -127,20 +128,40 @@ func (uc *ResetSessionUsecase) Execute(ctx context.Context, client *whatsmeow.Cl
 
 	log.Printf("[SESSION RESET] Seasonal data has been reset for Season %d!", sessionNumber)
 
-	// Send announcement to the group
+	// Send announcement to the group, tagging all members.
 	if groupID != "" && client != nil && client.IsConnected() {
-		announcement := buildSeasonResetAnnouncement(sessionNumber)
-
-		targetJID, _ := types.ParseJID(groupID)
-		msg := &waE2E.Message{
-			Conversation: &announcement,
-		}
-		_, err := client.SendMessage(ctx, targetJID, msg)
+		targetJID, err := types.ParseJID(groupID)
 		if err != nil {
-			log.Printf("[SESSION RESET] Failed to send announcement: %v", err)
-			return fmt.Errorf("reset succeeded but failed to send announcement: %w", err)
+			log.Printf("[SESSION RESET] Invalid GroupID %q: %v", groupID, err)
+		} else {
+			var mentions []string
+			if info, err := client.GetGroupInfo(ctx, targetJID); err == nil {
+				for _, p := range info.Participants {
+					if p.JID.IsEmpty() {
+						continue
+					}
+					mentions = append(mentions, p.JID.ToNonAD().String())
+				}
+			} else {
+				log.Printf("[SESSION RESET] Failed to fetch group info for mentions: %v", err)
+			}
+
+			announcement := buildSeasonResetAnnouncement(sessionNumber)
+			msg := &waE2E.Message{
+				ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+					Text: &announcement,
+					ContextInfo: &waE2E.ContextInfo{
+						MentionedJID: mentions,
+					},
+				},
+			}
+			_, err := client.SendMessage(ctx, targetJID, msg)
+			if err != nil {
+				log.Printf("[SESSION RESET] Failed to send announcement: %v", err)
+				return fmt.Errorf("reset succeeded but failed to send announcement: %w", err)
+			}
+			log.Printf("[SESSION RESET] Season %d announcement sent to group with %d mention(s)!", sessionNumber, len(mentions))
 		}
-		log.Printf("[SESSION RESET] Season %d announcement sent to group!", sessionNumber)
 	}
 
 	// Record that this season's reset was performed so it can't run twice.
@@ -163,23 +184,17 @@ Halo para pejuang keringat! 🏋️‍♂️
 
 %s
 
-✅ *Yang di-reset:*
-• 📊 Seasonal Points — mulai dari 0
-• 📅 Seasonal Activity — mulai dari 0
-• ⚔️ Seasonal Max Streak — mulai dari 0
-• 🏅 Season Badges — mulai berburu dari awal
-• 🏆 Rank & Seasonal Leaderboard — reset
+Karena sistem masih dalam masa *trial & error*, kali ini semua data di-reset *penuh* dari nol! 🧹
 
-💾 *Yang tetap tersimpan:*
-• 🔥 Streak mingguan — lanjutkan!
-• ⭐ Total Points, EXP & Level — lifetime progress aman
-• 🏅 Achievement archive — yang sudah pernah unlock tetap tersimpan
-• 🛡️ Centurion Cycles — tetap berlaku
+✅ *Yang di-reset total:*
+• 📊 Points, EXP & Level — kembali ke 0
+• 🔥 Streak & Max Streak — semua kembali ke 0
+• 📅 Seasonal Activity — kembali ke 0
+• 🏅 Semua Achievements & Badges — mulai dikumpulkan lagi
+• 🏆 Rank & Leaderboard — kosong, semua setara
+• 🛡️ Centurion Cycles & Streak Freeze — reset ke awal
 
-❄️ *Streak Freeze* — reset ke 1 tiap season. Dapat +1 lagi saat capai 4 minggu streak!
-
-🆕 *Season %d dimulai SEKARANG!*
-Semua peserta mulai dari titik yang sama untuk seasonal ranking. Tapi level dan EXP lifetime kamu tetap ada! 💪
+🆕 *Season %d dimulai SEKARANG — semua peserta mulai dari titik nol yang sama!* 💪
 
 📌 Langsung laporkan aktivitas pertamamu di Season %d dengan mengirim /lapor!
 
