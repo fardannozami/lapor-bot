@@ -155,6 +155,119 @@ func TestMatchTask(t *testing.T) {
 	}
 }
 
+// TestGenerateDailyQuest_OfficePoolSize guards the variety invariant: every
+// attribute must keep at least 4 options per tier so the per-user/per-day hash
+// selection stays varied (removing non-office items without replacements
+// would shrink the pools and make the daily quests repetitive).
+func TestGenerateDailyQuest_OfficePoolSize(t *testing.T) {
+	for _, job := range []string{"fighter", "ranger", "assassin", "healer", "tank", "necromancer"} {
+		medium, hard := questOptionsForJob(job, 0, 0)
+		if len(medium) < 4 {
+			t.Errorf("%s medium pool has %d options, want >=4", job, len(medium))
+		}
+		if len(hard) < 4 {
+			t.Errorf("%s hard pool has %d options, want >=4", job, len(hard))
+		}
+	}
+}
+
+// TestGenerateDailyQuest_OfficeFeasiblePool ensures exercises that need
+// equipment or a track are not generated as daily office side quests.
+func TestGenerateDailyQuest_OfficeFeasiblePool(t *testing.T) {
+	removed := []string{"skipping", "ladderdrill", "shuttlerun", "obstaclecourse", "adaptability"}
+	for _, job := range []string{"fighter", "ranger", "assassin", "healer", "tank", "necromancer", "mage"} {
+		for day := 1; day <= 28; day++ {
+			date := time.Date(2026, 6, day, 0, 0, 0, 0, time.UTC)
+			for _, userID := range []string{"628111", "628222", "628333"} {
+				tasks := GenerateDailyQuestForUser(userID, job, 10, date)
+				for _, task := range tasks {
+					for _, id := range removed {
+						if task.ID == id {
+							t.Fatalf("%s/%s/%s generated removed item %q", userID, job, date.Format(time.DateOnly), id)
+						}
+					}
+					if !MatchTask(task.Name, task.ID) {
+						t.Fatalf("generated task should be matchable by its name: %+v", task)
+					}
+				}
+			}
+		}
+	}
+}
+
+// TestGenerateDailyQuest_VaryAcrossUsersAndDays expands the randomization
+// check: across users and days, each attribute pool must actually produce
+// several different medium tasks (the hash spreads over the whole pool).
+func TestGenerateDailyQuest_VaryAcrossUsersAndDays(t *testing.T) {
+	jobs := []struct {
+		job     string
+		primary AttributeType
+	}{
+		{"fighter", AttrStr},
+		{"ranger", AttrSta},
+		{"assassin", AttrAgi},
+		{"healer", AttrVit},
+		{"tank", AttrEnd},
+		{"necromancer", AttrLuk},
+	}
+	for _, tt := range jobs {
+		medium, hard := questOptionsForJob(tt.job, 0, 0)
+		seenMedium := map[string]bool{}
+		seenHard := map[string]bool{}
+		for day := 1; day <= 14; day++ {
+			date := time.Date(2026, 6, day, 0, 0, 0, 0, time.UTC)
+			for _, userID := range []string{"628111", "628222", "628333", "628444", "628555"} {
+				tasks := GenerateDailyQuestForUser(userID, tt.job, 10, date)
+				if len(tasks) != 3 {
+					t.Fatalf("%s: expected 3 tasks, got %d", tt.job, len(tasks))
+				}
+				seenMedium[tasks[1].ID] = true
+				seenHard[tasks[2].ID] = true
+			}
+		}
+		if len(seenMedium) < 3 || len(seenMedium) > len(medium) {
+			t.Errorf("%s: medium variety = %d (%v), want 3..%d", tt.job, len(seenMedium), seenMedium, len(medium))
+		}
+		if len(seenHard) < 3 || len(seenHard) > len(hard) {
+			t.Errorf("%s: hard variety = %d (%v), want 3..%d", tt.job, len(seenHard), seenHard, len(hard))
+		}
+	}
+}
+
+// TestMatchTaskNewOfficeTasks locks the keyword mapping for the new
+// office-feasible side quest items.
+func TestMatchTaskNewOfficeTasks(t *testing.T) {
+	tests := []struct {
+		input  string
+		taskID string
+		want   bool
+	}{
+		{"single leg balance 2 menit", "singlelegbalance", true},
+		{"balance satu kaki 2", "singlelegbalance", true},
+		{"stair walk 10 menit", "stairwalk", true},
+		{"jalan di tangga 10", "stairwalk", true},
+		{"interval walk 20 menit", "intervalwalk", true},
+		{"jalan interval 20", "intervalwalk", true},
+		{"new route walk 15", "newroutewalk", true},
+		{"rute baru 15 menit", "newroutewalk", true},
+		{"timed walk challenge 30", "timedwalk", true},
+		// No cross-matches between the new walk items.
+		{"stair walk 10", "stairs", false},
+		{"stair walk 10", "intervalwalk", false},
+		{"interval walk 20", "timedwalk", false},
+		{"new route walk 15", "explorationwalk", false},
+		{"single leg balance 2", "lateralshuffle", false},
+		// Regular stairs input still matches only stairs.
+		{"naik turun tangga 5", "stairs", true},
+		{"naik turun tangga 5", "stairwalk", false},
+	}
+	for _, tt := range tests {
+		if got := MatchTask(tt.input, tt.taskID); got != tt.want {
+			t.Errorf("MatchTask(%q, %q) = %v, want %v", tt.input, tt.taskID, got, tt.want)
+		}
+	}
+}
+
 func hasAttribute(attrs []AttributeType, want AttributeType) bool {
 	for _, attr := range attrs {
 		if attr == want {

@@ -1,17 +1,21 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import {
   LayoutGrid,
   Table2,
   RefreshCw,
   AlertCircle,
-  ShieldAlert,
   HeartPulse,
   Sun,
   Moon,
   LogIn,
   UserCircle2,
+  Trophy,
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
 } from "lucide-react";
 import { useReports, useAuth } from "@lapor-bot/shared";
+import { CommandsPage } from "@lapor-bot/ui";
 import type { EnrichedReport } from "@lapor-bot/shared";
 import { StatsOverview } from "./components/StatsOverview";
 import { LeaderboardTable } from "./components/LeaderboardTable";
@@ -24,7 +28,7 @@ import { ProfileSetup } from "./components/ProfileSetup";
 
 const PAGE_SIZE = 15;
 type Theme = "light" | "dark";
-type Page = "dashboard" | "login" | "personal" | "profile-setup";
+type Page = "dashboard" | "login" | "personal" | "profile-setup" | "commands";
 
 function getInitialTheme(): Theme {
   if (typeof document === "undefined") return "dark";
@@ -107,14 +111,15 @@ function App() {
       >
         Skip to main content
       </a>
-      {/* HUD System Top Bar */}
-      <header className="max-w-7xl mx-auto pt-8 pb-6 border-b border-gray-850 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
+      {/* HUD System Top Bar — sticky so global actions never scroll away */}
+      <header className="sticky top-0 z-40 -mx-4 md:-mx-8 px-4 md:px-8 mb-8 header-glass border-b border-gray-850">
+        <div className="max-w-7xl mx-auto py-3 md:py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="min-w-0 w-full md:w-auto">
           <div className="flex items-center gap-2.5">
-            <div className="w-3 h-3 bg-system-green shadow-neon-purple rounded-full animate-pulse"></div>
-            <h1 className="text-xl md:text-2xl font-black font-orbitron tracking-widest text-white uppercase flex items-center gap-2">
-              <HeartPulse className="text-system-green" size={22} />
-              {seasonTitle}
+            <div className="w-3 h-3 shrink-0 bg-system-green shadow-neon-green rounded-full animate-pulse"></div>
+            <h1 className="text-lg md:text-2xl font-black font-orbitron tracking-widest text-white uppercase flex items-center gap-2 min-w-0">
+              <HeartPulse className="text-system-green shrink-0" size={22} />
+              <span className="truncate">{seasonTitle}</span>
             </h1>
           </div>
           <p className="text-xs text-gray-500 font-mono mt-1 tracking-wider uppercase">
@@ -124,14 +129,30 @@ function App() {
         </div>
 
         {/* Global actions and toggles */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto md:justify-end">
+          <div className="flex items-center gap-2 md:gap-3">
+            <button
+              type="button"
+              onClick={() => setPage("commands")}
+              aria-pressed={page === "commands"}
+              className={`btn-press flex items-center gap-2 min-h-[44px] px-3 md:px-4 rounded-xl border font-mono text-xs transition-colors ${
+                page === "commands"
+                  ? "bg-system-green/15 border-system-green/40 text-system-green"
+                  : "bg-gray-950 hover:bg-gray-900 border-gray-800 text-gray-300 hover:text-white"
+              }`}
+              title="Panduan & daftar command bot"
+            >
+              <BookOpen size={14} />
+              Panduan
+            </button>
+
             <div className="flex items-center bg-gray-950 p-1 rounded-xl border border-gray-800">
               <button
                 onClick={() => setViewMode("table")}
-                className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors ${
+                aria-pressed={viewMode === "table"}
+                className={`btn-press p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors ${
                   viewMode === "table"
-                    ? "bg-gray-800 text-system-blue"
+                    ? "bg-gray-800 text-system-volt"
                     : "text-gray-500 hover:text-gray-300"
                 }`}
                 title="Table View"
@@ -143,9 +164,10 @@ function App() {
                   setViewMode("cards");
                   setCardPage(1);
                 }}
-                className={`p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors ${
+                aria-pressed={viewMode === "cards"}
+                className={`btn-press p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors ${
                   viewMode === "cards"
-                    ? "bg-gray-800 text-system-blue"
+                    ? "bg-gray-800 text-system-volt"
                     : "text-gray-500 hover:text-gray-300"
                 }`}
                 title="Grid View"
@@ -158,7 +180,7 @@ function App() {
               type="button"
               aria-pressed={theme === "dark"}
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="flex items-center gap-2 min-h-[44px] px-3 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors"
+              className="btn-press flex items-center gap-2 min-h-[44px] px-3 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors"
               title="Toggle light/dark theme"
             >
               {theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}
@@ -168,7 +190,7 @@ function App() {
             <button
               onClick={() => refresh()}
               disabled={loading || refreshing}
-              className="flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+              className="btn-press flex items-center gap-2 min-h-[44px] px-3 md:px-4 rounded-xl bg-gray-950 hover:bg-gray-900 border border-gray-800 font-mono text-xs text-gray-300 hover:text-white transition-colors disabled:opacity-50"
             >
               <RefreshCw
                 size={12}
@@ -189,7 +211,7 @@ function App() {
             <button
               type="button"
               onClick={() => setPage("personal")}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-system-green/10 hover:bg-system-green/20 border border-system-green/30 font-mono text-xs text-system-green hover:text-white transition-colors"
+              className="btn-press flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-system-green/10 hover:bg-system-green/20 border border-system-green/30 font-mono text-xs text-system-green hover:text-white transition-colors"
               title="Lihat profil saya"
               aria-label={`Buka profil ${personalUser.name || "saya"}`}
             >
@@ -202,7 +224,7 @@ function App() {
             <button
               type="button"
               onClick={() => setPage("login")}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-system-blue/10 hover:bg-system-blue/20 border border-system-blue/30 font-mono text-xs text-system-blue hover:text-white transition-colors"
+              className="btn-press flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-xl bg-gradient-to-r from-system-green to-system-volt border border-system-volt/40 font-mono text-xs font-bold text-gray-950 uppercase tracking-wider shadow-neon-volt hover:brightness-110 transition-all"
               title="Masuk ke akun"
             >
               <LogIn size={14} />
@@ -210,10 +232,15 @@ function App() {
             </button>
           )}
         </div>
+        </div>
       </header>
 
       {/* Main Content Dashboard Frame */}
       <main id="main-content" className="max-w-7xl mx-auto">
+        {page === "commands" && (
+          <CommandsPage onBack={() => setPage("dashboard")} />
+        )}
+
         {page === "login" && (
           <LoginPage
             onLoginSuccess={(user) => {
@@ -289,15 +316,19 @@ function App() {
               <div className="py-20 flex flex-col items-center justify-center">
                 <div className="relative w-16 h-16">
                   <div className="absolute inset-0 rounded-full border-4 border-gray-800"></div>
-                  <div className="absolute inset-0 rounded-full border-4 border-t-system-blue border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+                  <div className="absolute inset-0 rounded-full border-4 border-t-system-volt border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+                  <HeartPulse
+                    className="absolute inset-0 m-auto text-system-volt animate-pulse"
+                    size={20}
+                  />
                 </div>
                 <p className="text-xs text-gray-400 mt-6 font-mono tracking-widest uppercase animate-pulse">
-                  Retrieving Hunter Status...
+                  Loading Scoreboard...
                 </p>
               </div>
             ) : hunters.length === 0 ? (
-              <div className="glass rounded-3xl p-16 text-center border border-gray-800">
-                <ShieldAlert
+              <div className="glass glass-glow-gold rounded-3xl p-16 text-center border border-gray-800">
+                <Trophy
                   className="text-system-gold mx-auto mb-4 animate-bounce"
                   size={40}
                 />
@@ -316,13 +347,18 @@ function App() {
               />
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                  {visibleCardHunters.map((hunter) => (
-                    <HunterCard
+                <div className="stagger-children grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                  {visibleCardHunters.map((hunter, i) => (
+                    <div
                       key={hunter.user_id}
-                      hunter={hunter}
-                      onClick={() => setSelectedHunter(hunter)}
-                    />
+                      style={{ "--stagger-i": i } as CSSProperties}
+                      className="animate-fade-in-up"
+                    >
+                      <HunterCard
+                        hunter={hunter}
+                        onClick={() => setSelectedHunter(hunter)}
+                      />
+                    </div>
                   ))}
                 </div>
                 <nav
@@ -342,20 +378,22 @@ function App() {
                       type="button"
                       onClick={() => goToCardPage(safeCardPage - 1)}
                       disabled={safeCardPage <= 1}
-                      className="px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white transition-colors"
+                      className="btn-press flex items-center gap-1 px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white hover:border-system-volt/40 transition-colors"
                     >
+                      <ChevronLeft size={14} />
                       Previous
                     </button>
-                    <span className="px-3 py-2 text-xs font-mono text-gray-500">
+                    <span className="px-3 py-2 text-xs font-mono text-gray-500 tnum">
                       Page {safeCardPage} / {cardTotalPages}
                     </span>
                     <button
                       type="button"
                       onClick={() => goToCardPage(safeCardPage + 1)}
                       disabled={safeCardPage >= cardTotalPages}
-                      className="px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white transition-colors"
+                      className="btn-press flex items-center gap-1 px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white hover:border-system-volt/40 transition-colors"
                     >
                       Next
+                      <ChevronRight size={14} />
                     </button>
                   </div>
                 </nav>

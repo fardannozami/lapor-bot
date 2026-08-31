@@ -3,7 +3,9 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/fardannozami/whatsapp-gateway/internal/domain"
@@ -28,6 +30,7 @@ const selectColumns = `user_id, name, COALESCE(job_class, ''), streak, activity_
 	COALESCE(seasonal_max_streak, 0), COALESCE(seasonal_achievements, ''),
 	COALESCE(streak_freezes, 0), COALESCE(goals_completed, 0),
 	COALESCE(total_side_quests, 0), COALESCE(seasonal_side_quests, 0),
+	COALESCE(walk_steps_total, 0), COALESCE(seasonal_walk_steps, 0),
 	COALESCE(str, 0), COALESCE(sta, 0), COALESCE(agi, 0), COALESCE(vit, 0),
 	COALESCE(endurance, 0), COALESCE(luk, 0)`
 
@@ -42,6 +45,7 @@ func scanReport(scanner interface{ Scan(dest ...any) error }) (*domain.Report, e
 		&report.SeasonalMaxStreak, &report.SeasonalAchievements,
 		&report.StreakFreezes, &report.GoalsCompleted,
 		&report.TotalSideQuests, &report.SeasonalSideQuests,
+		&report.WalkStepsTotal, &report.SeasonalWalkSteps,
 		&report.Str, &report.Sta, &report.Agi, &report.Vit,
 		&report.End, &report.Luk,
 	)
@@ -72,8 +76,8 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 	// of which usecase produced the Report.
 	report.EnsureAttributeBaseline()
 	query := `
-		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, level, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes, goals_completed, total_side_quests, seasonal_side_quests, str, sta, agi, vit, endurance, luk)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_reports (user_id, name, job_class, streak, activity_count, last_report_date, max_streak, total_points, level, achievements, comeback_streak, inactive_days, centurion_cycles, seasonal_points, seasonal_activity_count, seasonal_max_streak, seasonal_achievements, streak_freezes, goals_completed, total_side_quests, seasonal_side_quests, walk_steps_total, seasonal_walk_steps, str, sta, agi, vit, endurance, luk)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			name = excluded.name,
 			job_class = excluded.job_class,
@@ -94,6 +98,8 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 			streak_freezes = excluded.streak_freezes,
 			total_side_quests = excluded.total_side_quests,
 			seasonal_side_quests = excluded.seasonal_side_quests,
+			walk_steps_total = excluded.walk_steps_total,
+			seasonal_walk_steps = excluded.seasonal_walk_steps,
 			str = excluded.str,
 			sta = excluded.sta,
 			agi = excluded.agi,
@@ -108,6 +114,7 @@ func upsertReport(ctx context.Context, execer execContexter, report *domain.Repo
 		report.SeasonalPoints, report.SeasonalActivityCount, report.SeasonalMaxStreak,
 		report.SeasonalAchievements, report.StreakFreezes, report.GoalsCompleted,
 		report.TotalSideQuests, report.SeasonalSideQuests,
+		report.WalkStepsTotal, report.SeasonalWalkSteps,
 		report.Str, report.Sta, report.Agi, report.Vit,
 		report.End, report.Luk,
 	)
@@ -446,6 +453,7 @@ func (r *ReportRepository) ResetAllReports(ctx context.Context) error {
 		    seasonal_max_streak = 0,
 		    seasonal_achievements = '',
 		    seasonal_side_quests = 0,
+		    seasonal_walk_steps = 0,
 		    streak_freezes = 1
 	`)
 	return err
@@ -620,12 +628,18 @@ func (r *ReportRepository) InitTable(ctx context.Context) error {
 	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET sta = 1 WHERE sta < 1`)
 	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET agi = 1 WHERE agi < 1`)
 	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET vit = 1 WHERE vit < 1`)
-	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET endurance = 1 WHERE endurance < 1`)
 	_, _ = r.db.ExecContext(ctx, `UPDATE user_reports SET luk = 1 WHERE luk < 1`)
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN walk_steps_total INTEGER DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE user_reports ADD COLUMN seasonal_walk_steps INTEGER DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN report_count INTEGER NOT NULL DEFAULT 1")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN regular_report_count INTEGER NOT NULL DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN sidequest_count INTEGER NOT NULL DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN activity_text TEXT DEFAULT ''")
+	// Walk steps tracking (lapor jalan kaki): accumulated per user+date;
+	// walk_steps_last remembers the latest single-report delta so cancel can
+	// reverse it.
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN walk_steps INTEGER NOT NULL DEFAULT 0")
+	_, _ = r.db.ExecContext(ctx, "ALTER TABLE activity_logs ADD COLUMN walk_steps_last INTEGER NOT NULL DEFAULT 0")
 	_, _ = r.db.ExecContext(ctx, "ALTER TABLE strava_accounts ADD COLUMN name TEXT")
 
 	goalQuery := `
@@ -1108,6 +1122,263 @@ func (r *ReportRepository) DeleteLatestActivityLogByKind(ctx context.Context, us
 	return remaining, tx.Commit()
 }
 
+// GetReportEvents returns the ledger events for a user, date and kind in
+// occurred_at order (oldest first). Compensating cancel events (source =
+// "cancel", negative deltas) are included; callers that need only forward
+// grants filter on Source. Returns nil when the user has no ledger rows for
+// the date (e.g. reports predating the ledger).
+func (r *ReportRepository) GetReportEvents(ctx context.Context, userID string, activityDate time.Time, kind string) ([]domain.ReportActivityEvent, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT event_id, user_id, season_number, kind, activity_date,
+		       occurred_at_utc, points_delta, regular_count_delta,
+		       sidequest_count_delta, rule_version, source,
+		       COALESCE(activity_text, ''), COALESCE(metadata_json, '{}')
+		FROM report_events
+		WHERE user_id = ? AND activity_date = ? AND kind = ?
+		ORDER BY occurred_at_utc ASC, rowid ASC
+	`, userID, activityDate.Format(time.DateOnly), kind)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []domain.ReportActivityEvent
+	for rows.Next() {
+		var ev domain.ReportActivityEvent
+		var activityDate, occurredAt string
+		if err := rows.Scan(
+			&ev.EventID, &ev.UserID, &ev.SeasonNumber, &ev.Kind, &activityDate,
+			&occurredAt, &ev.PointsDelta, &ev.RegularCountDelta,
+			&ev.SideQuestCountDelta, &ev.RuleVersion, &ev.Source,
+			&ev.ActivityText, &ev.MetadataJSON,
+		); err != nil {
+			return nil, err
+		}
+		if d, err := time.Parse(time.DateOnly, activityDate); err == nil {
+			ev.ActivityDate = d
+		}
+		if t, err := time.Parse(time.RFC3339, occurredAt); err == nil {
+			ev.OccurredAt = t
+		}
+		events = append(events, ev)
+	}
+	return events, rows.Err()
+}
+
+// CancelActivityEvents atomically applies an activity cancellation in one tx:
+//  1. decrements (deleteAll=false) or clears (deleteAll=true) the kind counter
+//     on the day's activity_logs row, deleting the row when nothing remains,
+//  2. upserts the caller-adjusted user_reports aggregate,
+//  3. reconciles goals AFTER the upsert so the reconcile's goals_completed
+//     decrement lands on the upserted row instead of being overwritten by it,
+//  4. reverses walk steps carried in the event metadata ({"walk_steps": -N}
+//     subtracts N from the day's ledger; best-effort when the row is gone),
+//  5. records the compensating report_events row (negative deltas,
+//     source="cancel") and applies the same negative deltas to the
+//     incremental projections. Projection reversal is UPDATE-only: days that
+//     predate the ledger have no projection rows and must not gain any.
+//
+// cancelEvent deltas are expected to be <= 0. Returns the remaining kind
+// count for the date after the cancellation.
+func (r *ReportRepository) CancelActivityEvents(ctx context.Context, report *domain.Report, cancelEvent domain.ReportActivityEvent, kind string, deleteAll bool) (int, error) {
+	date := cancelEvent.ActivityDate.Format(time.DateOnly)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	rollback := func(err error) (int, error) {
+		_ = tx.Rollback()
+		return 0, err
+	}
+
+	regularCount, sideQuestCount, err := getActivityKindCounts(ctx, tx, report.UserID, date)
+	if err == sql.ErrNoRows {
+		_ = tx.Rollback()
+		return 0, nil
+	}
+	if err != nil {
+		return rollback(err)
+	}
+
+	remaining := 0
+	if kind == domain.ActivityKindSideQuest {
+		if deleteAll {
+			sideQuestCount = 0
+		} else {
+			if sideQuestCount == 0 {
+				_ = tx.Rollback()
+				return 0, nil
+			}
+			sideQuestCount--
+			remaining = sideQuestCount
+		}
+	} else {
+		if deleteAll {
+			regularCount = 0
+		} else {
+			if regularCount == 0 {
+				_ = tx.Rollback()
+				return 0, nil
+			}
+			regularCount--
+			remaining = regularCount
+		}
+	}
+
+	if err := saveActivityKindCounts(ctx, tx, report.UserID, date, regularCount, sideQuestCount); err != nil {
+		return rollback(err)
+	}
+	if err := upsertReport(ctx, tx, report); err != nil {
+		return rollback(err)
+	}
+	// Goal reconcile runs after upsertReport: it decrements user_reports.
+	// goals_completed directly, and doing it before the upsert would let the
+	// upserted (stale) struct overwrite the decrement.
+	if kind != domain.ActivityKindSideQuest && (deleteAll || remaining == 0) {
+		if err := reconcileGoalAfterActivityDelete(ctx, tx, report.UserID, cancelEvent.ActivityDate); err != nil {
+			return rollback(err)
+		}
+	}
+
+	// Walk reversal from the compensating event metadata. The day's row may
+	// already be deleted (all counters hit zero) — then the steps went with
+	// the row and there is nothing left to subtract.
+	if walkDelta := walkStepsFromMetadata(cancelEvent.MetadataJSON); walkDelta < 0 {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE activity_logs
+			SET walk_steps = MAX(walk_steps + ?, 0),
+			    walk_steps_last = 0
+			WHERE user_id = ? AND activity_date = ?
+		`, walkDelta, report.UserID, date); err != nil {
+			return rollback(err)
+		}
+	}
+
+	if cancelEvent.MetadataJSON == "" {
+		cancelEvent.MetadataJSON = "{}"
+	}
+	inserted, err := insertReportEvent(ctx, tx, cancelEvent)
+	if err != nil {
+		return rollback(err)
+	}
+	if inserted {
+		dayBecameInactive, err := reverseDailyActivityProjection(ctx, tx, cancelEvent)
+		if err != nil {
+			return rollback(err)
+		}
+		if err := reverseSeasonStatsProjection(ctx, tx, cancelEvent, dayBecameInactive); err != nil {
+			return rollback(err)
+		}
+	}
+
+	return remaining, tx.Commit()
+}
+
+// reverseDailyActivityProjection applies a compensating event's negative
+// deltas to the daily projection (UPDATE-only). It reports whether the day
+// transitioned to inactive (no remaining reports of any kind) so the season
+// projection can decrement active_days exactly once per disappearance.
+func reverseDailyActivityProjection(ctx context.Context, tx *sql.Tx, event domain.ReportActivityEvent) (dayBecameInactive bool, err error) {
+	activityDate := event.ActivityDate.Format(time.DateOnly)
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE user_daily_activity
+		SET regular_count = MAX(regular_count + ?, 0),
+		    sidequest_count = MAX(sidequest_count + ?, 0),
+		    total_points = MAX(total_points + ?, 0)
+		WHERE user_id = ? AND season_number = ? AND activity_date = ?
+	`, event.RegularCountDelta, event.SideQuestCountDelta, event.PointsDelta,
+		event.UserID, event.SeasonNumber, activityDate); err != nil {
+		return false, err
+	}
+	var total int
+	err = tx.QueryRowContext(ctx, `
+		SELECT COALESCE(regular_count, 0) + COALESCE(sidequest_count, 0)
+		FROM user_daily_activity
+		WHERE user_id = ? AND season_number = ? AND activity_date = ?
+	`, event.UserID, event.SeasonNumber, activityDate).Scan(&total)
+	if err == sql.ErrNoRows {
+		// Pre-ledger day: no projection row, so no active_days transition.
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return total <= 0, nil
+}
+
+// reverseSeasonStatsProjection applies a compensating event's negative deltas
+// to the season projection (UPDATE-only) and decrements active_days when the
+// cancelled day just became inactive.
+func reverseSeasonStatsProjection(ctx context.Context, execer execContexter, event domain.ReportActivityEvent, dayBecameInactive bool) error {
+	activeDayDelta := 0
+	if dayBecameInactive {
+		activeDayDelta = -1
+	}
+	_, err := execer.ExecContext(ctx, `
+		UPDATE user_season_stats
+		SET total_points = MAX(total_points + ?, 0),
+		    regular_reports = MAX(regular_reports + ?, 0),
+		    sidequest_reports = MAX(sidequest_reports + ?, 0),
+		    active_days = MAX(active_days + ?, 0)
+		WHERE user_id = ? AND season_number = ?
+	`, event.PointsDelta, event.RegularCountDelta, event.SideQuestCountDelta,
+		activeDayDelta, event.UserID, event.SeasonNumber)
+	return err
+}
+
+// walkStepsFromMetadata reads the walk_steps field from an event's
+// metadata_json. Forward events carry a positive value; compensating cancel
+// events carry the negated amount. Returns 0 when absent or unparseable.
+func walkStepsFromMetadata(metadataJSON string) int {
+	if metadataJSON == "" {
+		return 0
+	}
+	var m struct {
+		WalkSteps int `json:"walk_steps"`
+	}
+	if err := json.Unmarshal([]byte(metadataJSON), &m); err != nil {
+		return 0
+	}
+	return m.WalkSteps
+}
+
+// GetLatestActivityText returns the newest stored activity text for the user,
+// date and kind. activity_text accumulates with newlines in newest-last order,
+// so the last non-empty line is the most recently reported activity.
+func (r *ReportRepository) GetLatestActivityText(ctx context.Context, userID string, activityDate time.Time, kind string) (string, error) {
+	var condition string
+	switch kind {
+	case domain.ActivityKindSideQuest:
+		condition = "COALESCE(sidequest_count, 0) > 0"
+	case domain.ActivityKindRegularReport:
+		condition = "COALESCE(regular_report_count, 0) > 0"
+	default:
+		condition = "1 = 1"
+	}
+	query := fmt.Sprintf(`
+		SELECT COALESCE(activity_text, '')
+		FROM activity_logs
+		WHERE user_id = ? AND activity_date = ? AND %s
+		ORDER BY activity_date DESC
+		LIMIT 1
+	`, condition)
+	var text string
+	if err := r.db.QueryRowContext(ctx, query, userID, activityDate.Format(time.DateOnly)).Scan(&text); err == sql.ErrNoRows {
+		return "", nil
+	} else if err != nil {
+		return "", err
+	}
+	// Newest entries are appended last, so scan lines in reverse to return the
+	// most recent non-empty one.
+	lines := strings.Split(text, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if line := strings.TrimSpace(lines[i]); line != "" {
+			return line, nil
+		}
+	}
+	return "", nil
+}
+
 func getActivityKindCounts(ctx context.Context, tx *sql.Tx, userID, date string) (regularCount, sideQuestCount int, err error) {
 	var totalCount int
 	err = tx.QueryRowContext(ctx, `
@@ -1237,6 +1508,102 @@ func (r *ReportRepository) DeleteReport(ctx context.Context, userID string) erro
 	}
 	_, err := r.db.ExecContext(ctx, `DELETE FROM user_reports WHERE user_id = ?`, userID)
 	return err
+}
+
+// --- Walk Steps Tracking (lapor jalan kaki) ---
+
+// AddWalkSteps accumulates steps onto the user's activity log row for the
+// date. walk_steps_last remembers the latest single-report delta so
+// DeleteLatestWalkSteps can reverse exactly one report's steps.
+func (r *ReportRepository) AddWalkSteps(ctx context.Context, userID string, date time.Time, delta int) error {
+	if delta <= 0 {
+		return nil
+	}
+	query := `
+		INSERT INTO activity_logs (user_id, activity_date, created_at, report_count, walk_steps, walk_steps_last)
+		VALUES (?, ?, ?, 0, ?, ?)
+		ON CONFLICT(user_id, activity_date) DO UPDATE SET
+			walk_steps = walk_steps + excluded.walk_steps,
+			walk_steps_last = excluded.walk_steps_last
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		userID,
+		date.Format(time.DateOnly),
+		time.Now().UTC().Format(time.RFC3339),
+		delta,
+		delta,
+	)
+	return err
+}
+
+// DeleteLatestWalkSteps reverses the most recent walk addition for the date
+// (cancel support): walk_steps -= walk_steps_last, then clears the marker.
+func (r *ReportRepository) DeleteLatestWalkSteps(ctx context.Context, userID string, date time.Time) error {
+	query := `
+		UPDATE activity_logs
+		SET walk_steps = MAX(walk_steps - walk_steps_last, 0),
+		    walk_steps_last = 0
+		WHERE user_id = ? AND activity_date = ?
+	`
+	_, err := r.db.ExecContext(ctx, query, userID, date.Format(time.DateOnly))
+	return err
+}
+
+// SubtractWalkSteps removes an exact step amount from the day's walk ledger
+// (floored at 0) and clears the walk_steps_last marker. Used by cancel flows
+// that know the reversed amount precisely (from report_events metadata or
+// parsed activity text), where the marker-based DeleteLatestWalkSteps would
+// only undo the most recent addition.
+func (r *ReportRepository) SubtractWalkSteps(ctx context.Context, userID string, date time.Time, amount int) error {
+	if amount <= 0 {
+		return nil
+	}
+	query := `
+		UPDATE activity_logs
+		SET walk_steps = MAX(walk_steps - ?, 0),
+		    walk_steps_last = 0
+		WHERE user_id = ? AND activity_date = ?
+	`
+	_, err := r.db.ExecContext(ctx, query, amount, userID, date.Format(time.DateOnly))
+	return err
+}
+
+// GetWalkStepsTotals aggregates steps per user since the given date
+// (zero time = lifetime). Rows are ordered by steps DESC for direct
+// leaderboard consumption.
+func (r *ReportRepository) GetWalkStepsTotals(ctx context.Context, since time.Time) ([]domain.WalkStepsEntry, error) {
+	query := `
+		SELECT al.user_id,
+		       COALESCE(NULLIF(ur.name, ''), al.user_id) AS name,
+		       SUM(al.walk_steps) AS steps
+		FROM activity_logs al
+		LEFT JOIN user_reports ur ON ur.user_id = al.user_id
+		WHERE al.walk_steps > 0
+	`
+	args := []any{}
+	if !since.IsZero() {
+		query += ` AND al.activity_date >= ?`
+		args = append(args, since.Format(time.DateOnly))
+	}
+	query += `
+		GROUP BY al.user_id, COALESCE(NULLIF(ur.name, ''), al.user_id)
+		ORDER BY steps DESC, name ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []domain.WalkStepsEntry
+	for rows.Next() {
+		var entry domain.WalkStepsEntry
+		if err := rows.Scan(&entry.UserID, &entry.Name, &entry.Steps); err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	return entries, rows.Err()
 }
 
 func (r *ReportRepository) GetDailyActivityCount(ctx context.Context, userID string, date time.Time) (int, error) {

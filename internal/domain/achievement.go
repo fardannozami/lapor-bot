@@ -11,6 +11,10 @@ type Achievement struct {
 	DisplayEmoji  string
 	UnlockMessage string
 	Check         func(report *Report) bool
+	// Retired marks legacy badges that are no longer unlockable. They stay in
+	// the catalog so users who earned them before retirement still see them
+	// (FindBadgeSummary), but CheckNewAchievements skips them.
+	Retired bool
 }
 
 // AllAchievements defines all available achievements in order.
@@ -115,6 +119,12 @@ var AllAchievements = []Achievement{
 		Check:         func(r *Report) bool { return r.ActivityCount >= 100 },
 	},
 	// --- Extended Streak Achievements ---
+	// NOTE: streak_5, streak_10, season_active_7 and season_active_25 exist only
+	// in this legacy lifetime catalog — they were never reachable through the
+	// report flow (which checks AllSeasonAchievements + comeback badges) and
+	// were only unlockable through the old cancel-recalculation backdoor. They
+	// are retired: kept here so past earners keep their badges, but no longer
+	// awarded to anyone.
 	{
 		ID:            "streak_5",
 		Name:          "Iron Will",
@@ -123,6 +133,7 @@ var AllAchievements = []Achievement{
 		DisplayEmoji:  "🦾",
 		UnlockMessage: "Tekadmu sekuat baja! Lima minggu membuktikan bahwa olahraga sudah menjadi bagian dari DNA-mu. Tak ada yang bisa menghentikanmu sekarang! 🦾🔥",
 		Check:         func(r *Report) bool { return r.MaxStreak >= 5 },
+		Retired:       true,
 	},
 	{
 		ID:            "streak_10",
@@ -132,6 +143,7 @@ var AllAchievements = []Achievement{
 		DisplayEmoji:  "🚂",
 		UnlockMessage: "UNSTOPPABLE! Seperti kereta yang terus melaju, tak ada yang bisa menghentikan momentummu. Sepuluh minggu — kamu inspirasi bagi seluruh grup! 🚂💨",
 		Check:         func(r *Report) bool { return r.MaxStreak >= 10 },
+		Retired:       true,
 	},
 	{
 		ID:            "streak_16",
@@ -151,6 +163,7 @@ var AllAchievements = []Achievement{
 		DisplayEmoji:  "🌅",
 		UnlockMessage: "7 hari di season ini! Matahari terbit menandai awal yang cerah. Kamu sudah membangun momentum — teruskan! 🌅💪",
 		Check:         func(r *Report) bool { return r.SeasonalActivityCount >= 7 },
+		Retired:       true,
 	},
 	{
 		ID:            "season_active_25",
@@ -160,6 +173,7 @@ var AllAchievements = []Achievement{
 		DisplayEmoji:  "⚙️",
 		UnlockMessage: "25 hari di season ini! Grinder sejati tidak pernah berhenti berputar. Roda gigi disiplinmu terus menghasilkan progres! ⚙️🔥",
 		Check:         func(r *Report) bool { return r.SeasonalActivityCount >= 25 },
+		Retired:       true,
 	},
 	// --- Seasonal Point Achievements ---
 	{
@@ -444,9 +458,18 @@ func RecentAchievementSummaries(achievements string, limit int) []BadgeSummary {
 }
 
 // CheckNewAchievements evaluates all achievements against the report and returns newly unlocked ones.
+// Retired badges are never returned.
+//
+// Deprecated: the report flow awards season badges via CheckNewSeasonAchievements
+// plus comeback badges via CheckComebackAchievements. This legacy lifetime
+// catalog is display-only (FindBadgeSummary) since the cancel recalculation —
+// its last caller — stopped awarding achievements.
 func CheckNewAchievements(report *Report) []Achievement {
 	var newlyUnlocked []Achievement
 	for _, a := range AllAchievements {
+		if a.Retired {
+			continue
+		}
 		if !HasAchievement(report.Achievements, a.ID) && a.Check(report) {
 			newlyUnlocked = append(newlyUnlocked, a)
 		}

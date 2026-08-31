@@ -93,7 +93,6 @@ func splitReportsByToday(reports []*domain.Report, now time.Time) (activeToday, 
 	return activeToday, pendingToday
 }
 
-
 func reportDisplayName(report *domain.Report) string {
 	if report == nil {
 		return "Teman"

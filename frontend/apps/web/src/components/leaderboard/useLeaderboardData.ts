@@ -12,6 +12,7 @@ import {
   hasAnyActivity,
   hasStreakActivity,
   hasAttributeActivity,
+  hasWalkActivity,
   currentDailyStreak,
   ATTRIBUTE_TAB_TO_SORT_KEY,
 } from "@lapor-bot/shared";
@@ -23,6 +24,7 @@ const TAB_SORT_KEY: Record<LeaderboardTab, LeaderboardSortKey> = {
   lifetime: "lifetime_xp",
   streak: "weekly_streak",
   week: "weekly_activity",
+  walk: "walk_steps",
   attributes: "attribute_overall",
 };
 
@@ -31,6 +33,7 @@ const TAB_FILTER: Record<LeaderboardTab, (r: EnrichedReport) => boolean> = {
   lifetime: hasAnyActivity,
   streak: hasStreakActivity,
   week: (r) => r.week_active_days > 0,
+  walk: hasWalkActivity,
   attributes: hasAttributeActivity,
 };
 

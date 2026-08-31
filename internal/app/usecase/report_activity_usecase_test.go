@@ -390,7 +390,7 @@ func TestReportActivity_AnnouncesLifetimeTierAndSeasonRankUp(t *testing.T) {
 		TotalPoints:           1149,
 		SeasonalPoints:        149,
 		JobClass:              "fighter",
-		LastReportDate:        now,
+		LastReportDate:        now.AddDate(0, 0, -1),
 	}
 
 	msg, err := uc.Execute(ctx, "user1", "Diana", nil)
@@ -641,7 +641,7 @@ func TestReportActivity_SideQuestUsesSameAttributeClassifier(t *testing.T) {
 		Str:            1,
 	}
 
-	msg, err := uc.ExecuteSideQuest(ctx, "fighter", "Fighter", "Side quest: Wall Push-up / Desk Push-up", 1, 3, now)
+	msg, err := uc.ExecuteSideQuest(ctx, "fighter", "Fighter", "Side quest: Wall Push-up / Desk Push-up", 1, 3, 0, now)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1032,7 +1032,7 @@ func TestStreakBonus_WeeklyCappedForLongStreak(t *testing.T) {
 				ActivityCount: 30, SeasonalActivityCount: 30,
 				Achievements:         allPartialBadgeIDs(),
 				SeasonalAchievements: allSeasonBadgeIDs(),
-				LastReportDate:        lastWeek,
+				LastReportDate:       lastWeek,
 			}
 			// No daily history → daily bonus 0, isolating the weekly cap.
 			before := repo.reports["u"].SeasonalPoints
@@ -1079,11 +1079,11 @@ func TestStreakBonus_SideQuestHasNoStreakBonus(t *testing.T) {
 		Streak: 30, MaxStreak: 30, SeasonalMaxStreak: 30,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        today.AddDate(0, 0, -7),
+		LastReportDate:       today.AddDate(0, 0, -7),
 	}
 	before := repo.reports["u"].TotalPoints
 
-	msg, err := uc.ExecuteSideQuest(ctx, "u", "Questor", "Side quest: jalan kaki", 1, 5, time.Now())
+	msg, err := uc.ExecuteSideQuest(ctx, "u", "Questor", "Side quest: jalan kaki", 1, 5, 0, time.Now())
 	if err != nil {
 		t.Fatalf("ExecuteSideQuest: %v", err)
 	}
@@ -1117,7 +1117,7 @@ func TestReportPoints_RepeatReportHalved(t *testing.T) {
 		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        time.Now().AddDate(0, 0, -7),
+		LastReportDate:       time.Now().AddDate(0, 0, -7),
 	}
 
 	// First report of the day (isFullReport): base 10 + weekly (3→4, +6) = 16.
@@ -1150,6 +1150,243 @@ func TestReportPoints_RepeatReportHalved(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// SAME-DAY FAIRNESS INVARIANTS
+// =============================================================================
+//
+// One calendar day yields at most one active day on the leaderboard, for both
+// /lapor and /lapor sidequest. The active-day decision is fail closed: if the
+// activity ledger (dailyCounts) and LastReportDate ever disagree, the report
+// is treated as a repeat (halved XP, no counters/streak/badges).
+
+// TestReportActivity_SameDayRepeats_CountOneActiveDay verifies that three
+// accepted regular reports on one calendar day produce exactly ONE active day
+// (lifetime + season) while the 2nd/3rd reports earn the agreed half XP.
+func TestReportActivity_SameDayRepeats_CountOneActiveDay(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Repeat", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       time.Now().AddDate(0, 0, -7),
+	}
+
+	var deltas []int
+	for i := 0; i < 3; i++ {
+		before := repo.reports["u"].SeasonalPoints
+		if _, err := uc.Execute(ctx, "u", "Repeat", nil); err != nil {
+			t.Fatalf("report %d: %v", i+1, err)
+		}
+		deltas = append(deltas, repo.reports["u"].SeasonalPoints-before)
+	}
+
+	// First report: base 10 + weekly streak bonus (3→4 weeks, +6) = 16.
+	// Repeats: base 10 / 2 = 5 each, no streak bonuses.
+	want := []int{16, 5, 5}
+	for i, d := range deltas {
+		if d != want[i] {
+			t.Errorf("report %d: expected +%d, got +%d", i+1, want[i], d)
+		}
+	}
+
+	r := repo.reports["u"]
+	if r.ActivityCount != 31 {
+		t.Errorf("expected ActivityCount=31 (one active day), got %d", r.ActivityCount)
+	}
+	if r.SeasonalActivityCount != 31 {
+		t.Errorf("expected SeasonalActivityCount=31 (one active day), got %d", r.SeasonalActivityCount)
+	}
+	if r.Streak != 4 {
+		t.Errorf("expected Streak=4 (single weekly increment), got %d", r.Streak)
+	}
+}
+
+// TestReportActivity_FailClosed_LastReportTodayWithoutLog covers the drifted
+// state where LastReportDate is today but the ledger has no regular report for
+// today. The report must be treated as a repeat: halved XP, no counters.
+func TestReportActivity_FailClosed_LastReportTodayWithoutLog(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Drift", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       time.Now(),
+	}
+
+	before := repo.reports["u"].SeasonalPoints
+	if _, err := uc.Execute(ctx, "u", "Drift", nil); err != nil {
+		t.Fatalf("report: %v", err)
+	}
+
+	if got := repo.reports["u"].SeasonalPoints - before; got != 5 {
+		t.Errorf("fail-closed repeat: expected halved +5, got +%d", got)
+	}
+	r := repo.reports["u"]
+	if r.ActivityCount != 30 || r.SeasonalActivityCount != 30 {
+		t.Errorf("fail-closed repeat: counters must not change, got %d/%d", r.ActivityCount, r.SeasonalActivityCount)
+	}
+	if r.Streak != 3 {
+		t.Errorf("fail-closed repeat: streak must not change, got %d", r.Streak)
+	}
+}
+
+// TestReportActivity_FailClosed_LogExistsWithStaleLastReportDate covers the
+// opposite drift: the ledger already has a regular report for today while
+// LastReportDate points to an older day. The report must not earn a second
+// active day or streak increment.
+func TestReportActivity_FailClosed_LogExistsWithStaleLastReportDate(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	now := time.Now()
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Drift", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       now.AddDate(0, 0, -7),
+	}
+	repo.dailyCounts["u|"+domain.GetToday(now).Format(time.DateOnly)] = 1
+
+	before := repo.reports["u"].SeasonalPoints
+	if _, err := uc.Execute(ctx, "u", "Drift", nil); err != nil {
+		t.Fatalf("report: %v", err)
+	}
+
+	if got := repo.reports["u"].SeasonalPoints - before; got != 5 {
+		t.Errorf("stale-state repeat: expected halved +5, got +%d", got)
+	}
+	r := repo.reports["u"]
+	if r.ActivityCount != 30 || r.SeasonalActivityCount != 30 {
+		t.Errorf("stale-state repeat: counters must not change, got %d/%d", r.ActivityCount, r.SeasonalActivityCount)
+	}
+	if r.Streak != 3 {
+		t.Errorf("stale-state repeat: streak must not change, got %d", r.Streak)
+	}
+}
+
+// TestReportActivity_SideQuestRejectedForUnregisteredUser ensures a side quest
+// can never create a profile (and thus an active day) for an unknown user.
+func TestReportActivity_SideQuestRejectedForUnregisteredUser(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+
+	msg, err := uc.ExecuteSideQuest(ctx, "new", "Baru", "Side quest: Jalan Kaki", 1, 2, 0, time.Now())
+	if err != nil {
+		t.Fatalf("side quest: %v", err)
+	}
+	if !containsSubstring(msg, "belum terdaftar") {
+		t.Fatalf("expected registration guidance, got: %s", msg)
+	}
+	if repo.reports["new"] != nil {
+		t.Fatalf("side quest must not persist a report for an unregistered user")
+	}
+	if len(repo.dailyCounts) != 0 {
+		t.Fatalf("side quest must not log activity for an unregistered user")
+	}
+}
+
+// TestReportActivity_SideQuestDoesNotTouchActiveDays verifies side quests add
+// their difficulty points and sidequest counters but never active days,
+// streaks, or LastReportDate.
+func TestReportActivity_SideQuestDoesNotTouchActiveDays(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	lastReport := time.Now().AddDate(0, 0, -1)
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Quest", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       lastReport,
+	}
+
+	now := time.Now()
+	// Two completions in one side-quest report (easy 2 + medium 3 = 5 points).
+	if _, err := uc.ExecuteSideQuest(ctx, "u", "Quest", "Side quest: Jalan Kaki, Chair Squat", 2, 5, 0, now); err != nil {
+		t.Fatalf("side quest: %v", err)
+	}
+
+	r := repo.reports["u"]
+	if r.ActivityCount != 30 || r.SeasonalActivityCount != 30 {
+		t.Errorf("side quest: active-day counters must not change, got %d/%d", r.ActivityCount, r.SeasonalActivityCount)
+	}
+	if r.Streak != 3 {
+		t.Errorf("side quest: streak must not change, got %d", r.Streak)
+	}
+	if !r.LastReportDate.Equal(lastReport) {
+		t.Errorf("side quest: LastReportDate must not change, got %v", r.LastReportDate)
+	}
+	if r.TotalSideQuests != 2 || r.SeasonalSideQuests != 2 {
+		t.Errorf("side quest: expected 2 completions, got %d/%d", r.TotalSideQuests, r.SeasonalSideQuests)
+	}
+	if r.SeasonalPoints != 5 || r.TotalPoints != 5 {
+		t.Errorf("side quest: expected +5 difficulty points, got season=%d total=%d", r.SeasonalPoints, r.TotalPoints)
+	}
+}
+
+// TestReportActivity_YesterdayRejectedWhenAlreadyLogged ensures /lapor-kemarin
+// cannot award a second active day for a yesterday that already has a regular
+// report.
+func TestReportActivity_YesterdayRejectedWhenAlreadyLogged(t *testing.T) {
+	repo := &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	now := time.Now()
+	yesterday := domain.GetToday(now).AddDate(0, 0, -1)
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Catchup", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       now.AddDate(0, 0, -3),
+	}
+	repo.dailyCounts["u|"+yesterday.Format(time.DateOnly)] = 1
+
+	msg, err := uc.ExecuteYesterday(ctx, "u", "Catchup", nil)
+	if err != nil {
+		t.Fatalf("yesterday report: %v", err)
+	}
+	if !containsSubstring(msg, "sudah tercatat") {
+		t.Fatalf("expected already-logged rejection, got: %s", msg)
+	}
+	if r := repo.reports["u"]; r.ActivityCount != 30 || r.SeasonalActivityCount != 30 {
+		t.Fatalf("rejected catch-up must not change counters, got %d/%d", r.ActivityCount, r.SeasonalActivityCount)
+	}
+}
+
 // TestReportActivity_MultiAttributeGrantsSinglePoint verifies the attribute
 // fairness fix at the usecase level: a mixed session ("gym lalu lari dan
 // stretching") that matches three attribute categories grants exactly ONE
@@ -1169,7 +1406,7 @@ func TestReportActivity_MultiAttributeGrantsSinglePoint(t *testing.T) {
 		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
 		ActivityCount: 30, SeasonalActivityCount: 30,
 		SeasonalAchievements: allSeasonBadgeIDs(),
-		LastReportDate:        time.Now().AddDate(0, 0, -7),
+		LastReportDate:       time.Now().AddDate(0, 0, -7),
 		// Start above the attribute clamp floor so a single fair grant shows
 		// as a clean +1 delta on the chosen attribute and +0 on the rest.
 		Str: 5, Sta: 5, Agi: 5, Vit: 5,
@@ -1191,6 +1428,108 @@ func TestReportActivity_MultiAttributeGrantsSinglePoint(t *testing.T) {
 	if r.Sta-staBefore != 0 || r.Agi-agiBefore != 0 || r.Vit-vitBefore != 0 {
 		t.Fatalf("other attributes must not gain: STA Δ%d AGI Δ%d VIT Δ%d, want all 0",
 			r.Sta-staBefore, r.Agi-agiBefore, r.Vit-vitBefore)
+	}
+}
+
+// walkTrackingRepo records AddWalkSteps calls so tests can assert when (and
+// for which date) walk steps are credited to the activity ledger.
+type walkTrackingRepo struct {
+	*mockRepo
+	walkAdds []walkAdd
+}
+
+type walkAdd struct {
+	date  time.Time
+	steps int
+}
+
+func (m *walkTrackingRepo) AddWalkSteps(ctx context.Context, userID string, date time.Time, delta int) error {
+	m.walkAdds = append(m.walkAdds, walkAdd{date: date, steps: delta})
+	return nil
+}
+
+// TestReportActivity_YesterdayWalkRejectedDoesNotCreditSteps is the regression
+// test for the /lapor-kemarin walk bug: the old executeYesterdayWithWalk
+// wrapper credited steps whenever err == nil, but rejections also return
+// (message, nil) — so a rejected catch-up still banked the steps. Steps must
+// only be credited on the accepted path.
+func TestReportActivity_YesterdayWalkRejectedDoesNotCreditSteps(t *testing.T) {
+	repo := &walkTrackingRepo{mockRepo: &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	now := time.Now()
+	yesterday := domain.GetToday(now).AddDate(0, 0, -1)
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Walker", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       now.AddDate(0, 0, -3),
+		WalkStepsTotal:       1000, SeasonalWalkSteps: 1000,
+	}
+	// Yesterday already has a regular report -> the catch-up is rejected.
+	repo.dailyCounts["u|"+yesterday.Format(time.DateOnly)] = 1
+
+	msg, err := uc.ExecuteYesterdayWithMessage(ctx, "u", "Walker", "/lapor-kemarin jalan kaki 5000", nil)
+	if err != nil {
+		t.Fatalf("yesterday walk report: %v", err)
+	}
+	if !containsSubstring(msg, "sudah tercatat") {
+		t.Fatalf("expected already-logged rejection, got: %s", msg)
+	}
+	if len(repo.walkAdds) != 0 {
+		t.Fatalf("rejected report must not credit walk steps, got %d additions: %+v", len(repo.walkAdds), repo.walkAdds)
+	}
+	if r := repo.reports["u"]; r.WalkStepsTotal != 1000 || r.SeasonalWalkSteps != 1000 {
+		t.Fatalf("rejected report must not change walk totals, got %d/%d", r.WalkStepsTotal, r.SeasonalWalkSteps)
+	}
+}
+
+// TestReportActivity_YesterdayWalkAcceptedCreditsSteps is the positive control:
+// an accepted /lapor-kemarin jalan kaki credits yesterday's ledger exactly
+// once and bumps the profile walk totals.
+func TestReportActivity_YesterdayWalkAcceptedCreditsSteps(t *testing.T) {
+	repo := &walkTrackingRepo{mockRepo: &mockRepo{
+		reports:       make(map[string]*domain.Report),
+		dailyCounts:   make(map[string]int),
+		activityDates: make(map[string][]time.Time),
+	}}
+	uc := usecase.NewReportActivityUsecase(repo)
+	ctx := context.Background()
+	now := time.Now()
+	yesterday := domain.GetToday(now).AddDate(0, 0, -1)
+	repo.reports["u"] = &domain.Report{
+		UserID: "u", Name: "Walker", JobClass: "fighter",
+		Streak: 3, MaxStreak: 5, SeasonalMaxStreak: 5,
+		ActivityCount: 30, SeasonalActivityCount: 30,
+		SeasonalAchievements: allSeasonBadgeIDs(),
+		LastReportDate:       now.AddDate(0, 0, -3),
+		WalkStepsTotal:       1000, SeasonalWalkSteps: 1000,
+	}
+
+	msg, err := uc.ExecuteYesterdayWithMessage(ctx, "u", "Walker", "/lapor-kemarin jalan kaki 5000", nil)
+	if err != nil {
+		t.Fatalf("yesterday walk report: %v", err)
+	}
+	if !containsSubstring(msg, "Laporan kemarin diterima") {
+		t.Fatalf("expected acceptance, got: %s", msg)
+	}
+	if len(repo.walkAdds) != 1 {
+		t.Fatalf("accepted report must credit walk steps exactly once, got %d: %+v", len(repo.walkAdds), repo.walkAdds)
+	}
+	add := repo.walkAdds[0]
+	if add.steps != 5000 || !add.date.Equal(yesterday) {
+		t.Fatalf("walk credit = %+v, want 5000 steps on %s", add, yesterday.Format(time.DateOnly))
+	}
+	if r := repo.reports["u"]; r.WalkStepsTotal != 6000 || r.SeasonalWalkSteps != 6000 {
+		t.Fatalf("walk totals = %d/%d, want 6000/6000", r.WalkStepsTotal, r.SeasonalWalkSteps)
+	}
+	if !containsSubstring(msg, "Langkah kemarin") {
+		t.Fatalf("response should announce the credited steps, got: %s", msg)
 	}
 }
 

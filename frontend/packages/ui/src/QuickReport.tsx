@@ -33,6 +33,7 @@ const QUICK_CHIPS = [
   { label: "Gym", icon: Dumbbell, message: "Gym hari ini" },
   { label: "Lari", icon: Footprints, message: "Lari" },
   { label: "Sepeda", icon: Bike, message: "Sepeda" },
+  { label: "Jalan", icon: Footprints, message: "jalan kaki" },
   { label: "Olahraga", icon: Activity, message: "Olahraga" },
 ];
 
@@ -144,7 +145,7 @@ export function QuickReport({
       {/* Main report form */}
       <form onSubmit={handleSubmit} className="mb-3">
         <div className="flex gap-2">
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-0">
             <input
               ref={inputRef}
               type="text"
@@ -244,7 +245,7 @@ export function QuickReport({
                 onChange={(e) => setSidequestInput(e.target.value)}
                 placeholder="pushup 15"
                 disabled={submitting}
-                className="flex-1 px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-base sm:text-sm font-mono text-white placeholder:text-gray-600 focus:outline-none focus:border-system-green/50 transition-all disabled:opacity-50"
+                className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-base sm:text-sm font-mono text-white placeholder:text-gray-600 focus:outline-none focus:border-system-green/50 transition-all disabled:opacity-50"
               />
               <button
                 type="submit"

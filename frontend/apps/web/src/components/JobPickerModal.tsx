@@ -27,7 +27,12 @@ export const JobPickerModal: React.FC<JobPickerModalProps> = ({
       {/* Backdrop click dismiss */}
       <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg overflow-hidden glass rounded-3xl p-6 md:p-8 z-10 max-h-[90vh] flex flex-col">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Pilih job class"
+        className="relative w-full max-w-lg overflow-hidden glass rounded-3xl p-6 md:p-8 z-10 max-h-[90vh] flex flex-col animate-scale-in"
+      >
         {/* Header */}
         <div className="flex items-start justify-between mb-5 border-b border-gray-800 pb-4 shrink-0">
           <div>

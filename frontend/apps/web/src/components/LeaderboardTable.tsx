@@ -7,6 +7,9 @@ import {
   Award,
   CalendarDays,
   Swords,
+  Footprints,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type {
   EnrichedReport,
@@ -18,6 +21,7 @@ import type {
 import { SeasonalRow } from "./leaderboard/rows/SeasonalRow";
 import { LifetimeRow } from "./leaderboard/rows/LifetimeRow";
 import { StreakRow } from "./leaderboard/rows/StreakRow";
+import { WalkRow } from "./leaderboard/rows/WalkRow";
 import { WeekRow } from "./leaderboard/rows/WeekRow";
 import { AttributeRow } from "./leaderboard/rows/AttributeRow";
 import { useLeaderboardData } from "./leaderboard/useLeaderboardData";
@@ -46,6 +50,7 @@ const LEADERBOARD_TABS: {
   { id: "seasonal", label: "Season Rank", icon: Trophy },
   { id: "lifetime", label: "Lifetime XP", icon: Award },
   { id: "streak", label: "Streak Masters", icon: Flame },
+  { id: "walk", label: "Jalan Kaki", icon: Footprints },
   { id: "week", label: "Minggu Ini", icon: CalendarDays },
   { id: "attributes", label: "Attributes", icon: Swords },
 ];
@@ -66,6 +71,7 @@ const STREAK_SUB_TABS: { id: StreakTab; label: string }[] = [
 ];
 
 const TABLE_HEADERS: Record<LeaderboardTab, string[]> = {
+  walk: ["Rank", "Hunter", "Job", "Langkah Minggu Ini", "Langkah Season", "Lifetime Langkah"],
   seasonal: [
     "Rank",
     "Hunter",
@@ -123,8 +129,17 @@ const TABLE_HEADERS: Record<LeaderboardTab, string[]> = {
   ],
 };
 
-const rowClass = (rank: number) =>
-  `group transition-all hover:bg-gray-800/20 cursor-pointer ${rank < 3 ? "bg-gradient-to-r from-gray-950/20 to-transparent" : ""}`;
+const rowClass = (rank: number) => {
+  const podium =
+    rank === 0
+      ? "tr-podium-1"
+      : rank === 1
+        ? "tr-podium-2"
+        : rank === 2
+          ? "tr-podium-3"
+          : "";
+  return `group transition-all hover:bg-gray-800/20 cursor-pointer ${podium}`;
+};
 
 export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
   hunters,
@@ -211,6 +226,16 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
               onSelectHunter={onSelectHunter}
             />
           );
+        case "walk":
+          return (
+            <WalkRow
+              key={hunter.user_id}
+              hunter={hunter}
+              rank={rank}
+              rowClass={rc}
+              onSelectHunter={onSelectHunter}
+            />
+          );
         case "week":
           return (
             <WeekRow
@@ -242,17 +267,25 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
   return (
     <div className="glass rounded-3xl p-5 md:p-6 mb-8">
       <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between mb-6 border-b border-gray-850 pb-5">
-        <div className="flex flex-wrap bg-gray-950/80 p-1.5 rounded-xl border border-gray-800/60 max-w-fit">
+        <div className="flex flex-nowrap overflow-x-auto scrollbar-none gap-1 bg-gray-950/80 p-1.5 rounded-xl border border-gray-800/60 w-full lg:w-auto lg:max-w-fit">
           {LEADERBOARD_TABS.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
+                aria-pressed={active}
+                onClick={(e) => {
+                  handleTabChange(tab.id);
+                  e.currentTarget.scrollIntoView({
+                    behavior: "smooth",
+                    inline: "center",
+                    block: "nearest",
+                  });
+                }}
+                className={`btn-press flex shrink-0 whitespace-nowrap items-center gap-2 px-4 py-2 min-h-[40px] rounded-lg text-xs font-bold font-orbitron tracking-wider transition-all uppercase ${
                   active
-                    ? "bg-gradient-to-r from-system-blue to-system-purple text-white shadow-neon-purple"
+                    ? "bg-gradient-to-r from-system-green to-system-volt text-gray-950 shadow-neon-volt"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/60"
                 }`}
               >
@@ -263,8 +296,8 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
           })}
         </div>
 
-        <div className="flex gap-2 items-center">
-          <div className="relative">
+        <div className="flex gap-2 items-center w-full lg:w-auto">
+          <div className="relative flex-1 lg:flex-none min-w-0">
             <Search
               size={14}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
@@ -273,10 +306,10 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari hunter…"
-              className="pl-9 pr-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-system-blue/50 transition-colors w-40"
+              className="w-full lg:w-40 pl-9 pr-3 py-2 min-h-[40px] rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-system-volt/60 focus:shadow-neon-volt transition-all"
             />
           </div>
-          <div className="relative">
+          <div className="relative shrink-0">
             <SlidersHorizontal
               size={14}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
@@ -284,7 +317,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
             <select
               value={selectedJob}
               onChange={(e) => setSelectedJob(e.target.value)}
-              className="pl-9 pr-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-200 focus:outline-none focus:border-system-blue/50 transition-colors appearance-none cursor-pointer"
+              className="pl-9 pr-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-200 focus:outline-none focus:border-system-volt/60 focus:shadow-neon-volt transition-all appearance-none cursor-pointer"
             >
               {JOB_FILTER_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>
@@ -304,7 +337,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
               <button
                 key={sub.id}
                 onClick={() => handleAttributeSubTabChange(sub.id)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold font-mono tracking-wider transition-all uppercase ${
+                className={`btn-press px-3 py-1.5 rounded-lg text-[10px] font-bold font-mono tracking-wider transition-all uppercase ${
                   active
                     ? "bg-gradient-to-r from-system-red to-system-gold text-white"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/60"
@@ -325,7 +358,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
               <button
                 key={sub.id}
                 onClick={() => handleStreakSubTabChange(sub.id)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold font-mono tracking-wider transition-all uppercase ${
+                className={`btn-press px-3 py-1.5 rounded-lg text-[10px] font-bold font-mono tracking-wider transition-all uppercase ${
                   active
                     ? "bg-gradient-to-r from-system-gold to-system-red text-white"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/60"
@@ -338,8 +371,8 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div key={activeTab} className="overflow-x-auto animate-fade-in">
+        <table className="w-full tnum">
           <thead>
             <tr className="border-b border-gray-800/80">
               {tableHeaders.map((header, i) => (
@@ -372,7 +405,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
       )}
 
       {totalPages > 1 && (
-        <nav className="flex items-center justify-between mt-6 pt-4 border-t border-gray-800/60">
+        <nav className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6 pt-4 border-t border-gray-800/60">
           <p className="text-xs font-mono text-gray-500">
             Menampilkan {pageStartRank + 1}–
             {Math.min(pageStartRank + visibleHunters.length, totalCount)} dari{" "}
@@ -383,20 +416,22 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
               type="button"
               onClick={() => goToPage(safePage - 1)}
               disabled={safePage <= 1}
-              className="px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white transition-colors"
+              className="btn-press flex items-center gap-1 px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white hover:border-system-volt/40 transition-colors"
             >
+              <ChevronLeft size={14} />
               Previous
             </button>
-            <span className="px-3 py-2 text-xs font-mono text-gray-500">
+            <span className="px-3 py-2 text-xs font-mono text-gray-500 tnum">
               Page {safePage} / {totalPages}
             </span>
             <button
               type="button"
               onClick={() => goToPage(safePage + 1)}
               disabled={safePage >= totalPages}
-              className="px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white transition-colors"
+              className="btn-press flex items-center gap-1 px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs font-mono text-gray-300 disabled:opacity-40 hover:text-white hover:border-system-volt/40 transition-colors"
             >
               Next
+              <ChevronRight size={14} />
             </button>
           </div>
         </nav>

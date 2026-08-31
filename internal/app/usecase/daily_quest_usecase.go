@@ -20,6 +20,12 @@ type DailyQuestUsecase struct {
 	repo domain.ReportRepository
 }
 
+// Easy cardio thresholds, shared with the morning prompt and display text.
+const (
+	easyCardioWalkSteps = 4000
+	easyCardioBikeKm    = 5
+)
+
 func NewDailyQuestUsecase(repo domain.ReportRepository) *DailyQuestUsecase {
 	return &DailyQuestUsecase{repo: repo}
 }
@@ -87,7 +93,7 @@ func (u *DailyQuestUsecase) SendDailyQuests(ctx context.Context, now time.Time, 
 	}
 
 	dateStr := domain.GetToday(now).Format("02 Jan 2006")
-	msgText := fmt.Sprintf("🌅 *Selamat pagi, Hunters!*\n\nSide quest hari ini sudah terbuka untuk %d hunter yang sudah memilih job. Buka `/lapor sidequest` untuk lihat pilihan easy, medium, dan hard hari ini.\n\nPilih yang ringan dulu juga boleh—minimal jalan kaki 4.000 langkah atau sepeda 5 km, atau gerakan singkat di rumah/kantor. Side quest cuma bonus kecil; misi utama tetap konsisten olahraga dan lapor di grup. ✨\n\n📅 %s\n📝 Lapor side quest: `/lapor sidequest <kegiatan> <jumlah>`\n\n🌐 Lihat klasemen & stats: https://lapor-bot.web.id/", eligibleCount, dateStr)
+	msgText := fmt.Sprintf("🌅 *Selamat pagi, Hunters!*\n\nSide quest hari ini sudah terbuka untuk %d hunter yang sudah memilih job. Buka `/lapor sidequest` untuk lihat pilihan easy, medium, dan hard hari ini.\n\nPilih yang ringan dulu juga boleh—minimal jalan kaki 4.000 langkah (masuk leaderboard langkah!) atau sepeda 5 km, atau gerakan singkat di rumah/kantor. Side quest cuma bonus kecil; misi utama tetap konsisten olahraga dan lapor di grup. ✨\n\n📅 %s\n📝 Lapor side quest: `/lapor sidequest <kegiatan> <jumlah>`\n\n🌐 Lihat klasemen & stats: https://lapor-bot.web.id/", eligibleCount, dateStr)
 
 	targetJID, err := types.ParseJID(groupID)
 	if err != nil {
@@ -201,6 +207,10 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 	var completedTasks []string
 	var rejected []string
 	totalSideQuestPoints := 0
+	// Walk steps completed through the easy cardio quest are credited to the
+	// same walk-step ledger used by the main /lapor (leaderboard + totals),
+	// so side-quest walking shows up on the walk ranking.
+	walkStepsForCredit := 0
 
 	for _, line := range inputLines {
 		namePart, val := parseLineFloat(line)
@@ -218,7 +228,7 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 				matched = true
 				added := 0
 				if task.ID == "easycardio" {
-					if !isEasyCardioComplete(namePart, val) {
+					if !completeEasyCardio(namePart, line, val, &walkStepsForCredit) {
 						rejected = append(rejected, fmt.Sprintf("%s butuh minimal jalan kaki 4000 langkah atau sepeda 5 km, laporanmu baru %s", task.Name, formatEasyCardioReport(namePart, val)))
 						continue
 					}
@@ -277,7 +287,10 @@ func (u *DailyQuestUsecase) UpdateProgress(ctx context.Context, userID, name str
 	}
 
 	activityText := "Side quest: " + strings.Join(completedTasks, ", ")
-	reportResult, err := reportUC.ExecuteSideQuest(ctx, userID, name, activityText, len(completedTasks), totalSideQuestPoints, now)
+	if walkStepsForCredit > 0 {
+		activityText += fmt.Sprintf(" (%s langkah)", domain.FormatStepsID(walkStepsForCredit))
+	}
+	reportResult, err := reportUC.ExecuteSideQuest(ctx, userID, name, activityText, len(completedTasks), totalSideQuestPoints, walkStepsForCredit, now)
 	if err != nil {
 		return "", err
 	}
@@ -366,7 +379,7 @@ func parseLineFloat(line string) (string, float64) {
 
 func formatQuestTarget(task domain.QuestTask) string {
 	if task.ID == "easycardio" {
-		return "4000 langkah / 5 km"
+		return fmt.Sprintf("%d langkah / %d km", easyCardioWalkSteps, easyCardioBikeKm)
 	}
 	return formatQuestValue(task, task.Target)
 }
@@ -384,12 +397,27 @@ func formatQuestValue(task domain.QuestTask, value int) string {
 	return fmt.Sprintf("%d %s", value, task.Unit)
 }
 
-func isEasyCardioComplete(namePart string, value float64) bool {
-	if domain.MatchTask(namePart, "jalan") {
-		return value >= 4000
-	}
+// completeEasyCardio reports whether an easy-cardio line satisfies the quest
+// and records the earned walk steps. Walking uses the robust walk parser
+// (thousand separators, rb/ribu/k suffixes, Strava links) so "jalan 4.000",
+// "jalan 4rb" and pasted links all parse; the step count is credited to the
+// walk ledger. Cycling stays all-or-nothing at 5 km with no step credit.
+func completeEasyCardio(namePart, line string, val float64, walkSteps *int) bool {
 	if domain.MatchTask(namePart, "sepeda") {
-		return value >= 5 && value < 1000 || value >= 5000
+		return val >= easyCardioBikeKm
+	}
+	if steps, ok := domain.ParseWalkReport(line); ok {
+		if steps >= easyCardioWalkSteps {
+			*walkSteps += steps
+			return true
+		}
+		return false
+	}
+	// Not a parseable step count (e.g. "jalan 30 menit"): fall back to the
+	// raw value so a plain step number still works.
+	if val >= easyCardioWalkSteps {
+		*walkSteps += int(val)
+		return true
 	}
 	return false
 }

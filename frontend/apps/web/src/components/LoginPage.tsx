@@ -50,7 +50,7 @@ export function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4">
-      <div className="w-full max-w-md glass rounded-3xl p-8 border border-system-green/20">
+      <div className="w-full max-w-md glass glass-glow-volt rounded-3xl p-8 border border-system-volt/25 animate-scale-in">
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={onBack}
@@ -124,7 +124,7 @@ export function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-system-blue/10 hover:bg-system-blue/20 border border-system-blue/30 text-system-blue font-bold font-orbitron text-sm tracking-wider uppercase transition-colors disabled:opacity-50"
+            className="btn-press w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-system-green to-system-volt border border-system-volt/40 text-gray-950 font-bold font-orbitron text-sm tracking-wider uppercase shadow-neon-volt hover:brightness-110 transition-all disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="animate-spin" size={16} />

@@ -54,6 +54,9 @@ export interface EnrichedReport {
   vit: number;
   end: number;
   luk: number;
+  walk_steps_total?: number;
+  seasonal_walk_steps?: number;
+  week_walk_steps?: number;
   rank_name: string;
   rank_icon: string;
   season_rank_progress: TierProgress;
@@ -93,6 +96,62 @@ export interface PersonalGoal {
   is_completed: boolean;
   completed_at?: string;
   days: GoalDay[];
+}
+
+/**
+ * A structured training program (program latihan) assigned to a user.
+ * Backend does not exist yet - this is the forward contract for the
+ * upcoming program feature. The UI renders from this shape once wired.
+ */
+export interface TrainingProgram {
+  id: string;
+  title: string;
+  description?: string;
+  /** ISO date the program starts (YYYY-MM-DD). */
+  start_date: string;
+  /** ISO date the program ends (YYYY-MM-DD). */
+  end_date?: string;
+  /** Program-level completion 0-100. */
+  progress_percent: number;
+  /** Total sessions in the program. */
+  total_sessions: number;
+  /** Sessions the user has completed. */
+  completed_sessions: number;
+  /** Weekly cadence target (e.g. 3 = 3x per week). */
+  sessions_per_week: number;
+  /** Optional structured weeks of the program. */
+  weeks?: TrainingWeek[];
+  /** Marked active when the program is the user's current one. */
+  is_active?: boolean;
+}
+
+export interface TrainingWeek {
+  week_number: number;
+  title?: string;
+  sessions: TrainingSession[];
+}
+
+export interface TrainingSession {
+  id: string;
+  /** Session title, e.g. "Push Day" or "Lari Interval". */
+  title: string;
+  /** ISO date the session is scheduled (YYYY-MM-DD). */
+  scheduled_date: string;
+  /** Session-level completion 0-100. */
+  progress_percent: number;
+  is_completed: boolean;
+  /** Optional exercises / moves inside the session. */
+  exercises?: TrainingExercise[];
+}
+
+export interface TrainingExercise {
+  id: string;
+  name: string;
+  /** Target value, e.g. "10", "5 km", "30 menit". */
+  target: string;
+  /** Best-effort result logged by the user, when reported. */
+  result?: string;
+  is_completed: boolean;
 }
 
 export interface QuestTask {
@@ -136,6 +195,7 @@ export type LeaderboardTab =
   | "lifetime"
   | "streak"
   | "week"
+  | "walk"
   | "attributes";
 
 export type AttributeTab =
@@ -155,6 +215,9 @@ export type LeaderboardSortKey =
   | "weekly_streak"
   | "daily_streak"
   | "weekly_activity"
+  | "walk_steps"
+  | "walk_steps_week"
+  | "walk_steps_season"
   | "attribute_overall"
   | "attribute_str"
   | "attribute_sta"

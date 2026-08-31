@@ -68,10 +68,10 @@ func TestDailyStreakFromDates(t *testing.T) {
 	today := time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC)
 
 	cases := []struct {
-		name   string
-		dates  []time.Time
-		today  time.Time
-		want   int
+		name  string
+		dates []time.Time
+		today time.Time
+		want  int
 	}{
 		{
 			name:  "no history counts today only",
