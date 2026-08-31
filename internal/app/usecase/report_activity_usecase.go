@@ -41,6 +41,23 @@ const (
 	weeklyStreakBonusCap     = 5 // max +10 pts per report from weekly streak
 	dailyStreakBonusPerStep  = 1
 	dailyStreakBonusCap      = 5 // max +5 pts per report from daily streak
+
+	// Newcomer boost: +5 pts per report for the first 2 weeks (14 days) to
+	// help new users close the gap with long-streak veterans.
+	newcomerBoostPoints   = 5
+	newcomerDaysThreshold = 14
+
+	// Season catch-up bonus: +5 pts per report for users who join mid-season
+	// (first week of season activity). Helps late joiners stay competitive.
+	seasonCatchUpBonus      = 5
+	seasonCatchUpDaysWindow = 7
+
+	// Diminishing returns on weekly streak bonus after 8 weeks.
+	// The bonus multiplier decreases linearly from 100% to 50% between
+	// week 8 and week 16, preventing runaway XP for very long streaks.
+	diminishingReturnsStartWeek = 8
+	diminishingReturnsFloorWeek = 16
+	diminishingReturnsFloorPct  = 50
 )
 
 type typedActivityRepository interface {
@@ -387,8 +404,10 @@ func (uc *ReportActivityUsecase) execute(ctx context.Context, userID, name strin
 		attrs, _ := domain.ResolveReportAttributes(activityForParse, report.JobClass)
 		chosenAttrs := selectMageAttributes(attrs, report.JobClass,
 			attributeSelectionSeed(userID, activityKind, today.Format(time.DateOnly), dailyCount+1, activityForParse))
-		chosenAttribute = string(chosen)
-		statGains = applyAttributeGains(report, []domain.AttributeType{chosen}, AttributeGainPerReport)
+		if len(chosenAttrs) > 0 {
+			chosenAttribute = string(chosenAttrs[0])
+		}
+		statGains = applyAttributeGains(report, chosenAttrs, AttributeGainPerReport)
 	}
 
 	var newAchievements []domain.Achievement
@@ -785,8 +804,10 @@ func (uc *ReportActivityUsecase) executeYesterday(ctx context.Context, userID, n
 		attrs, _ := domain.ResolveReportAttributes(activityForParse, report.JobClass)
 		chosenAttrs := selectMageAttributes(attrs, report.JobClass,
 			attributeSelectionSeed(userID, domain.ActivityKindRegularReport, yesterday.Format(time.DateOnly), dailyCount+1, activityForParse))
-		chosenAttribute = string(chosen)
-		statGains = applyAttributeGains(report, []domain.AttributeType{chosen}, AttributeGainPerReport)
+		if len(chosenAttrs) > 0 {
+			chosenAttribute = string(chosenAttrs[0])
+		}
+		statGains = applyAttributeGains(report, chosenAttrs, AttributeGainPerReport)
 	}
 
 	newAchievements := domain.CheckNewSeasonAchievements(report)
