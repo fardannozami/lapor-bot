@@ -538,6 +538,54 @@ func main() {
 		},
 	})
 
+	// One-time announcement for the new season (Season 2 starts Sep 1, 2026).
+	// Fires at 07:00 WIB on the day after the season starts, tagging all members.
+	tomorrow := time.Now().In(jakartaLoc).AddDate(0, 0, 1)
+	seasonAnnouncementAt := time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 7, 0, 0, 0, jakartaLoc)
+	sched.AddJob(&scheduler.Job{
+		Name:    "season-start-announcement",
+		Freq:    scheduler.OneShotSchedule{FireAt: seasonAnnouncementAt},
+		Recover: false,
+		Fn: func(ctx context.Context) error {
+			if cfg.GroupID == "" || !waService.IsLoggedIn() || !waService.GetClient().IsConnected() {
+				return fmt.Errorf("not connected or no group configured")
+			}
+			client := waService.GetClient()
+			groupJID, err := types.ParseJID(cfg.GroupID)
+			if err != nil {
+				return fmt.Errorf("invalid GroupID: %w", err)
+			}
+
+			info, err := client.GetGroupInfo(ctx, groupJID)
+			if err != nil {
+				return fmt.Errorf("failed to fetch group info: %w", err)
+			}
+
+			var mentions []string
+			for _, p := range info.Participants {
+				if p.JID.IsEmpty() {
+					continue
+				}
+				mentions = append(mentions, p.JID.ToNonAD().String())
+			}
+
+			now := time.Now().In(jakartaLoc)
+			sessionNumber, _ := usecase.GetCurrentSessionInfo(now)
+			text := usecase.SeasonAnnouncement(sessionNumber)
+
+			msg := &waE2E.Message{
+				ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+					Text: &text,
+					ContextInfo: &waE2E.ContextInfo{
+						MentionedJID: mentions,
+					},
+				},
+			}
+			log.Printf("[SCHEDULER] Sending Season %d start announcement with %d mentions", sessionNumber, len(mentions))
+			return sender.SendHighPriority(ctx, groupJID, msg)
+		},
+	})
+
 	sched.Start()
 
 	log.Printf("Starting HTTP server on port %s", cfg.Port)

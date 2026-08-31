@@ -166,6 +166,13 @@ Semua peserta mulai dari titik yang sama untuk seasonal ranking. Tapi level dan 
 *Semangat Season %d!* 🚀🔥`, sessionNumber, seasonTransition, sessionNumber, sessionNumber, sessionNumber)
 }
 
+// SeasonAnnouncement returns the standard "new season has begun" announcement
+// text for the given session number. It is exported so the bot can announce a
+// season start independently (e.g. via a scheduled one-shot message).
+func SeasonAnnouncement(sessionNumber int) string {
+	return buildSeasonResetAnnouncement(sessionNumber)
+}
+
 // ScheduleSessionReset starts a background goroutine that automatically resets
 // season data every 4 months (Jan 1, May 1, Sep 1) at 00:00 WIB.
 // It loops forever, scheduling the next reset after each one completes.

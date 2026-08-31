@@ -35,6 +35,19 @@ func (d DailySchedule) Next(now time.Time) time.Time {
 	return today
 }
 
+// OneShotSchedule fires exactly once at the given time. After that moment
+// passes, Next returns a zero time so the owning job stops scheduling.
+type OneShotSchedule struct {
+	FireAt time.Time
+}
+
+func (o OneShotSchedule) Next(now time.Time) time.Time {
+	if now.Before(o.FireAt) {
+		return o.FireAt
+	}
+	return time.Time{}
+}
+
 // WeeklySchedule fires once per week on the specified weekday, hour, and minute
 // in the given location.
 type WeeklySchedule struct {
@@ -137,6 +150,10 @@ func (s *Scheduler) runJob(job *Job) {
 	}
 
 	for {
+		if job.nextRun.IsZero() {
+			log.Printf("[SCHEDULER] %s: no further runs scheduled, stopping", job.Name)
+			return
+		}
 		delay := time.Until(job.nextRun)
 		log.Printf("[SCHEDULER] %s: next run at %v (in %v)", job.Name, job.nextRun, delay.Round(time.Second))
 

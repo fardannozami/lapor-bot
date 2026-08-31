@@ -104,6 +104,81 @@ func TestWeeklyScheduleNext(t *testing.T) {
 	}
 }
 
+func TestOneShotScheduleNext(t *testing.T) {
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	fireAt := time.Date(2026, time.September, 1, 7, 0, 0, 0, loc)
+
+	tests := []struct {
+		name     string
+		now      time.Time
+		expected time.Time
+		zero     bool
+	}{
+		{
+			name:     "before fire time returns fire time",
+			now:      time.Date(2026, time.August, 31, 23, 59, 0, 0, loc),
+			expected: fireAt,
+		},
+		{
+			name:     "at fire time returns zero (already fired)",
+			now:      fireAt,
+			zero:     true,
+		},
+		{
+			name:     "after fire time returns zero",
+			now:      fireAt.Add(5 * time.Minute),
+			zero:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := (OneShotSchedule{FireAt: fireAt}).Next(tt.now)
+			if tt.zero {
+				if !got.IsZero() {
+					t.Errorf("Next() = %v, want zero time", got)
+				}
+				return
+			}
+			if !got.Equal(tt.expected) {
+				t.Errorf("Next() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSchedulerOneShotStops(t *testing.T) {
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var fired int32
+	sched := NewScheduler(ctx)
+
+	// A one-shot that fires ~100ms from now, then should stop scheduling.
+	fireAt := time.Now().In(loc).Add(100 * time.Millisecond)
+	sched.AddJob(&Job{
+		Name:    "one-shot-test",
+		Freq:    OneShotSchedule{FireAt: fireAt},
+		Recover: false,
+		Fn: func(ctx context.Context) error {
+			atomic.AddInt32(&fired, 1)
+			return nil
+		},
+	})
+
+	sched.Start()
+
+	// Give it time to fire the one-shot.
+	time.Sleep(400 * time.Millisecond)
+	sched.Stop()
+
+	count := atomic.LoadInt32(&fired)
+	if count != 1 {
+		t.Errorf("One-shot job should have fired exactly once, got %d", count)
+	}
+}
+
 func TestParseDaily(t *testing.T) {
 	loc := time.UTC
 
