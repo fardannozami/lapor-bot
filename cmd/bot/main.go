@@ -538,8 +538,8 @@ func main() {
 		},
 	})
 
-	// One-time announcement for the new season (Season 2 starts Sep 1, 2026).
-	// Fires at 07:00 WIB on the day after the season starts, tagging all members.
+	// One-time announcement: full fresh start (Season 1 was a trial, all data
+	// wiped). Fires at 07:00 WIB on the day after, tagging all members.
 	tomorrow := time.Now().In(jakartaLoc).AddDate(0, 0, 1)
 	seasonAnnouncementAt := time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 7, 0, 0, 0, jakartaLoc)
 	sched.AddJob(&scheduler.Job{
@@ -569,9 +569,7 @@ func main() {
 				mentions = append(mentions, p.JID.ToNonAD().String())
 			}
 
-			now := time.Now().In(jakartaLoc)
-			sessionNumber, _ := usecase.GetCurrentSessionInfo(now)
-			text := usecase.SeasonAnnouncement(sessionNumber)
+			text := usecase.FreshStartAnnouncement()
 
 			msg := &waE2E.Message{
 				ExtendedTextMessage: &waE2E.ExtendedTextMessage{
@@ -581,7 +579,7 @@ func main() {
 					},
 				},
 			}
-			log.Printf("[SCHEDULER] Sending Season %d start announcement with %d mentions", sessionNumber, len(mentions))
+			log.Printf("[SCHEDULER] Sending fresh-start announcement with %d mentions", len(mentions))
 			return sender.SendHighPriority(ctx, groupJID, msg)
 		},
 	})

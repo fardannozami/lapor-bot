@@ -173,6 +173,34 @@ func SeasonAnnouncement(sessionNumber int) string {
 	return buildSeasonResetAnnouncement(sessionNumber)
 }
 
+// FreshStartAnnouncement returns the announcement text for a full data wipe.
+// Unlike SeasonAnnouncement, it states that ALL data (including lifetime) has
+// been cleared so every hunter truly starts from zero. It is used when Season 1
+// was a trial and the whole database was reset.
+func FreshStartAnnouncement() string {
+	return `🔄 *MULAI BARU DARI NOL!* 🔄
+
+Halo para pejuang keringat! 🏋️‍♂️
+
+Season 1 kemarin adalah *masa trial*, dan sistem poinnya masih belum stabil. Jadi sekarang kita mulai *benar-benar dari 0* — semua data dihapus total! 🧹
+
+✅ *Yang di-reset penuh:*
+• 📊 Points, EXP & Level — kembali ke 0
+• 🔥 Streak & Max Streak — semua kembali ke 0
+• 🏅 Semua Achievements & Badges — mulai dikumpulkan lagi
+• 📅 Riwayat Aktivitas & Goals — dibersihkan
+• 🎭 Atribut (STR/STA/AGI/VIT/END/LUK) — reset ke baseline
+• 🏆 Leaderboard & Rank — kosong, semua setara
+
+🎯 *Kenapa di-reset?*
+Karena nilai & aturan Season 1 masih trial dan belum final. Supaya adil, semua peserta mulai dari titik nol yang sama dengan sistem poin yang sudah disempurnakan. 💪
+
+📌 *Langkah pertama kamu di Season 2:*
+Kirim /lapor untuk laporan aktivitas pertama kamu dan mulai membangun skor dari awal!
+
+*Semangat Season 2 yang baru!* 🚀🔥
+`}
+
 // ScheduleSessionReset starts a background goroutine that automatically resets
 // season data every 4 months (Jan 1, May 1, Sep 1) at 00:00 WIB.
 // It loops forever, scheduling the next reset after each one completes.
