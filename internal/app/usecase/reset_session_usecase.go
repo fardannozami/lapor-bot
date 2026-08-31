@@ -101,8 +101,23 @@ func GetNextResetTime(now time.Time) time.Time {
 	return time.Date(year+1, SessionResetMonths[0], 1, 0, 0, 0, 0, loc)
 }
 
+// seasonResetMarker returns the idempotency marker name for a given season.
+func seasonResetMarker(sessionNumber int) string {
+	return fmt.Sprintf("session_reset_v1_%d", sessionNumber)
+}
+
 // Execute resets seasonal report data and sends an announcement to the group.
+// It is idempotent per season: the reset and announcement only run once, so
+// duplicate triggers (e.g. startup missed-reset check racing the scheduled
+// timer, or multiple bot instances) won't send the announcement twice.
 func (uc *ResetSessionUsecase) Execute(ctx context.Context, client *whatsmeow.Client, groupID string, sessionNumber int) error {
+	marker := seasonResetMarker(sessionNumber)
+	done, err := uc.repo.HasMigration(ctx, marker)
+	if err == nil && done {
+		log.Printf("[SESSION RESET] Season %d already reset; skipping duplicate.", sessionNumber)
+		return nil
+	}
+
 	log.Printf("[SESSION RESET] Starting Season %d reset — clearing seasonal data...", sessionNumber)
 
 	// Reset all reports in the database
@@ -126,6 +141,11 @@ func (uc *ResetSessionUsecase) Execute(ctx context.Context, client *whatsmeow.Cl
 			return fmt.Errorf("reset succeeded but failed to send announcement: %w", err)
 		}
 		log.Printf("[SESSION RESET] Season %d announcement sent to group!", sessionNumber)
+	}
+
+	// Record that this season's reset was performed so it can't run twice.
+	if err := uc.repo.SaveMigration(ctx, marker); err != nil {
+		log.Printf("[SESSION RESET] Failed to save reset marker: %v", err)
 	}
 
 	return nil
