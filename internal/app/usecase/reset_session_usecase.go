@@ -129,6 +129,10 @@ func (uc *ResetSessionUsecase) Execute(ctx context.Context, client *whatsmeow.Cl
 	log.Printf("[SESSION RESET] Seasonal data has been reset for Season %d!", sessionNumber)
 
 	// Send announcement to the group, tagging all members.
+	// WhatsApp silently drops ExtendedTextMessage with >256 MentionedJID
+	// entries, so we batch into chunks of 200.
+	const maxMentionsPerMessage = 200
+
 	if groupID != "" && client != nil && client.IsConnected() {
 		targetJID, err := types.ParseJID(groupID)
 		if err != nil {
@@ -147,20 +151,27 @@ func (uc *ResetSessionUsecase) Execute(ctx context.Context, client *whatsmeow.Cl
 			}
 
 			announcement := buildSeasonResetAnnouncement(sessionNumber)
-			msg := &waE2E.Message{
-				ExtendedTextMessage: &waE2E.ExtendedTextMessage{
-					Text: &announcement,
-					ContextInfo: &waE2E.ContextInfo{
-						MentionedJID: mentions,
+			for i := 0; i < len(mentions); i += maxMentionsPerMessage {
+				end := i + maxMentionsPerMessage
+				if end > len(mentions) {
+					end = len(mentions)
+				}
+				batch := mentions[i:end]
+				msg := &waE2E.Message{
+					ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+						Text: &announcement,
+						ContextInfo: &waE2E.ContextInfo{
+							MentionedJID: batch,
+						},
 					},
-				},
+				}
+				_, err := client.SendMessage(ctx, targetJID, msg)
+				if err != nil {
+					log.Printf("[SESSION RESET] Failed to send announcement batch %d/%d: %v", i/maxMentionsPerMessage+1, (len(mentions)+maxMentionsPerMessage-1)/maxMentionsPerMessage, err)
+					return fmt.Errorf("reset succeeded but failed to send announcement: %w", err)
+				}
 			}
-			_, err := client.SendMessage(ctx, targetJID, msg)
-			if err != nil {
-				log.Printf("[SESSION RESET] Failed to send announcement: %v", err)
-				return fmt.Errorf("reset succeeded but failed to send announcement: %w", err)
-			}
-			log.Printf("[SESSION RESET] Season %d announcement sent to group with %d mention(s)!", sessionNumber, len(mentions))
+			log.Printf("[SESSION RESET] Season %d announcement sent to group with %d mention(s) in %d batch(es)!", sessionNumber, len(mentions), (len(mentions)+maxMentionsPerMessage-1)/maxMentionsPerMessage)
 		}
 	}
 
@@ -173,32 +184,46 @@ func (uc *ResetSessionUsecase) Execute(ctx context.Context, client *whatsmeow.Cl
 }
 
 func buildSeasonResetAnnouncement(sessionNumber int) string {
-	seasonTransition := "Season perdana telah resmi dimulai. Semua hunter mulai berburu dari titik yang sama! 🎉"
 	if sessionNumber > 1 {
-		seasonTransition = fmt.Sprintf("Season %d telah resmi berakhir! 🎉", sessionNumber-1)
+		return fmt.Sprintf(`🚨✨ *SEASON %d RESMI DIMULAI!* ✨🚨
+
+🏆 *SEASON %d — START FROM ZERO!* 🏆
+
+Halo semua Hunters! 👋🔥
+
+Season %d kemarin adalah *masa TRIAL & ERROR* — sistem poin dan aturannya masih uji coba. Jadi untuk keadilan bersama, *semua data di-WIPE TOTAL!* 🧹💥
+
+📋 *Yang di-reset penuh:*
+• 💰 Points, EXP & Level → *0*
+• 🔥 Streak & Max Streak → *0*
+• 🏅 Achievements & Badges → *0*
+• 📅 Seasonal Activity & Goals → *0*
+• 🎭 Stats (STR/STA/AGI/VIT/END/LUK) → *baseline*
+• 🏆 Rank & Leaderboard → *kosong, semua SETARA!*
+
+🎯 *Semua peserta kembali ke titik nol yang sama!* Tidak ada yang diuntungkan, tidak ada yang dirugikan — adil untuk semua! 💪
+
+📌 *Langkah pertama di Season %d:*
+👉 Kirim */lapor* sekarang untuk laporan pertamamu dan mulai membangun skor dari awal!
+
+🌐 Lihat klasemen & stats: https://lapor-bot.web.id/
+
+*Siap berburu di Season %d? SEMANGAT!* 🚀🔥`, sessionNumber, sessionNumber, sessionNumber-1, sessionNumber, sessionNumber)
 	}
 
-	return fmt.Sprintf(`🔄 *SEASON %d TELAH DIMULAI!* 🔄
+	return fmt.Sprintf(`🎉 *SEASON %d TELAH DIMULAI!* 🎉
 
 Halo para pejuang keringat! 🏋️‍♂️
 
-%s
-
-Karena sistem masih dalam masa *trial & error*, kali ini semua data di-reset *penuh* dari nol! 🧹
-
-✅ *Yang di-reset total:*
-• 📊 Points, EXP & Level — kembali ke 0
-• 🔥 Streak & Max Streak — semua kembali ke 0
-• 📅 Seasonal Activity — kembali ke 0
-• 🏅 Semua Achievements & Badges — mulai dikumpulkan lagi
-• 🏆 Rank & Leaderboard — kosong, semua setara
-• 🛡️ Centurion Cycles & Streak Freeze — reset ke awal
+Season perdana telah resmi dimulai. Semua hunter mulai berburu dari titik yang sama! 🎯
 
 🆕 *Season %d dimulai SEKARANG — semua peserta mulai dari titik nol yang sama!* 💪
 
 📌 Langsung laporkan aktivitas pertamamu di Season %d dengan mengirim /lapor!
 
-*Semangat Season %d!* 🚀🔥`, sessionNumber, seasonTransition, sessionNumber, sessionNumber, sessionNumber)
+🌐 Lihat klasemen & stats: https://lapor-bot.web.id/
+
+*Semangat Season %d!* 🚀🔥`, sessionNumber, sessionNumber, sessionNumber, sessionNumber)
 }
 
 // SeasonAnnouncement returns the standard "new season has begun" announcement
