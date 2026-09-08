@@ -15,7 +15,7 @@ COPY frontend/apps/ ./apps/
 RUN npm run build --workspace=@lapor-bot/web
 
 # Stage 2: Build Go Backend
-FROM golang:1.25-alpine AS backend-builder
+FROM golang:1.26-alpine AS backend-builder
 WORKDIR /app
 RUN apk add --no-cache git
 COPY go.mod go.sum ./
